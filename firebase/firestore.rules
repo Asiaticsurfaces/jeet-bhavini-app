@@ -3,10 +3,15 @@ rules_version = '2';
 //
 // Guests: signed in anonymously; they unlock their pass with their phone number.
 // Staff: sign in to the family panel with Google. Each has a doc in /admins
-// (keyed by email) with a role:
-//   owner  – everything, including the guest list import and managing people
-//   family – sees every status, updates help/lost/pickups/duties/photos
-//   event  – event team: posts live updates and the "Happening now" banner
+// (keyed by email). role 'owner' can do everything (incl. guest import and
+// managing people). Everyone else has tick-box permissions in `perms`:
+//   live    – post live updates and the "Happening now" banner
+//   help    – see and resolve help requests
+//   lost    – lost & found
+//   pickups – arrivals and driver assignment
+//   guests  – guest list, RSVPs, private notes (read)
+//   photos  – see all photos, hide/show, add photographer photos
+//   team    – duties (tick done), vendors, drivers, contacts
 service cloud.firestore {
   match /databases/{db}/documents {
 
@@ -20,10 +25,18 @@ service cloud.firestore {
       return myEmail() != '' && exists(staffPath())
         ? get(staffPath()).data.get('role', 'family') : 'none';
     }
-    function isOwner()  { return role() == 'owner'; }
-    function isFamily() { return role() in ['owner', 'family']; }           // see & update statuses
-    function canAlert() { return role() in ['owner', 'event']; }            // post live updates
-    function isStaff()  { return role() in ['owner', 'family', 'event']; }  // any panel access
+    function isOwner() { return role() == 'owner'; }
+    function isStaff() { return role() != 'none'; }
+    // Older entries without `perms` fall back to their preset.
+    function preset(r) {
+      return r == 'event' ? {'live': true}
+        : r == 'family' ? {'help': true, 'lost': true, 'pickups': true, 'guests': true, 'photos': true, 'team': true}
+        : {};
+    }
+    function can(p) {
+      return isOwner() || (isStaff()
+        && get(staffPath()).data.get('perms', preset(role())).get(p, false) == true);
+    }
     function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
     function creatingMine() { return signedIn() && request.resource.data.uid == request.auth.uid; }
 
@@ -44,46 +57,46 @@ service cloud.firestore {
     // they know the number, but nobody outside the family can list it.
     match /guests/{phone} {
       allow get: if signedIn();
-      allow list: if isFamily();
+      allow list: if can('guests');
       allow write: if isOwner();
     }
     match /guestNotes/{phone} {
-      allow read: if isFamily();
+      allow read: if can('guests');
       allow write: if isOwner();
     }
 
     // Live updates and banner: everyone reads; owner and event team write.
-    match /posts/{id} { allow read: if signedIn(); allow write: if canAlert(); }
+    match /posts/{id} { allow read: if signedIn(); allow write: if can('live'); }
     match /config/{id} {
       allow read: if signedIn();
-      allow write: if isOwner() || (id == 'now' && canAlert());
+      allow write: if isOwner() || (id == 'now' && can('live'));
     }
-    match /found/{id} { allow read: if signedIn(); allow write: if isFamily(); }
+    match /found/{id} { allow read: if signedIn(); allow write: if can('lost'); }
 
     // Things a guest sends: they see their own; family sees and updates all.
     match /tickets/{id} {
       allow create: if creatingMine();
-      allow read: if mine() || isFamily();
-      allow update: if isFamily();
+      allow read: if mine() || can('help');
+      allow update: if can('help');
       allow delete: if isOwner();
     }
     match /lost/{id} {
       allow create: if creatingMine();
-      allow read: if mine() || isFamily();
-      allow update: if isFamily();
+      allow read: if mine() || can('lost');
+      allow update: if can('lost');
       allow delete: if isOwner();
     }
     // Arrival details, one per guest device; family assigns the driver.
     match /arrivals/{uid} {
-      allow read: if (signedIn() && request.auth.uid == uid) || isFamily();
+      allow read: if (signedIn() && request.auth.uid == uid) || can('pickups');
       allow create: if (signedIn() && request.auth.uid == uid
-                         && !request.resource.data.keys().hasAny(['driver'])) || isFamily();
+                         && !request.resource.data.keys().hasAny(['driver'])) || can('pickups');
       allow update: if (signedIn() && request.auth.uid == uid
-                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver'])) || isFamily();
+                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver'])) || can('pickups');
       allow delete: if isOwner();
     }
     match /rsvps/{uid} {
-      allow read: if (signedIn() && request.auth.uid == uid) || isFamily();
+      allow read: if (signedIn() && request.auth.uid == uid) || can('guests');
       allow write: if signedIn() && request.auth.uid == uid;
     }
     match /pushTokens/{uid} {
@@ -95,7 +108,7 @@ service cloud.firestore {
     match /wishes/{id} {
       allow read: if signedIn();
       allow create: if creatingMine() && request.resource.data.text.size() <= 500;
-      allow update: if isFamily();
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
     match /songs/{id} {
@@ -105,27 +118,27 @@ service cloud.firestore {
       allow update: if signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
         && request.resource.data.votes == resource.data.votes + 1;
-      allow delete: if isFamily();
+      allow delete: if isOwner();
     }
 
     // Wedding camera. Everyone sees photos family hasn't hidden; the app
     // keeps guest shots blurred until they "develop" (revealAt, 9 AM next day).
     match /photos/{id} {
       allow create: if creatingMine() && request.resource.data.hidden == false;
-      allow read: if mine() || isFamily()
+      allow read: if mine() || can('photos')
         || (signedIn() && resource.data.hidden == false);
-      allow update: if isFamily();
+      allow update: if can('photos');
       allow delete: if isOwner();
     }
 
-    // Planning. Family sees all and ticks duties done; owner edits (via import).
+    // Planning. Team permission sees all and ticks duties done; owner edits (via import).
     match /duties/{id} {
-      allow read: if isFamily();
-      allow update: if isFamily()
+      allow read: if can('team');
+      allow update: if can('team')
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done']);
       allow create, delete: if isOwner();
     }
-    match /vendors/{id} { allow read: if isFamily(); allow write: if isOwner(); }
-    match /drivers/{id} { allow read: if isFamily(); allow write: if isOwner(); }
+    match /vendors/{id} { allow read: if can('team'); allow write: if isOwner(); }
+    match /drivers/{id} { allow read: if can('team') || can('pickups'); allow write: if isOwner(); }
   }
 }

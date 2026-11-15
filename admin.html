@@ -52,6 +52,12 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 .center{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
 .center img{width:120px}
 .err{color:var(--red);font-size:14px}
+.permgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:560px){.permgrid{grid-template-columns:1fr}}
+.permgrid label{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;font-size:14px}
+.permgrid label input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--plum)}
+.permgrid label small{display:block;color:var(--muted);font-size:12px}
+.pchips{display:flex;flex-wrap:wrap;gap:4px}
 </style>
 </head>
 <body>
@@ -154,15 +160,13 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <div class="card" id="peopleCard">
         <h3>People &amp; access</h3>
         <p class="muted small">Who can open this panel, and what they can do. They sign in with this Google (Gmail) account.</p>
-        <div class="tablewrap"><table><thead><tr><th>Can…</th><th>Owner</th><th>Family</th><th>Event team</th></tr></thead><tbody>
-          <tr><td>Post live updates &amp; "Happening now"</td><td>✓</td><td>—</td><td>✓</td></tr>
-          <tr><td>See help requests, lost &amp; found, pickups, guests, RSVPs</td><td>✓</td><td>✓</td><td>—</td></tr>
-          <tr><td>Resolve help, mark found, assign drivers, tick duties, hide photos</td><td>✓</td><td>✓</td><td>—</td></tr>
-          <tr><td>Import the guest list, manage people</td><td>✓</td><td>—</td><td>—</td></tr>
-        </tbody></table></div>
-        <div class="row"><input id="adminEmail" type="email" placeholder="name@gmail.com" style="flex:2;min-width:180px">
-          <select id="adminRole" style="flex:1;min-width:130px"><option value="family">Family</option><option value="event">Event team</option><option value="owner">Owner</option></select>
-          <button class="btn" id="adminAdd">Add</button></div>
+        <div class="stack" style="border:1px dashed var(--line);border-radius:14px;padding:12px">
+          <b>Add a person</b>
+          <input id="adminEmail" type="email" placeholder="name@gmail.com">
+          <div class="row"><span class="small muted">Quick pick:</span><div class="row" id="presetBtns"></div></div>
+          <div class="permgrid" id="newPerms"></div>
+          <button class="btn" id="adminAdd" style="align-self:flex-start">Add person</button>
+        </div>
         <div class="stack" id="adminList"></div>
       </div>
     </section>
@@ -198,14 +202,27 @@ async function start() {
   $('#signIn').onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch(e => { if (e.code !== 'auth/popup-closed-by-user') fail(e); });
   $('#signOut').onclick = () => A.signOut(auth).then(() => location.reload());
 
-  const ROLE_NAME = { owner: 'Owner', family: 'Family', event: 'Event team' };
+  const ROLE_NAME = { owner: 'Owner', family: 'Family', event: 'Event team', custom: 'Custom' };
+  // Tick-box permissions (the security rules check the same keys).
+  const PERMS = [
+    ['live', 'Live updates', 'Post updates and the "Happening now" banner'],
+    ['help', 'Help requests', 'See and resolve guests\' help requests'],
+    ['lost', 'Lost & found', 'See reports, mark found, add found items'],
+    ['pickups', 'Pickups', 'See arrivals and assign drivers'],
+    ['guests', 'Guest list', 'See guests, rooms, RSVPs and headcounts'],
+    ['photos', 'Photos', 'See all photos, hide them, add photographer photos'],
+    ['team', 'Team', 'Duties (tick done), vendors, drivers, contacts'],
+  ];
+  const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team'], event: ['live'] };
+  const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
+    : (d.perms || Object.fromEntries((PRESETS[d.role] || []).map(k => [k, true])));
   A.onAuthStateChanged(auth, async u => {
     if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
     $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true;
-    let role = 'owner';
+    let role = 'owner', perms = permsOf({ role: 'owner' });
     try {
       const a = await getDoc(doc(db, 'admins', u.email));
-      if (a.exists()) role = a.data().role || 'family';
+      if (a.exists()) { role = a.data().role || 'custom'; perms = permsOf(a.data()); }
       else {
         // First-ever sign-in claims the panel (allowed only until config/adminsLocked exists).
         await setDoc(doc(db, 'admins', u.email), { email: u.email, role: 'owner', addedAt: serverTimestamp() });
@@ -218,16 +235,20 @@ async function start() {
       $('#signIn').hidden = false; $('#signIn').textContent = 'Use a different account'; return;
     }
     $('#gate').hidden = true; $('#panel').hidden = false;
-    $('#whoami').textContent = `${u.email} · ${ROLE_NAME[role] || role}`;
-    run(u, role);
+    $('#whoami').textContent = `${u.email} · ${role === 'owner' ? 'Owner' : PERMS.filter(([k]) => perms[k]).map(([, n]) => n).join(', ') || 'No access yet'}`;
+    run(u, role, perms);
   });
 
-  function run(u, role) {
+  function run(u, role, perms) {
     // What this person may do (the security rules enforce the same).
-    const can = { live: role === 'owner' || role === 'event', fam: role === 'owner' || role === 'family', owner: role === 'owner' };
+    const can = { ...perms, owner: role === 'owner', drivers: !!(perms.pickups || perms.team) };
+    // Subscribe only to data this person is allowed to read.
+    const sub = (perm, ref, fn) => { if (can[perm]) onSnapshot(ref, fn, e => console.warn(perm, e.code)); };
     // ---------- tabs ----------
     const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']]
-      .filter(([k]) => k === 'live' ? can.live : can.fam);
+      .filter(([k]) => can[k]);
+    if (!TABS.length) { $('#tabs').innerHTML = ''; $$('[data-sec]').forEach(x => x.hidden = true);
+      $('#panel').insertAdjacentHTML('beforeend', '<p class="muted">You don\'t have any permissions yet. Ask Jeet to tick what you need.</p>'); return; }
     let cur = location.hash.slice(1);
     if (!TABS.some(([k]) => k === cur)) cur = TABS[0][0];
     $('#importCard').hidden = !can.owner; $('#peopleCard').hidden = !can.owner;
@@ -261,9 +282,8 @@ async function start() {
 
     }
 
-    if (!can.fam) return;
     // ---------- help ----------
-    onSnapshot(collection(db, 'tickets'), s => {
+    sub('help', collection(db, 'tickets'), s => {
       const order = { open: 0, working: 1, done: 2 };
       const T = list(s).sort((a, b) => (order[a.status] ?? 0) - (order[b.status] ?? 0) || byNew(a, b));
       badges.help = T.filter(t => t.status === 'open').length || 0; tabs();
@@ -278,7 +298,7 @@ async function start() {
     });
 
     // ---------- lost & found ----------
-    onSnapshot(collection(db, 'lost'), s => {
+    sub('lost', collection(db, 'lost'), s => {
       const L = list(s).sort((a, b) => (a.status === 'found') - (b.status === 'found') || byNew(a, b));
       badges.lost = L.filter(l => l.status !== 'found').length || 0; tabs();
       $('#lostList').innerHTML = L.length ? L.map(l => `<div class="item ${l.status === 'found' ? 'done' : ''}"><b>${esc(l.item)}</b><p class="small">Last seen: ${esc(l.where || 'not sure')}</p>
@@ -288,7 +308,7 @@ async function start() {
     });
     $('#foundAdd').onclick = () => { const item = $('#foundItem').value.trim(); if (!item) return toast('What was found?');
       addDoc(collection(db, 'found'), { item, where: $('#foundWhere').value.trim(), createdAt: serverTimestamp() }).then(() => { $('#foundItem').value = ''; $('#foundWhere').value = ''; toast('Added'); }).catch(fail); };
-    onSnapshot(collection(db, 'found'), s => {
+    sub('lost', collection(db, 'found'), s => {
       const L = list(s).sort(byNew);
       $('#foundList').innerHTML = L.length ? L.map(f => `<div class="item"><div class="row between"><b>${esc(f.item)}</b><button class="btn danger sm" data-fdel="${f.id}">Returned</button></div><p class="small muted">${esc(f.where || '')}</p></div>`).join('') : '<p class="muted">Nothing found yet.</p>';
       $$('[data-fdel]').forEach(b => b.onclick = () => deleteDoc(doc(db, 'found', b.dataset.fdel)).catch(fail));
@@ -297,8 +317,8 @@ async function start() {
     // ---------- pickups ----------
     let DRIVERS = [], ARR = [];
     const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec' })[d] || d;
-    onSnapshot(collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
-    onSnapshot(collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
+    sub('drivers', collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
+    sub('pickups', collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
     function renderArr() {
       const A2 = [...ARR].sort((a, b) => (+((a.day === '30') ? 0 : a.day) - +((b.day === '30') ? 0 : b.day)) || String(a.time).localeCompare(String(b.time)));
       const ppl = A2.reduce((n, a) => n + (+a.people || 1), 0), pk = A2.filter(a => a.pickup && a.mode !== 'Car'), un = pk.filter(a => !a.driver?.n);
@@ -323,8 +343,8 @@ async function start() {
 
     // ---------- guests ----------
     let GUESTS = [], RSVP = [];
-    onSnapshot(collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); });
-    onSnapshot(collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
+    sub('guests', collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); });
+    sub('guests', collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
     $('#guestQ').oninput = () => renderGuests();
     const EVK = [['mameru', 'Mameru'], ['sangeet', 'Sangeet'], ['mandap', 'Mandap Ropan'], ['wedding', 'Wedding']];
     function renderGuests() {
@@ -391,7 +411,7 @@ async function start() {
 
     // ---------- photos ----------
     let PH = [];
-    onSnapshot(collection(db, 'photos'), s => { PH = list(s).sort(byNew); renderPhotos(); });
+    sub('photos', collection(db, 'photos'), s => { PH = list(s).sort(byNew); renderPhotos(); });
     $('#phFilter').onchange = renderPhotos;
     function renderPhotos() {
       const f = $('#phFilter').value;
@@ -423,27 +443,50 @@ async function start() {
 
     // ---------- team ----------
     let DUT = [], VEN = [], CON = [];
-    onSnapshot(collection(db, 'duties'), s => { DUT = list(s); renderTeam(); });
-    onSnapshot(collection(db, 'vendors'), s => { VEN = list(s); renderTeam(); });
-    onSnapshot(doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
+    sub('team', collection(db, 'duties'), s => { DUT = list(s); renderTeam(); });
+    sub('team', collection(db, 'vendors'), s => { VEN = list(s); renderTeam(); });
+    sub('team', doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
     if (can.owner) {
-      const order = { owner: 0, family: 1, event: 2 };
-      onSnapshot(collection(db, 'admins'), s => {
-        const L = list(s).sort((a, b) => (order[a.role] ?? 1) - (order[b.role] ?? 1) || a.id.localeCompare(b.id));
-        $('#adminList').innerHTML = L.map(a => a.id === u.email
-          ? `<div class="item"><div class="row between"><b>${esc(a.id)}</b><span class="chip plum">You · ${ROLE_NAME[a.role] || a.role}</span></div></div>`
-          : `<div class="item"><div class="row between"><b style="word-break:break-all">${esc(a.id)}</b><div class="row">
-              <select data-arole="${esc(a.id)}" style="width:auto">${Object.entries(ROLE_NAME).map(([k, n]) => `<option value="${k}" ${a.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
-              <button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button></div></div></div>`).join('');
-        $$('[data-arole]').forEach(sel => sel.onchange = () => updateDoc(doc(db, 'admins', sel.dataset.arole), { role: sel.value }).then(() => toast(`Now ${ROLE_NAME[sel.value]}`)).catch(fail));
-        $$('[data-adel]').forEach(b => b.onclick = () => confirm(`Remove ${b.dataset.adel}? They won't be able to open the panel.`) && deleteDoc(doc(db, 'admins', b.dataset.adel)).catch(fail));
-      });
-      $('#adminAdd').onclick = () => {
-        const e = $('#adminEmail').value.trim().toLowerCase(), r = $('#adminRole').value;
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
-        setDoc(doc(db, 'admins', e), { email: e, role: r, addedBy: u.email, addedAt: serverTimestamp() })
-          .then(() => { $('#adminEmail').value = ''; toast(`Added as ${ROLE_NAME[r]}. They can sign in now`); }).catch(fail);
+      const grid = (id, p) => PERMS.map(([k, n, d]) => `<label><input type="checkbox" data-p="${k}" data-g="${id}" ${p[k] ? 'checked' : ''}><span>${n}<small>${d}</small></span></label>`).join('');
+      const read = id => Object.fromEntries($$(`[data-g="${id}"]`).filter(c => c.checked).map(c => [c.dataset.p, true]));
+      const presetOf = p => Object.entries(PRESETS).find(([, ks]) => ks.length === Object.keys(p).length && ks.every(k => p[k]))?.[0] || 'custom';
+      // ---- add a person ----
+      let picked = 'family';
+      const drawNew = p => {
+        $('#newPerms').innerHTML = grid('new', p);
+        $('#presetBtns').innerHTML = ['family', 'event'].map(k => `<button class="btn ${presetOf(p) === k ? '' : 'ghost'} sm" data-preset="${k}">${ROLE_NAME[k]}</button>`).join('');
+        $$('#presetBtns [data-preset]').forEach(b => b.onclick = () => drawNew(Object.fromEntries(PRESETS[b.dataset.preset].map(k => [k, true]))));
+        $$('[data-g="new"]').forEach(c => c.onchange = () => drawNew(read('new')));
       };
+      drawNew(Object.fromEntries(PRESETS.family.map(k => [k, true])));
+      $('#adminAdd').onclick = () => {
+        const e = $('#adminEmail').value.trim().toLowerCase(), p = read('new');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
+        if (!Object.keys(p).length) return toast('Tick at least one permission');
+        setDoc(doc(db, 'admins', e), { email: e, role: presetOf(p), perms: p, addedBy: u.email, addedAt: serverTimestamp() })
+          .then(() => { $('#adminEmail').value = ''; toast('Added. They can sign in now'); }).catch(fail);
+      };
+      // ---- people list ----
+      let editing = null, PEOPLE = [];
+      const drawPeople = () => {
+        const L = [...PEOPLE].sort((a, b) => (b.role === 'owner') - (a.role === 'owner') || a.id.localeCompare(b.id));
+        $('#adminList').innerHTML = L.map(a => {
+          const p = permsOf(a);
+          if (a.role === 'owner') return `<div class="item"><div class="row between"><b style="word-break:break-all">${esc(a.id)}</b><span class="chip plum">${a.id === u.email ? 'You · ' : ''}Owner · everything</span></div></div>`;
+          const chips = PERMS.filter(([k]) => p[k]).map(([, n]) => `<span class="chip">${n}</span>`).join('') || '<span class="chip red">No access</span>';
+          return `<div class="item"><div class="row between"><b style="word-break:break-all">${esc(a.id)}</b>
+              <div class="row"><button class="btn ghost sm" data-aedit="${esc(a.id)}">${editing === a.id ? 'Close' : 'Edit'}</button><button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button></div></div>
+            <div class="pchips">${chips}</div>
+            ${editing === a.id ? `<div class="permgrid">${grid('e', p)}</div><div class="row"><button class="btn sm" data-asave="${esc(a.id)}">Save permissions</button><button class="btn ghost sm" data-aowner="${esc(a.id)}">Make owner</button></div>` : ''}</div>`;
+        }).join('');
+        $$('[data-aedit]').forEach(b => b.onclick = () => { editing = editing === b.dataset.aedit ? null : b.dataset.aedit; drawPeople(); });
+        $$('[data-asave]').forEach(b => b.onclick = () => { const p = read('e');
+          updateDoc(doc(db, 'admins', b.dataset.asave), { perms: p, role: presetOf(p) }).then(() => { editing = null; toast('Permissions saved'); }).catch(fail); });
+        $$('[data-aowner]').forEach(b => b.onclick = () => confirm(`Make ${b.dataset.aowner} an owner? Owners can do everything, including removing people.`)
+          && updateDoc(doc(db, 'admins', b.dataset.aowner), { role: 'owner' }).then(() => { editing = null; toast('Now an owner'); }).catch(fail));
+        $$('[data-adel]').forEach(b => b.onclick = () => confirm(`Remove ${b.dataset.adel}? They won't be able to open the panel.`) && deleteDoc(doc(db, 'admins', b.dataset.adel)).catch(fail));
+      };
+      onSnapshot(collection(db, 'admins'), s => { PEOPLE = list(s); drawPeople(); });
     }
     const tel = p => p ? `<a class="btn ghost sm" href="tel:+91${esc(p)}">Call</a>` : '';
     function renderTeam() {
