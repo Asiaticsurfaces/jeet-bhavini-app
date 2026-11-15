@@ -122,7 +122,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 
     <!-- GUESTS -->
     <section data-sec="guests" class="stack" hidden>
-      <div class="card">
+      <div class="card" id="importCard">
         <h3>Import the guest list</h3>
         <p class="muted small">Choose the filled-in <b>Wedding guest list.xlsx</b>. It updates guests, volunteers, vendors, help contacts and drivers. You can import again any time after changes.</p>
         <input type="file" id="xlsx" accept=".xlsx,.xls">
@@ -151,10 +151,18 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <h3>Vendors</h3><div class="stack" id="vendorList"></div>
       <h3>Drivers</h3><div class="stack" id="driverList"></div>
       <h3>Help contacts (shown to guests)</h3><div class="stack" id="contactList"></div>
-      <div class="card">
-        <h3>Family admins</h3>
-        <p class="muted small">People who can open this panel. They sign in with this Gmail address.</p>
-        <div class="row"><input id="adminEmail" type="email" placeholder="family.member@gmail.com" style="flex:1"><button class="btn" id="adminAdd">Add</button></div>
+      <div class="card" id="peopleCard">
+        <h3>People &amp; access</h3>
+        <p class="muted small">Who can open this panel, and what they can do. They sign in with this Google (Gmail) account.</p>
+        <div class="tablewrap"><table><thead><tr><th>Can…</th><th>Owner</th><th>Family</th><th>Event team</th></tr></thead><tbody>
+          <tr><td>Post live updates &amp; "Happening now"</td><td>✓</td><td>—</td><td>✓</td></tr>
+          <tr><td>See help requests, lost &amp; found, pickups, guests, RSVPs</td><td>✓</td><td>✓</td><td>—</td></tr>
+          <tr><td>Resolve help, mark found, assign drivers, tick duties, hide photos</td><td>✓</td><td>✓</td><td>—</td></tr>
+          <tr><td>Import the guest list, manage people</td><td>✓</td><td>—</td><td>—</td></tr>
+        </tbody></table></div>
+        <div class="row"><input id="adminEmail" type="email" placeholder="name@gmail.com" style="flex:2;min-width:180px">
+          <select id="adminRole" style="flex:1;min-width:130px"><option value="family">Family</option><option value="event">Event team</option><option value="owner">Owner</option></select>
+          <button class="btn" id="adminAdd">Add</button></div>
         <div class="stack" id="adminList"></div>
       </div>
     </section>
@@ -190,12 +198,15 @@ async function start() {
   $('#signIn').onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch(e => { if (e.code !== 'auth/popup-closed-by-user') fail(e); });
   $('#signOut').onclick = () => A.signOut(auth).then(() => location.reload());
 
+  const ROLE_NAME = { owner: 'Owner', family: 'Family', event: 'Event team' };
   A.onAuthStateChanged(auth, async u => {
     if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
     $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true;
+    let role = 'owner';
     try {
       const a = await getDoc(doc(db, 'admins', u.email));
-      if (!a.exists()) {
+      if (a.exists()) role = a.data().role || 'family';
+      else {
         // First-ever sign-in claims the panel (allowed only until config/adminsLocked exists).
         await setDoc(doc(db, 'admins', u.email), { email: u.email, role: 'owner', addedAt: serverTimestamp() });
         await setDoc(doc(db, 'config', 'adminsLocked'), { by: u.email, at: serverTimestamp() });
@@ -203,17 +214,23 @@ async function start() {
       }
     }
     catch (e) {
-      $('#gateMsg').innerHTML = `<b>${esc(u.email)}</b> isn't on the family list yet. Ask Jeet to add this email in Firebase → Firestore → <code>admins</code>.`;
+      $('#gateMsg').innerHTML = `<b>${esc(u.email)}</b> doesn't have access yet. Ask Jeet to add this email in the family panel → Team → People &amp; access.`;
       $('#signIn').hidden = false; $('#signIn').textContent = 'Use a different account'; return;
     }
-    $('#gate').hidden = true; $('#panel').hidden = false; $('#whoami').textContent = u.email;
-    run(u);
+    $('#gate').hidden = true; $('#panel').hidden = false;
+    $('#whoami').textContent = `${u.email} · ${ROLE_NAME[role] || role}`;
+    run(u, role);
   });
 
-  function run(u) {
+  function run(u, role) {
+    // What this person may do (the security rules enforce the same).
+    const can = { live: role === 'owner' || role === 'event', fam: role === 'owner' || role === 'family', owner: role === 'owner' };
     // ---------- tabs ----------
-    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']];
-    let cur = location.hash.slice(1) || 'live';
+    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']]
+      .filter(([k]) => k === 'live' ? can.live : can.fam);
+    let cur = location.hash.slice(1);
+    if (!TABS.some(([k]) => k === cur)) cur = TABS[0][0];
+    $('#importCard').hidden = !can.owner; $('#peopleCard').hidden = !can.owner;
     const badges = {};
     function tabs() {
       $('#tabs').innerHTML = TABS.map(([k, n]) => `<button data-k="${k}" aria-pressed="${k === cur}">${n}${badges[k] ? `<span class="badge">${badges[k]}</span>` : ''}</button>`).join('');
@@ -222,7 +239,8 @@ async function start() {
     }
     tabs();
 
-    // ---------- live ----------
+    // ---------- live (owner, event team) ----------
+    if (can.live) {
     onSnapshot(doc(db, 'config', 'now'), s => {
       const n = s.exists() ? s.data() : {};
       $('#nowState').innerHTML = n.on && n.text ? `<span class="chip sage">Showing now</span> ${esc(n.text)}` : '<span class="chip">Banner is hidden</span>';
@@ -241,6 +259,9 @@ async function start() {
       $$('#postList [data-del]').forEach(b => b.onclick = () => confirm('Delete this update for everyone?') && deleteDoc(doc(db, 'posts', b.dataset.del)).catch(fail));
     });
 
+    }
+
+    if (!can.fam) return;
     // ---------- help ----------
     onSnapshot(collection(db, 'tickets'), s => {
       const order = { open: 0, working: 1, done: 2 };
@@ -405,16 +426,25 @@ async function start() {
     onSnapshot(collection(db, 'duties'), s => { DUT = list(s); renderTeam(); });
     onSnapshot(collection(db, 'vendors'), s => { VEN = list(s); renderTeam(); });
     onSnapshot(doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
-    onSnapshot(collection(db, 'admins'), s => {
-      const L = list(s).sort((a, b) => (b.role === 'owner') - (a.role === 'owner') || a.id.localeCompare(b.id));
-      $('#adminList').innerHTML = L.map(a => `<div class="item"><div class="row between"><div><b>${esc(a.id)}</b>${a.role === 'owner' ? ' <span class="chip plum">Owner</span>' : ''}</div>${a.id !== u.email && a.role !== 'owner' ? `<button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button>` : ''}</div></div>`).join('');
-      $$('[data-adel]').forEach(b => b.onclick = () => confirm(`Remove ${b.dataset.adel} from the family panel?`) && deleteDoc(doc(db, 'admins', b.dataset.adel)).catch(fail));
-    });
-    $('#adminAdd').onclick = () => {
-      const e = $('#adminEmail').value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
-      setDoc(doc(db, 'admins', e), { email: e, role: 'family', addedBy: u.email, addedAt: serverTimestamp() }).then(() => { $('#adminEmail').value = ''; toast('Added. They can sign in now'); }).catch(fail);
-    };
+    if (can.owner) {
+      const order = { owner: 0, family: 1, event: 2 };
+      onSnapshot(collection(db, 'admins'), s => {
+        const L = list(s).sort((a, b) => (order[a.role] ?? 1) - (order[b.role] ?? 1) || a.id.localeCompare(b.id));
+        $('#adminList').innerHTML = L.map(a => a.id === u.email
+          ? `<div class="item"><div class="row between"><b>${esc(a.id)}</b><span class="chip plum">You · ${ROLE_NAME[a.role] || a.role}</span></div></div>`
+          : `<div class="item"><div class="row between"><b style="word-break:break-all">${esc(a.id)}</b><div class="row">
+              <select data-arole="${esc(a.id)}" style="width:auto">${Object.entries(ROLE_NAME).map(([k, n]) => `<option value="${k}" ${a.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+              <button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button></div></div></div>`).join('');
+        $$('[data-arole]').forEach(sel => sel.onchange = () => updateDoc(doc(db, 'admins', sel.dataset.arole), { role: sel.value }).then(() => toast(`Now ${ROLE_NAME[sel.value]}`)).catch(fail));
+        $$('[data-adel]').forEach(b => b.onclick = () => confirm(`Remove ${b.dataset.adel}? They won't be able to open the panel.`) && deleteDoc(doc(db, 'admins', b.dataset.adel)).catch(fail));
+      });
+      $('#adminAdd').onclick = () => {
+        const e = $('#adminEmail').value.trim().toLowerCase(), r = $('#adminRole').value;
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
+        setDoc(doc(db, 'admins', e), { email: e, role: r, addedBy: u.email, addedAt: serverTimestamp() })
+          .then(() => { $('#adminEmail').value = ''; toast(`Added as ${ROLE_NAME[r]}. They can sign in now`); }).catch(fail);
+      };
+    }
     const tel = p => p ? `<a class="btn ghost sm" href="tel:+91${esc(p)}">Call</a>` : '';
     function renderTeam() {
       const done = DUT.filter(d => d.done).length;
