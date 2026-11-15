@@ -2,3 +2,6 @@
 .vercel
 wedding-app-upload.zip
 assets/brass_elephant.png
+*.xlsx
+*.csv
+serviceAccount*.json

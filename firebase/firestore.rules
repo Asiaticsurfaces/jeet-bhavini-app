@@ -1,0 +1,100 @@
+rules_version = '2';
+// Jeet & Bhavini wedding app — who can read and write what.
+//
+// Everyone in the app is signed in: guests anonymously (they unlock their
+// pass with their phone number), family with Google. A family member is
+// anyone whose email has a doc in /admins.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(db)/documents/admins/$(request.auth.token.email));
+    }
+    function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
+    function creatingMine() { return signedIn() && request.resource.data.uid == request.auth.uid; }
+
+    // Family allowlist. Only the owner adds people here, from the console.
+    match /admins/{email} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Guest pass, keyed by 10-digit phone. A guest can fetch ONE record if
+    // they know the number, but nobody can list or search the guest list.
+    match /guests/{phone} {
+      allow get: if signedIn();
+      allow list, write: if isAdmin();
+    }
+    // Private notes (food, health, family remarks): family only.
+    match /guestNotes/{phone} {
+      allow read, write: if isAdmin();
+    }
+
+    // Live updates and the "Happening now" banner: everyone reads, family writes.
+    match /posts/{id}   { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /config/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /found/{id}   { allow read: if signedIn(); allow write: if isAdmin(); }
+
+    // Things a guest sends: they see their own, family sees all.
+    match /tickets/{id} {
+      allow create: if creatingMine();
+      allow read: if mine() || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+    match /lost/{id} {
+      allow create: if creatingMine();
+      allow read: if mine() || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+    // Arrival details, one per guest device; family assigns the driver.
+    match /arrivals/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow create, update: if (signedIn() && request.auth.uid == uid
+                                && !request.resource.data.keys().hasAny(['driver']))
+                            || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /rsvps/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+    match /pushTokens/{uid} {
+      allow write: if signedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    // Shared walls: everyone reads, anyone signed in adds, family moderates.
+    match /wishes/{id} {
+      allow read: if signedIn();
+      allow create: if creatingMine() && request.resource.data.text.size() <= 500;
+      allow update, delete: if isAdmin();
+    }
+    match /songs/{id} {
+      allow read: if signedIn();
+      allow create: if creatingMine() && request.resource.data.title.size() <= 120;
+      // Voting: only the vote count may change, by exactly +1.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+        && request.resource.data.votes == resource.data.votes + 1;
+      allow delete: if isAdmin();
+    }
+
+    // Wedding camera. A guest's shots are private until they "develop"
+    // (revealAt, 9 AM next day) and family hasn't hidden them.
+    match /photos/{id} {
+      allow create: if creatingMine();
+      allow read: if mine() || isAdmin()
+        || (signedIn() && resource.data.hidden == false
+            && request.time >= resource.data.revealAt);
+      allow update, delete: if isAdmin();
+    }
+
+    // Family-only planning.
+    match /duties/{id}  { allow read, write: if isAdmin(); }
+    match /vendors/{id} { allow read, write: if isAdmin(); }
+    match /drivers/{id} { allow read, write: if isAdmin(); }
+  }
+}

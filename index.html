@@ -167,8 +167,6 @@ input[type=text],textarea{width:100%;font:15px var(--body);padding:12px 16px;bor
 .helpcats button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px;font:500 14px var(--body);cursor:pointer;text-align:left}
 .helpcats button[aria-pressed=true]{border-color:var(--plum);background:var(--plum-soft);color:var(--plum-deep)}
 .ticket{padding:14px 16px;border-radius:16px;background:var(--sage-soft)}
-.seat-result{padding:16px;border-radius:16px;background:var(--sage-soft)}
-.seat-result b{font:600 30px var(--display);color:var(--sage)}
 .wish{padding:14px 16px;border-radius:16px;background:var(--gold-soft)}
 .wish p{font:italic 500 17px var(--display);margin-bottom:4px}
 details{border-bottom:1px solid var(--line);padding:12px 0}
@@ -355,9 +353,8 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <div id="moreHome" class="screen">
       <div><p class="eyebrow">Everything you need</p><h1 data-t="info">Guest Info</h1></div>
       <div class="tiles">
-        <button class="tile urgent" data-go="help"><b data-t="needHelp">Need help?</b><small>Cab, room, medical</small></button>
+        <button class="tile urgent" data-go="help" style="grid-column:1/-1"><b data-t="needHelp">Need help?</b><small>Cab, room, medical</small></button>
         <button class="tile" data-go="lost"><b data-t="lost">Lost &amp; found</b><small>Report or claim items</small></button>
-        <button class="tile" data-go="seat"><b data-t="seat">Find my seat</b><small>Table &amp; tablemates</small></button>
         <button class="tile" data-go="wishes"><b data-t="wishes">Blessings</b><small>Leave a message</small></button>
         <button class="tile" data-go="travel"><b data-t="arrival">My arrival</b><small>Travel &amp; pickup</small></button>
         <button class="tile" data-go="map"><b data-t="map">Venue map</b><small>Find every place</small></button>
@@ -390,13 +387,6 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <input type="text" id="lostWhere" placeholder="Where did you last have it? e.g. Sangeet lawn">
       <button class="btn" id="lostBtn">Report it</button>
       <div class="stack" id="myLost"></div>
-    </div>
-
-    <div id="m-seat" class="screen" hidden>
-      <button class="back" data-go="home">← Guest info</button>
-      <h1 data-t="seat">Find my seat</h1>
-      <input type="text" id="seatQ" placeholder="Type your name" autocomplete="off">
-      <div id="seatOut"></div>
     </div>
 
     <div id="m-wishes" class="screen" hidden>
@@ -486,7 +476,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     </div>
   </section>
 
-  <p class="demo-note" style="margin-top:24px">Preview · guest names, rooms and tables are samples</p>
+  <p class="demo-note" style="margin-top:24px">Preview · guest names and rooms are samples</p>
 </div>
 
 <nav class="bar" aria-label="Main">
@@ -511,7 +501,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <p class="dateline">1 – 2 December 2026</p>
     <div class="ornament" style="width:100%"><span>✦</span></div>
     <h2>Find your invite</h2>
-    <p class="muted">Type your name to see your room, your table and your events.</p>
+    <p class="muted">Type your name to see your room and your events.</p>
     <input type="text" id="loginQ" placeholder="Your name" autocomplete="off">
     <div class="stack" id="loginHits" style="width:100%"></div>
     <p class="demo-note">Preview guests: Riya, Kunal, Neha</p>
@@ -526,7 +516,7 @@ function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTim
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- language (key labels) ---------- */
-const GU={namaste:'નમસ્તે',untilHm:'હસ્તમેળાપ સુધી · સાંજે 5:41, 2 ડિસેમ્બર',needHelp:'મદદ જોઈએ છે?',upNext:'હવે પછી',pass:'તમારો લગ્ન પાસ',alerts:'કાર્યક્રમ સૂચનાઓ',news:'તાજા સમાચાર',arrival:'મારું આગમન',map:'સ્થળનો નકશો',schedule:'અમારા પ્રસંગો',camera:'લગ્ન કૅમેરા',findMe:'મારા ફોટા શોધો',info:'મહેમાન માહિતી',lost:'ખોવાયેલું-મળેલું',seat:'મારી બેઠક શોધો',wishes:'આશીર્વાદ',nHome:'ઘર',nEvents:'પ્રસંગો',nHelp:'મદદ',nInfo:'માહિતી'};
+const GU={namaste:'નમસ્તે',untilHm:'હસ્તમેળાપ સુધી · સાંજે 5:41, 2 ડિસેમ્બર',needHelp:'મદદ જોઈએ છે?',upNext:'હવે પછી',pass:'તમારો લગ્ન પાસ',alerts:'કાર્યક્રમ સૂચનાઓ',news:'તાજા સમાચાર',arrival:'મારું આગમન',map:'સ્થળનો નકશો',schedule:'અમારા પ્રસંગો',camera:'લગ્ન કૅમેરા',findMe:'મારા ફોટા શોધો',info:'મહેમાન માહિતી',lost:'ખોવાયેલું-મળેલું',wishes:'આશીર્વાદ',nHome:'ઘર',nEvents:'પ્રસંગો',nHelp:'મદદ',nInfo:'માહિતી'};
 const EN={};$$('[data-t]').forEach(el=>{EN[el.dataset.t]??=el.textContent});
 let lang=store.get('lang','en');
 function applyLang(){$$('[data-t]').forEach(el=>el.textContent=(lang==='gu'?GU:EN)[el.dataset.t]||EN[el.dataset.t]);
@@ -558,11 +548,10 @@ const POSTS=[
  {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
 ];
 const GUESTS=[
- {n:'Riya Shah',side:"Groom's side",room:'214',table:4,events:EVENTS.map(e=>e.id)},
- {n:'Kunal Mehta',side:"Bride's side",room:'118',table:7,events:['sangeet','mandap','wedding']},
- {n:'Neha Patel',side:"Groom's friend",room:null,table:12,events:['sangeet','wedding']},
+ {n:'Riya Shah',side:"Groom's side",room:'214',party:3,events:EVENTS.map(e=>e.id)},
+ {n:'Kunal Mehta',side:"Bride's side",room:'118',party:2,events:['sangeet','mandap','wedding']},
+ {n:'Neha Patel',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
 ];
-const SEATS=[['Riya Shah',4],['Amit Shah',4],['Kunal Mehta',7],['Pooja Mehta',7],['Neha Patel',12],['Rahul Joshi',12]];
 const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-03-beach-hands.jpg',ar:'3/4'},
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-08-boat-colour.jpg',ar:'4/5'},
@@ -608,9 +597,9 @@ function renderHome(){
   $('#upnext').innerHTML=`<div class="thumb"><img src="${nx.img}" alt=""></div>
    <div style="min-width:0;flex:1"><h3>${evName(nx)}</h3><div class="muted small">${DAYS.find(d=>d.id===nx.day).dow}, ${nx.day} Dec · ${nx.time}<br>${nx.venue}</div></div>
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
-  $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>Table</span><b>${ME.table}</b></div>
+  $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>People</span><b>${ME.party||1}</b></div>
      <div><span>Events</span><b>${ME.events.length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`
-    :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room, table and events.</p>';
+    :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
   $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
   renderAlerts();renderLive();renderNow();renderPickup();
@@ -636,7 +625,7 @@ const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec'})[d]
 const fmtT=t=>{const[h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`};
 $('#qrBtn').onclick=()=>{
   if(!ME)return;const o=$('#qrOut');if(!o.hidden){o.hidden=true;$('#qrBtn').textContent='Show check-in QR';return}
-  const data=`JB2026|${ME.n}|ROOM ${ME.room||'-'}|TABLE ${ME.table}`;let img='';
+  const data=`JB2026|${ME.n}|ROOM ${ME.room||'-'}|PEOPLE ${ME.party||1}`;let img='';
   try{const q=qrcode(0,'M');q.addData(data);q.make();img=q.createSvgTag({cellSize:5,margin:2,scalable:true})}catch(e){img='<p class="muted small" style="line-height:1.4;width:200px">QR loads when online</p>'}
   o.innerHTML=`<div class="qrwrap"><div class="qrbox">${img}</div><b>${esc(ME.n)}</b><p class="muted small">Show this at the hotel desk to check in${ME.room?` to room ${ME.room}`:''}. Volunteers scan it to find your details.</p></div>`;
   o.hidden=false;$('#qrBtn').textContent='Hide QR';
@@ -730,7 +719,7 @@ $('#selfie').onchange=e=>{
 };
 
 /* ---------- info ---------- */
-const subs=['help','lost','seat','wishes','travel','map','family','stay','faq','songs','contacts'];
+const subs=['help','lost','wishes','travel','map','family','stay','faq','songs','contacts'];
 function goMore(g){if(g==='family')renderFamily();if(g==='map')renderMap();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0)}
 $$('[data-go]').forEach(b=>b.onclick=()=>goMore(b.dataset.go));
 const CATS=['Cab or transport','Room issue','Medical','Food / dietary','Lost something','Something else'];
@@ -746,7 +735,7 @@ $('#helpSend').onclick=()=>{
   tickets.unshift({id:'JB-'+(101+tickets.length),cat:helpCat,text:$('#helpText').value.trim(),at:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})});
   store.set('tickets',tickets);helpCat=null;$('#helpText').value='';renderHelp();toast('Sent to the hospitality team (preview)');
 };
-const FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, table 5']];
+const FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, near the stage']];
 let lost=store.get('lost',[]);
 function renderLost(){
   $('#found').innerHTML=FOUND.map(([i,w])=>`<div class="post" style="align-items:center"><div style="flex:1;min-width:0"><b>${i}</b><span class="muted small">${w}</span></div><button class="btn ghost sm" data-claim>It's mine</button></div>`).join('');
@@ -754,14 +743,6 @@ function renderLost(){
   $('#myLost').innerHTML=lost.map(l=>`<div class="wish"><b>${esc(l.item)}</b><p class="small" style="font:400 13px var(--body)">Last seen: ${esc(l.where||'not sure')} · Searching</p></div>`).join('');
 }
 $('#lostBtn').onclick=()=>{const item=$('#lostItem').value.trim();if(!item)return toast('Tell us what you lost');lost.unshift({item,where:$('#lostWhere').value.trim()});store.set('lost',lost);$('#lostItem').value='';$('#lostWhere').value='';renderLost();toast('Reported. We\'ll alert you if it turns up')};
-$('#seatQ').oninput=e=>{
-  const q=e.target.value.trim().toLowerCase();
-  if(q.length<2){$('#seatOut').innerHTML='<p class="muted">Start typing your first or last name.</p>';return}
-  const hits=SEATS.filter(s=>s[0].toLowerCase().includes(q));
-  $('#seatOut').innerHTML=hits.length?hits.map(([n,t])=>{const mates=SEATS.filter(s=>s[1]===t&&s[0]!==n).map(s=>s[0]).join(', ');
-    return `<div class="seat-result" style="margin-bottom:10px"><p class="eyebrow">${esc(n)}</p><b>Table ${t}</b><p>Sitting with: ${mates||'new friends!'}</p></div>`}).join('')
-    :'<p class="muted">No match. Tap Need help and the team will sort it out.</p>';
-};
 let wishes=store.get('wishes',[]);
 function renderWishes(){$('#wishes').innerHTML=wishes.length?wishes.map(x=>`<div class="wish"><p>“${esc(x.w)}”</p><b class="small">— ${esc(x.n)}</b></div>`).join(''):'<p class="muted">Be the first to bless Jeet & Bhavini.</p>'}
 $('#wishBtn').onclick=()=>{const w=$('#wishText').value.trim();if(!w)return toast('Write a blessing first');wishes.unshift({n:$('#wishName').value.trim()||'A guest',w});store.set('wishes',wishes);$('#wishText').value='';renderWishes();toast('Blessing posted')};
@@ -856,7 +837,6 @@ $('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
 
 function renderAll(){
   renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
-  $('#seatQ').value=ME?ME.n.split(' ')[0]:'';$('#seatQ').dispatchEvent(new Event('input'));
 }
 renderAll();applyLang();
 if(!ME&&!store.get('skipLogin',false))openLogin();
