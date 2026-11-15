@@ -590,6 +590,8 @@ async function start() {
     // The Rooms tab needs the guest list too.
     if (can.guests || can.rooms) onSnapshot(collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); onGuests(); }, e => console.warn('guests', e.code));
     sub('guests', collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
+    let LINKS = [];
+    sub('guests', collection(db, 'phoneLinks'), s => { LINKS = list(s); renderGuests(); });
     $('#guestQ').oninput = () => renderGuests();
     const EVK = [['mameru', 'Mameru'], ['sangeet', 'Sangeet'], ['mandap', 'Mandap Ropan'], ['wedding', 'Wedding']];
     function renderGuests() {
@@ -600,8 +602,12 @@ async function start() {
       $('#guestStats').innerHTML = `<div><b>${GUESTS.length}</b><span>Families</span></div><div><b>${people}</b><span>People invited</span></div><div><b>${GUESTS.filter(g => g.room).length}</b><span>With a room</span></div>` +
         EVK.map(([k, n]) => `<div><b>${evCount(k)}</b><span>${n} invited · ${going(k)} said going</span></div>`).join('');
       const q = $('#guestQ').value.trim().toLowerCase();
-      const rows = GUESTS.filter(g => !q || [g.name, g.id, g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
-      $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td><a href="tel:+91${esc(g.id)}">${esc(g.id)}</a></td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
+      const phonesOf = g => [...new Set([g.phone, ...LINKS.filter(l => l.guestId === g.id).map(l => l.id)].filter(Boolean))];
+      const byPhone = Object.fromEntries(LINKS.map(l => [l.id, l.guestId]));
+      RSVP.forEach(r => { const gid = r.guestId || byPhone[r.phone]; if (gid) rs[gid] = r.answers || {}; });
+      $('#guestStats').insertAdjacentHTML('beforeend', `<div><b>${GUESTS.filter(g => phonesOf(g).length).length}</b><span>Opened the app (number saved)</span></div>`);
+      const rows = GUESTS.filter(g => !q || [g.name, ...phonesOf(g), g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
+      $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td>${phonesOf(g).map(p => `<a href="tel:+91${esc(p)}">${esc(p)}</a>`).join('<br>') || '<span class="muted small">Not yet</span>'}</td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
         <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td></tr>`).join('')
         : `<tr><td colspan="7" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Import the Excel above.'}</td></tr>`;
     }
@@ -864,13 +870,16 @@ async function start() {
         const errors = [], guests = new Map(), notes = [];
         rows('Guests').forEach((r, i) => {
           const name = val(r, 'guest name'); if (!name || sample(r)) return;
-          const phone = normPhone(val(r, 'phone'));
-          if (phone.length !== 10) return errors.push(`Row ${i + 3}: ${name} — phone "${val(r, 'phone')}" isn't 10 digits`);
-          if (guests.has(phone)) return errors.push(`Row ${i + 3}: ${name} — same phone as ${guests.get(phone).name}`);
-          guests.set(phone, { name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(1, parseInt(val(r, 'no. of people', 'people')) || 1),
+          const raw = val(r, 'phone'), phone = normPhone(raw);
+          if (raw && phone.length !== 10) return errors.push(`Row ${i + 3}: ${name} — phone "${raw}" isn't 10 digits (leave it empty if you don't have it)`);
+          if (phone && [...guests.values()].some(x => x.phone === phone)) return errors.push(`Row ${i + 3}: ${name} — same phone as ${[...guests.values()].find(x => x.phone === phone).name}`);
+          // Id: the number when there is one, else the name (Riya Shah → riya-shah, riya-shah-2 …).
+          let id = phone;
+          if (!id) { const base = name.toLowerCase().replace(/[^a-z0-9\u0A80-\u0AFF]+/g, '-').replace(/^-|-$/g, '') || 'guest'; id = base; for (let k = 2; guests.has(id); k++) id = `${base}-${k}`; }
+          guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(1, parseInt(val(r, 'no. of people', 'people')) || 1),
             room: val(r, 'room'), lang: val(r, 'language') || 'EN',
             events: { mameru: yn(val(r, 'mameru')), sangeet: yn(val(r, 'sangeet')), mandap: yn(val(r, 'mandap')), wedding: yn(val(r, 'wedding')) } });
-          const n = val(r, 'notes'); if (n) notes.push([phone, n]);
+          const n = val(r, 'notes'); if (n) notes.push([id, n]);
         });
         const duties = rows('Volunteers').filter(r => val(r, 'volunteer') && !sample(r)).map(r => ({ who: val(r, 'volunteer'), phone: normPhone(val(r, 'phone')), task: val(r, 'duty'), date: val(r, 'date'), time: val(r, 'time'), place: val(r, 'place'), done: false }));
         const vendors = rows('Vendors').filter(r => val(r, 'role') && !sample(r)).map(r => ({ role: val(r, 'role'), name: val(r, 'business'), phone: normPhone(val(r, 'phone')), note: val(r, 'notes') }));
@@ -891,8 +900,13 @@ async function start() {
             const old = GUESTS.find(x => x.id === ph);
             const keep = old && STAYS.some(s => s.guestId === ph) ? { room: old.room || '', roomWhere: old.roomWhere || '', stayIn: old.stayIn || '', stayOut: old.stayOut || '' } : {};
             ops.push(b => b.set(doc(db, 'guests', ph), { ...g, ...keep, updatedAt: serverTimestamp() }));
+            // Name search index for first login (keeps numbers guests already saved).
+            const words = g.name.toLowerCase().split(/[^a-z0-9\u0A80-\u0AFF]+/).filter(w => w.length >= 2);
+            const tokens = [...new Set(words.flatMap(w => Array.from({ length: Math.min(w.length, 12) - 1 }, (_, k) => w.slice(0, k + 2))))];
+            ops.push(b => b.set(doc(db, 'guestIndex', ph), { name: g.name, side: g.side || '', people: g.people, tokens }, { merge: true }));
+            if (g.phone) ops.push(b => b.set(doc(db, 'phoneLinks', g.phone), { guestId: ph, name: g.name, at: serverTimestamp() }));
           }
-          for (const g of gone) ops.push(b => b.delete(doc(db, 'guests', g.id)));
+          for (const g of gone) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestIndex', g.id))); }
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
             if (!items.length) continue;   // empty tab in the Excel: keep what was added in the panel

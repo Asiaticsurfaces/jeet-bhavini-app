@@ -505,11 +505,19 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <p class="dateline">1 – 2 December 2026</p>
     <div class="ornament" style="width:100%"><span>✦</span></div>
     <h2>Find your invite</h2>
-    <p class="muted">Enter the mobile number the family has for you, to see your room and your events.</p>
-    <input type="tel" id="loginQ" placeholder="Your mobile number" autocomplete="tel" inputmode="numeric" maxlength="14">
-    <button class="btn" id="loginGo" style="width:100%">Open my invite</button>
+    <p class="muted">Enter your mobile number. The first time, you'll pick your name from the guest list. After that the app opens your invite by itself.</p>
+    <div id="phoneStep" class="stack" style="width:100%">
+      <input type="tel" id="loginQ" placeholder="Your mobile number" autocomplete="tel" inputmode="numeric" maxlength="14">
+      <button class="btn" id="loginGo" style="width:100%">Continue</button>
+    </div>
+    <div id="nameStep" class="stack" style="width:100%" hidden>
+      <p class="muted small" style="margin:0">First time on <b id="nameFor"></b>. Find your name on the guest list:</p>
+      <input type="text" id="nameQ" placeholder="Type your first or last name" autocomplete="name">
+      <div class="stack" id="nameHits" style="width:100%"></div>
+      <button class="linkbtn" id="nameBack">← Use a different number</button>
+    </div>
     <div class="stack" id="loginHits" style="width:100%"></div>
-    <p class="demo-note" id="loginDemo">Preview numbers: 9820012345 (Riya), 9820054321 (Kunal), 9820099999 (Neha)</p>
+    <p class="demo-note" id="loginDemo">Preview: 9820012345 opens Riya. Any other number lets you pick a name (try Neha).</p>
   </div>
 </div>
 
@@ -557,7 +565,7 @@ let POSTS=[
 const GUESTS=[
  {n:'Riya Shah',phone:'9820012345',side:"Groom's side",room:'214',party:3,events:EVENTS.map(e=>e.id)},
  {n:'Kunal Mehta',phone:'9820054321',side:"Bride's side",room:'118',party:2,events:['sangeet','mandap','wedding']},
- {n:'Neha Patel',phone:'9820099999',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
+ {n:'Neha Patel',phone:'',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
 ];
 let CONTACTS=[['Hospitality desk','','Rooms, cabs, anything at the venue'],['Jabuani family','',"Groom's side"],['Nakrani family','',"Bride's side"]];
 /* When js/cloud.js connects to Firebase it sets window.CLOUD; until then the app runs on sample data. */
@@ -847,26 +855,65 @@ $$('.ftabs button').forEach(b=>b.onclick=()=>{famTab=b.dataset.ft;renderFamily()
 
 /* ---------- guest login ---------- */
 function guestWelcome(g){ME=g;store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`);if(CLOUD_ON())CLOUD.onGuest(ME)}
+let loginPhone='',nameTimer=null,nameHits=[];
+// Step 1: mobile number. A number we know opens the pass straight away.
 async function tryLogin(){
   const ph=normPhone($('#loginQ').value);
-  if(ph.length!==10){$('#loginHits').innerHTML='<p class="muted">Enter your 10-digit mobile number.</p>';return}
+  if(ph.length!==10){$('#loginHits').innerHTML='<p class="muted">Enter your 10-digit mobile number.</p>';renderLoginFoot();return}
   $('#loginGo').disabled=true;$('#loginHits').innerHTML='<p class="muted">Looking for your invite…</p>';
   try{
     const g=CLOUD_ON()?await CLOUD.findGuest(ph):GUESTS.find(x=>x.phone===ph);
-    if(g)return guestWelcome(g);
-    $('#loginHits').innerHTML='<p class="muted">We couldn\'t find that number. Try the number the family messaged you on, or tap Need help after browsing.</p>';
-  }catch(e){$('#loginHits').innerHTML='<p class="muted">Couldn\'t connect. Check your internet and try again.</p>'}
-  finally{$('#loginGo').disabled=false;renderLoginFoot()}
+    if(g)return guestWelcome({...g,phone:ph});
+    loginPhone=ph;showNameStep();
+  }catch(e){console.error(e);$('#loginHits').innerHTML='<p class="muted">Couldn\'t connect. Check your internet and try again.</p>';renderLoginFoot()}
+  finally{$('#loginGo').disabled=false}
+}
+// Step 2 (first time only): find your name on the guest list.
+function showNameStep(){
+  $('#phoneStep').hidden=true;$('#nameStep').hidden=false;
+  $('#nameFor').textContent=`+91 ${loginPhone.slice(0,5)} ${loginPhone.slice(5)}`;
+  $('#nameQ').value='';$('#loginHits').innerHTML='';renderLoginFoot();$('#nameQ').focus();
+}
+function backToPhone(){$('#phoneStep').hidden=false;$('#nameStep').hidden=true;$('#nameHits').innerHTML='';$('#loginHits').innerHTML='';renderLoginFoot()}
+async function searchNames(){
+  const q=$('#nameQ').value.trim();
+  if(q.replace(/\s/g,'').length<2){$('#nameHits').innerHTML='<p class="muted small">Type at least 2 letters of your first or last name.</p>';return}
+  $('#nameHits').innerHTML='<p class="muted small">Searching…</p>';
+  try{
+    const words=q.toLowerCase().split(/\s+/).filter(Boolean);
+    nameHits=CLOUD_ON()?await CLOUD.searchGuests(q)
+      :GUESTS.filter(g=>words.every(w=>g.n.toLowerCase().split(/\s+/).some(t=>t.startsWith(w)))).map(g=>({id:g.n,name:g.n,side:g.side,people:g.party}));
+    if(q!==$('#nameQ').value.trim())return;
+    $('#nameHits').innerHTML=nameHits.length?nameHits.map((g,i)=>`<button class="guest-hit" data-pick="${i}"><span><b>${esc(g.name)}</b><br><small>${esc(g.side==='Bride'?"Bride's side":g.side==='Groom'?"Groom's side":g.side||'')}${g.people?` · ${g.people} ${g.people==1?'person':'people'}`:''}</small></span><span class="chip sage">That's me</span></button>`).join('')
+      :'<p class="muted">No match yet. Try only your first name or surname. Still not there? Browse without signing in and tap Need help.</p>';
+    $$('[data-pick]').forEach(b=>b.onclick=()=>confirmName(nameHits[+b.dataset.pick]));
+  }catch(e){console.error(e);$('#nameHits').innerHTML='<p class="muted">Couldn\'t search. Check your internet and try again.</p>'}
+}
+function confirmName(g){
+  $('#nameHits').innerHTML=`<div class="card stack" style="text-align:left;width:100%;box-sizing:border-box">
+    <p class="eyebrow">Is this you?</p><h3>${esc(g.name)}</h3>
+    <p class="muted small">We'll save +91 ${loginPhone} with your name, so next time the app opens your pass straight away.</p>
+    <div class="row"><button class="btn" id="pickYes" style="flex:1">Yes, that's me</button><button class="btn ghost" id="pickNo">No</button></div></div>`;
+  $('#pickNo').onclick=searchNames;
+  $('#pickYes').onclick=async()=>{
+    $('#pickYes').disabled=true;$('#pickYes').textContent='Saving…';
+    try{
+      const me=CLOUD_ON()?await CLOUD.linkPhone(g.id,loginPhone):{...GUESTS.find(x=>x.n===g.id),phone:loginPhone};
+      if(!me)throw new Error('missing');
+      guestWelcome({...me,phone:loginPhone});
+    }catch(e){console.error(e);$('#pickYes').disabled=false;$('#pickYes').textContent='Yes, that\'s me';toast('Couldn\'t save. Check your internet and try again')}
+  };
 }
 function renderLoginFoot(){
   if(!$('#skipLogin'))$('#loginHits').insertAdjacentHTML('beforeend','<button class="linkbtn" id="skipLogin">Browse without signing in</button>');
   $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
   $('#loginDemo').hidden=CLOUD_ON();
 }
-function renderLogin(){$('#loginHits').innerHTML='';renderLoginFoot()}
+function renderLogin(){backToPhone()}
 function openLogin(){$('#login').hidden=false;$('#loginQ').value='';renderLogin()}
 function closeLogin(){$('#login').hidden=true;renderAll()}
 $('#loginGo').onclick=tryLogin;$('#loginQ').onkeydown=e=>{if(e.key==='Enter')tryLogin()};
+$('#nameQ').oninput=()=>{clearTimeout(nameTimer);nameTimer=setTimeout(searchNames,300)};$('#nameBack').onclick=backToPhone;
 $('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
 
 function renderContacts(){

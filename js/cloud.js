@@ -18,8 +18,8 @@ async function start() {
   const auth = A.getAuth(app);
   const db = F.getFirestore(app);
   const st = S.getStorage(app);
-  const { doc, getDoc, setDoc, addDoc, updateDoc, collection, query, where, onSnapshot,
-          serverTimestamp, increment, Timestamp } = F;
+  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, collection, query, where, limit, onSnapshot,
+          serverTimestamp, increment, arrayUnion, Timestamp } = F;
 
   const user = await new Promise((res, rej) => {
     const off = A.onAuthStateChanged(auth, u => { if (u) { off(); res(u); } });
@@ -30,7 +30,7 @@ async function start() {
   // The app's state lives in index.html's top-level `let` variables (ME, POSTS, travel...),
   // which modules can read and assign by name; they are not window properties.
   const me = () => ME || null;
-  const who = () => ({ uid, phone: me()?.phone || '', name: me()?.n || 'Guest', room: me()?.room || '' });
+  const who = () => ({ uid, guestId: me()?.id || '', phone: me()?.phone || '', name: me()?.n || 'Guest', room: me()?.room || '' });
   const ms = t => (t && t.toMillis ? t.toMillis() : Date.now());
   const ago = t => {
     const m = Math.round((Date.now() - ms(t)) / 60000);
@@ -63,13 +63,36 @@ async function start() {
 
   const CLOUD = {
     uid,
+    // A number the guest saved before (phoneLinks), else a number from the Excel.
     async findGuest(phone) {
-      const snap = await getDoc(doc(db, 'guests', phone));
+      const link = await getDoc(doc(db, 'phoneLinks', phone));
+      const id = link.exists() ? link.data().guestId : phone;
+      return this.loadGuest(id, phone);
+    },
+    // First login: search the guest list by name (any word, from 2 letters).
+    async searchGuests(text) {
+      const words = text.toLowerCase().split(/[^a-z0-9\u0A80-\u0AFF]+/).filter(w => w.length >= 2);
+      if (!words.length) return [];
+      const key = words.reduce((a, b) => (b.length > a.length ? b : a)).slice(0, 12);
+      const s = await getDocs(query(collection(db, 'guestIndex'), where('tokens', 'array-contains', key), limit(10)));
+      return s.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(g => words.every(w => g.tokens.some(t => t.startsWith(w.slice(0, 12)))));
+    },
+    // "Yes, that's me": remember this number for that guest, then open their pass.
+    async linkPhone(id, phone) {
+      const g = await this.loadGuest(id, phone);
+      if (!g) return null;
+      await setDoc(doc(db, 'phoneLinks', phone), { guestId: id, name: g.n, at: serverTimestamp() });
+      updateDoc(doc(db, 'guestIndex', id), { phones: arrayUnion(phone) }).catch(() => {});
+      return g;
+    },
+    async loadGuest(id, phone) {
+      const snap = await getDoc(doc(db, 'guests', id));
       if (!snap.exists()) return null;
       const g = snap.data();
       const ev = g.events || {};
       return {
-        n: g.name, phone, room: g.room || null, party: g.people || 1,
+        id, n: g.name, phone, room: g.room || null, party: g.people || 1,
         roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '',
         side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
         skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to

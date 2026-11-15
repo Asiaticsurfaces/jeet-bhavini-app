@@ -55,8 +55,9 @@ service cloud.firestore {
       allow update, delete: if isOwner() && email != myEmail();
     }
 
-    // Guest pass, keyed by 10-digit phone. A guest can fetch ONE record if
-    // they know the number, but nobody outside the family can list it.
+    // Guest pass. Keyed by phone (older imports) or by a name id when the
+    // guest list has no number. A guest fetches ONE record; nobody outside
+    // the family can list them.
     match /guests/{phone} {
       allow get: if signedIn();
       allow list: if can('guests') || can('rooms');
@@ -64,6 +65,28 @@ service cloud.firestore {
       // Rooms tab writes only the room shown on the guest's pass.
       allow update: if can('rooms')
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'roomWhere', 'stayIn', 'stayOut']);
+    }
+    // Name search for first login: tokens of each name. A guest may search
+    // (10 results at most per query, so the list can't be dumped) and add
+    // their own number to `phones`; family reads all.
+    match /guestIndex/{id} {
+      allow get: if signedIn();
+      allow list: if can('guests') || can('rooms') || (signedIn() && request.query.limit <= 10);
+      allow write: if isOwner();
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phones'])
+        && request.resource.data.phones.hasAll(resource.data.get('phones', []))
+        && request.resource.data.phones.size() <= resource.data.get('phones', []).size() + 1;
+    }
+    // Which guest a mobile number belongs to, saved when a guest picks their
+    // name the first time. Lookup by exact number only.
+    match /phoneLinks/{phone} {
+      allow get: if signedIn();
+      allow list: if can('guests') || can('rooms');
+      allow create: if signedIn() && phone.matches('[0-9]{10}')
+        && request.resource.data.keys().hasOnly(['guestId', 'name', 'at'])
+        && exists(/databases/$(db)/documents/guests/$(request.resource.data.guestId));
+      allow update, delete: if isOwner() || can('guests');
     }
     match /guestNotes/{phone} {
       allow read: if can('guests');
