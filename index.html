@@ -901,7 +901,9 @@ function confirmName(g){
       const me=CLOUD_ON()?await CLOUD.linkPhone(g.id,loginPhone):{...GUESTS.find(x=>x.n===g.id),phone:loginPhone};
       if(!me)throw new Error('missing');
       guestWelcome({...me,phone:loginPhone});
-    }catch(e){console.error(e);$('#pickYes').disabled=false;$('#pickYes').textContent='Yes, that\'s me';toast('Couldn\'t save. Check your internet and try again')}
+    }catch(e){console.error(e);
+      if(e&&e.code==='permission-denied'){$('#nameHits').innerHTML=`<p class="muted">${esc(g.name)} is already registered with another number. If that's you, browse without signing in and tap <b>Need help</b>. The family can fix it.</p>`;renderLoginFoot();return}
+      $('#pickYes').disabled=false;$('#pickYes').textContent='Yes, that\'s me';toast('Couldn\'t save. Check your internet and try again')}
   };
 }
 function renderLoginFoot(){

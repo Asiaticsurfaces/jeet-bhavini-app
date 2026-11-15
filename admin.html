@@ -607,9 +607,20 @@ async function start() {
       RSVP.forEach(r => { const gid = r.guestId || byPhone[r.phone]; if (gid) rs[gid] = r.answers || {}; });
       $('#guestStats').insertAdjacentHTML('beforeend', `<div><b>${GUESTS.filter(g => phonesOf(g).length).length}</b><span>Opened the app (number saved)</span></div>`);
       const rows = GUESTS.filter(g => !q || [g.name, ...phonesOf(g), g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
-      $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td>${phonesOf(g).map(p => `<a href="tel:+91${esc(p)}">${esc(p)}</a>`).join('<br>') || '<span class="muted small">Not yet</span>'}</td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
+      $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td>${phonesOf(g).map(p => `<a href="tel:+91${esc(p)}">${esc(p)}</a>`).join('<br>') || '<span class="muted small">Not yet</span>'}${phonesOf(g).length ? `<br><button class="btn ghost sm" data-free="${esc(g.id)}" style="margin-top:4px">Free up name</button>` : ''}</td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
         <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td></tr>`).join('')
         : `<tr><td colspan="7" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Import the Excel above.'}</td></tr>`;
+      // Free a name so its rightful guest can pick it again (wrong person picked it, or a new number).
+      $$('[data-free]').forEach(b => b.onclick = async () => {
+        const g = GUESTS.find(x => x.id === b.dataset.free); if (!g) return;
+        if (!confirm(`Free up "${g.name}"? Its saved number(s) are removed, and the next person who picks this name gets it. Their phone will ask them to pick their name again.`)) return;
+        try { const bt = writeBatch(db);
+          LINKS.filter(l => l.guestId === g.id).forEach(l => bt.delete(doc(db, 'phoneLinks', l.id)));
+          if (g.phone) bt.update(doc(db, 'guests', g.id), { phone: '' });
+          bt.set(doc(db, 'guestIndex', g.id), { phones: [] }, { merge: true });
+          await bt.commit(); toast('Name freed. It can be picked again');
+        } catch (e) { fail(e); }
+      });
     }
 
     // ---------- rooms ----------
@@ -903,7 +914,7 @@ async function start() {
             // Name search index for first login (keeps numbers guests already saved).
             const words = g.name.toLowerCase().split(/[^a-z0-9\u0A80-\u0AFF]+/).filter(w => w.length >= 2);
             const tokens = [...new Set(words.flatMap(w => Array.from({ length: Math.min(w.length, 12) - 1 }, (_, k) => w.slice(0, k + 2))))];
-            ops.push(b => b.set(doc(db, 'guestIndex', ph), { name: g.name, side: g.side || '', people: g.people, tokens }, { merge: true }));
+            ops.push(b => b.set(doc(db, 'guestIndex', ph), { name: g.name, side: g.side || '', people: g.people, tokens, ...(g.phone ? { phones: [g.phone] } : {}) }, { merge: true }));
             if (g.phone) ops.push(b => b.set(doc(db, 'phoneLinks', g.phone), { guestId: ph, name: g.name, at: serverTimestamp() }));
           }
           for (const g of gone) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestIndex', g.id))); }

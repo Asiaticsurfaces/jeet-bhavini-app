@@ -67,16 +67,21 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'roomWhere', 'stayIn', 'stayOut']);
     }
     // Name search for first login: tokens of each name. A guest may search
-    // (10 results at most per query, so the list can't be dumped) and add
-    // their own number to `phones`; family reads all.
+    // (20 results at most per query, so the list can't be dumped). ONE NAME,
+    // ONE NUMBER: a guest claims a name only while it has no number
+    // (`phones` empty), in the same batch as its phoneLinks entry. Family can
+    // free a name again.
     match /guestIndex/{id} {
       allow get: if signedIn();
-      allow list: if can('guests') || can('rooms') || (signedIn() && request.query.limit <= 10);
+      allow list: if can('guests') || can('rooms') || (signedIn() && request.query.limit <= 20);
       allow write: if isOwner();
+      allow update: if can('guests')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phones']);
       allow update: if signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phones'])
-        && request.resource.data.phones.hasAll(resource.data.get('phones', []))
-        && request.resource.data.phones.size() <= resource.data.get('phones', []).size() + 1;
+        && resource.data.get('phones', []).size() == 0
+        && request.resource.data.phones.size() == 1
+        && getAfter(/databases/$(db)/documents/phoneLinks/$(request.resource.data.phones[0])).data.guestId == id;
     }
     // Which guest a mobile number belongs to, saved when a guest picks their
     // name the first time. Lookup by exact number only.
@@ -85,8 +90,9 @@ service cloud.firestore {
       allow list: if can('guests') || can('rooms');
       allow create: if signedIn() && phone.matches('[0-9]{10}')
         && request.resource.data.keys().hasOnly(['guestId', 'name', 'at'])
-        && exists(/databases/$(db)/documents/guests/$(request.resource.data.guestId));
-      allow update, delete: if isOwner() || can('guests');
+        && exists(/databases/$(db)/documents/guests/$(request.resource.data.guestId))
+        && getAfter(/databases/$(db)/documents/guestIndex/$(request.resource.data.guestId)).data.get('phones', []).hasAny([phone]);
+      allow create, update, delete: if isOwner() || can('guests');
     }
     match /guestNotes/{phone} {
       allow read: if can('guests');

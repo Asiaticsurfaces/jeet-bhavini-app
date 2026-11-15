@@ -19,7 +19,7 @@ async function start() {
   const db = F.getFirestore(app);
   const st = S.getStorage(app);
   const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, collection, query, where, limit, onSnapshot,
-          serverTimestamp, increment, arrayUnion, Timestamp } = F;
+          serverTimestamp, increment, arrayUnion, writeBatch, Timestamp } = F;
 
   const user = await new Promise((res, rej) => {
     const off = A.onAuthStateChanged(auth, u => { if (u) { off(); res(u); } });
@@ -74,16 +74,20 @@ async function start() {
       const words = text.toLowerCase().split(/[^a-z0-9\u0A80-\u0AFF]+/).filter(w => w.length >= 2);
       if (!words.length) return [];
       const key = words.reduce((a, b) => (b.length > a.length ? b : a)).slice(0, 12);
-      const s = await getDocs(query(collection(db, 'guestIndex'), where('tokens', 'array-contains', key), limit(10)));
+      const s = await getDocs(query(collection(db, 'guestIndex'), where('tokens', 'array-contains', key), limit(20)));
       return s.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(g => !(g.phones || []).length)   // a name someone already registered is not offered again
         .filter(g => words.every(w => g.tokens.some(t => t.startsWith(w.slice(0, 12)))));
     },
     // "Yes, that's me": remember this number for that guest, then open their pass.
     async linkPhone(id, phone) {
       const g = await this.loadGuest(id, phone);
       if (!g) return null;
-      await setDoc(doc(db, 'phoneLinks', phone), { guestId: id, name: g.n, at: serverTimestamp() });
-      updateDoc(doc(db, 'guestIndex', id), { phones: arrayUnion(phone) }).catch(() => {});
+      // Claim the name and save the number together; refused if someone claimed it first.
+      const b = writeBatch(db);
+      b.update(doc(db, 'guestIndex', id), { phones: [phone] });
+      b.set(doc(db, 'phoneLinks', phone), { guestId: id, name: g.n, at: serverTimestamp() });
+      await b.commit();
       return g;
     },
     async loadGuest(id, phone) {
