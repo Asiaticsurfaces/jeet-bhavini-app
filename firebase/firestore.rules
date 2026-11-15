@@ -16,10 +16,17 @@ service cloud.firestore {
     function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
     function creatingMine() { return signedIn() && request.resource.data.uid == request.auth.uid; }
 
-    // Family allowlist. Only the owner adds people here, from the console.
+    // Family allowlist. The very first family member to sign in to the
+    // family panel claims it; the panel then writes config/adminsLocked so
+    // nobody else can self-register. After that, admins add each other.
     match /admins/{email} {
-      allow read: if isAdmin();
-      allow write: if false;
+      allow read: if isAdmin()
+        || (signedIn() && request.auth.token.email == email);
+      allow create: if isAdmin()
+        || (signedIn() && request.auth.token.email == email
+            && request.auth.token.email_verified == true
+            && !exists(/databases/$(db)/documents/config/adminsLocked));
+      allow update, delete: if isAdmin();
     }
 
     // Guest pass, keyed by 10-digit phone. A guest can fetch ONE record if
