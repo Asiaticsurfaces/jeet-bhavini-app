@@ -111,6 +111,10 @@ async function start() {
     const n = s.exists() ? s.data() : null;
     NOWS = n && n.on && n.text ? [{ t: n.text, place: n.place || null }] : []; nowI = 0; refresh('now');
   });
+  onSnapshot(doc(db, 'config', 'map'), s => {
+    const L = s.exists() ? s.data().places : null;
+    if (Array.isArray(L) && L.length) { PLACES = L; refresh('map'); }
+  });
   onSnapshot(doc(db, 'config', 'contacts'), s => {
     if (s.exists() && Array.isArray(s.data().list)) { CONTACTS = s.data().list.map(c => [c.label, c.phone || '', c.note || '']); refresh('contacts'); }
   });

@@ -12,7 +12,7 @@ rules_version = '2';
 //   guests  – guest list, RSVPs, private notes (read)
 //   photos  – see all photos, hide/show, add photographer photos
 //   team    – duties (tick done), add/edit vendors and drivers, contacts
-//   events  – add and edit the wedding events (schedule)
+//   events  – add and edit the wedding events (schedule) and the venue map
 service cloud.firestore {
   match /databases/{db}/documents {
 
@@ -70,7 +70,7 @@ service cloud.firestore {
     match /posts/{id} { allow read: if signedIn(); allow write: if can('live'); }
     match /config/{id} {
       allow read: if signedIn();
-      allow write: if isOwner() || (id == 'now' && can('live'));
+      allow write: if isOwner() || (id == 'now' && can('live')) || (id == 'map' && can('events'));
     }
     match /found/{id} { allow read: if signedIn(); allow write: if can('lost'); }
 

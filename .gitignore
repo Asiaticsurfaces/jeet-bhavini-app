@@ -5,3 +5,4 @@ assets/brass_elephant.png
 *.xlsx
 *.csv
 serviceAccount*.json
+_*.html

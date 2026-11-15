@@ -180,6 +180,15 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <div class="row"><button class="btn" id="evSave">Save event</button><button class="btn ghost" id="evCancel">Cancel</button><button class="btn danger" id="evDelete" hidden>Delete event</button></div>
       </div>
       <div class="stack" id="evList"></div>
+
+      <div class="card" id="mapCard">
+        <div class="row between"><h3>Venue map</h3><button class="btn ghost sm" id="mapReset">Reset view</button></div>
+        <p class="muted small">Place each location on the 3D map: tap <b>Set on map</b>, then tap the spot. Drag to turn the map, pinch or scroll to zoom. Guests see changes after you tap <b>Save map</b>.</p>
+        <p class="chip plum" id="mapPicking" hidden></p>
+        <div id="adminMap" style="height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--line);position:relative;background:#e2ebe4"></div>
+        <div class="stack" id="placeList"></div>
+        <div class="row"><button class="btn ghost sm" id="placeAdd">+ Add place</button><button class="btn" id="mapSave">Save map</button><span class="small muted" id="mapState"></span></div>
+      </div>
     </section>
 
     <!-- TEAM -->
@@ -256,7 +265,7 @@ async function start() {
     ['guests', 'Guest list', 'See guests, rooms, RSVPs and headcounts'],
     ['photos', 'Photos', 'See all photos, hide them, add photographer photos'],
     ['team', 'Team', 'Duties, vendors and drivers (add / edit), contacts'],
-    ['events', 'Events', 'Add and edit the wedding events guests see'],
+    ['events', 'Events & map', 'Add and edit the wedding events and the venue map'],
   ];
   const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team'], event: ['live'] };
   const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
@@ -389,6 +398,56 @@ async function start() {
           : '<p class="muted">Guests currently see the 4 built-in events. Copy them above to edit, or add a new event (the built-in ones then stop showing until copied).</p>';
         $$('[data-evedit]').forEach(b => b.onclick = () => openForm(EVS.find(e => e.id === b.dataset.evedit)));
       });
+    }
+
+    // ---------- venue map (events permission) ----------
+    if (can.events) {
+      const COLORS = ['#8e3a5d', '#c99a5b', '#3d8b4e', '#2f6fb3', '#a8894f', '#5b5550', '#7d7a74', '#b8322b'];
+      let mod = null, m3 = null, PL = [], picking = null, dirty = false;
+      const setDirty = d => { dirty = d; $('#mapState').textContent = d ? 'Unsaved changes' : 'Saved'; };
+      const drawList = () => {
+        $('#placeList').innerHTML = PL.map((p, i) => `<div class="item"><div class="grid2">
+            <input data-pn="${i}" value="${esc(p.name)}" placeholder="Place name">
+            <div class="row" style="flex-wrap:nowrap">${COLORS.map(c => `<button aria-label="Colour ${c}" data-pc="${i}" data-c="${c}" style="width:24px;height:24px;border-radius:50%;border:${p.color === c ? '3px solid #33322e' : '1px solid #fff'};background:${c};cursor:pointer;flex:none"></button>`).join('')}</div></div>
+          <input data-pd="${i}" value="${esc(p.desc || '')}" placeholder="What happens here (shown to guests)">
+          <div class="row"><button class="btn ${p.x == null ? '' : 'ghost'} sm" data-pset="${i}">${picking === i ? 'Tap the map…' : p.x == null ? 'Set on map' : 'Move on map'}</button>
+            ${p.x == null ? '<span class="chip red">Not on the map yet</span>' : `<button class="btn ghost sm" data-pfocus="${i}">Show</button>`}
+            <button class="btn danger sm" data-pdel="${i}">Remove</button></div></div>`).join('');
+        $$('[data-pn]').forEach(x => x.oninput = () => { PL[x.dataset.pn].name = x.value; setDirty(true); });
+        $$('[data-pd]').forEach(x => x.oninput = () => { PL[x.dataset.pd].desc = x.value; setDirty(true); });
+        $$('[data-pc]').forEach(b => b.onclick = () => { PL[b.dataset.pc].color = b.dataset.c; setDirty(true); drawList(); m3 && m3.setPlaces(PL); });
+        $$('[data-pset]').forEach(b => b.onclick = () => { picking = +b.dataset.pset; m3 && m3.setPickMode(true);
+          $('#mapPicking').hidden = false; $('#mapPicking').textContent = `Tap the map where "${PL[picking].name || 'this place'}" is`; drawList(); $('#adminMap').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+        $$('[data-pfocus]').forEach(b => b.onclick = () => { m3 && m3.focus(PL[b.dataset.pfocus].id); $('#adminMap').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+        $$('[data-pdel]').forEach(b => b.onclick = () => { if (!confirm(`Remove "${PL[b.dataset.pdel].name}" from the map?`)) return; PL.splice(+b.dataset.pdel, 1); setDirty(true); drawList(); m3 && m3.setPlaces(PL); });
+      };
+      const boot = async () => {
+        mod = mod || await import('./js/map3d.js');
+        if (!m3) m3 = await mod.createMap($('#adminMap'), { places: PL, onPick: (x, y) => {
+          if (picking == null) return;
+          Object.assign(PL[picking], { x, y }); const id = PL[picking].id; picking = null;
+          m3.setPickMode(false); $('#mapPicking').hidden = true; setDirty(true); drawList(); m3.setPlaces(PL); m3.focus(id);
+        } });
+        m3.setPlaces(PL);
+      };
+      $('#placeAdd').onclick = () => { PL.push({ id: 'p-' + Math.random().toString(36).slice(2, 7), name: 'New place', desc: '', color: COLORS[PL.length % COLORS.length] });
+        setDirty(true); drawList(); $$('[data-pn]').at(-1)?.focus(); };
+      $('#mapReset').onclick = () => m3 && m3.resetView();
+      $('#mapSave').onclick = () => {
+        if (PL.some(p => !p.name.trim())) return toast('Every place needs a name');
+        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), updatedBy: u.email, updatedAt: serverTimestamp() })
+          .then(() => { setDirty(false); toast('Map saved. Guests see it now'); }).catch(fail);
+      };
+      onSnapshot(doc(db, 'config', 'map'), async s => {
+        if (dirty) return;                          // don't overwrite edits in progress
+        mod = mod || await import('./js/map3d.js');
+        const L = s.exists() && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
+        PL = L.map(p => ({ ...p })); drawList(); $('#mapState').textContent = s.exists() ? 'Saved' : 'Suggested spots, not saved yet';
+        if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">This browser can\'t show the 3D map.</p>'; });
+      }, e => console.warn('map', e.code));
+      // build the 3D scene when the Events tab is opened
+      const openTab = () => { if (cur === 'events') boot().catch(e => console.error(e)); };
+      window.addEventListener('hashchange', openTab); openTab();
     }
 
     // ---------- help ----------

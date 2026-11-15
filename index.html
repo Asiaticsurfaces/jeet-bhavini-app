@@ -235,7 +235,7 @@ nav.bar .fab{justify-content:center;align-items:center;padding:0;gap:0}
 select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* Map */
-.map{border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#eef0e2;box-shadow:var(--shadow)}
+.map{height:430px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#e2ebe4;box-shadow:var(--shadow);position:relative}
 .map svg{display:block;width:100%;height:auto}
 .map .zone{cursor:pointer;transition:opacity .2s}
 .map .zone rect,.map .zone ellipse{stroke:#fff;stroke-width:3}
@@ -422,7 +422,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div><p class="eyebrow">Oleander, Karjat</p><h1 data-t="map">Venue map</h1></div>
       <div class="legend" id="legend" role="group" aria-label="Highlight a place"></div>
       <div class="map" id="map"></div>
-      <p class="demo-note">Illustrative layout. We'll replace it with the real Oleander plan.</p>
+      <p class="demo-note">Drag to turn the map · pinch to zoom · tap a pin</p>
       <div class="card stack" id="mapInfo"></div>
     </div>
 
@@ -739,7 +739,7 @@ $('#selfie').onchange=e=>{
 
 /* ---------- info ---------- */
 const subs=['help','lost','wishes','travel','map','family','stay','faq','songs','contacts'];
-function goMore(g){if(g==='family')renderFamily();if(g==='map')renderMap();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0)}
+function goMore(g){if(g==='family')renderFamily();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0);if(g==='map')renderMap()}
 $$('[data-go]').forEach(b=>b.onclick=()=>goMore(b.dataset.go));
 const CATS=['Cab or transport','Room issue','Medical','Food / dietary','Lost something','Something else'];
 let helpCat=null;let tickets=store.get('tickets',[]);
@@ -793,27 +793,23 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
   store.set('travel',travel);renderTravel();renderPickup();if(CLOUD_ON())CLOUD.saveArrival(travel).catch(cloudErr);toast('Arrival saved. Thank you!')};
 
 /* ---------- venue map ---------- */
-const PLACES=[
- {id:'lobby',n:'Lobby & help desk',c:'#c99a5b',d:'Check-in, welcome kits, lost & found and the hospitality team.',shape:'<rect x="150" y="300" width="100" height="56" rx="10"/>',lx:200,ly:333},
- {id:'ballroom',n:'Ballroom',c:'#8e3a5d',d:'Mameru (1 Dec, 9 AM) and Mandap Ropan (2 Dec, 8 AM).',shape:'<rect x="24" y="170" width="140" height="100" rx="14"/>',lx:94,ly:225},
- {id:'lawn',n:'Lawn',c:'#5f8f5a',d:'Sangeet (1 Dec, 7 PM) and dinner.',shape:'<rect x="186" y="150" width="190" height="120" rx="14"/>',lx:281,ly:215},
- {id:'lake',n:'Lake Side',c:'#4f86a8',d:'Wedding: Jaan 3:30 PM, Hastamelap 5:41 PM (2 Dec). Shuttle gate is here too.',shape:'<ellipse cx="200" cy="70" rx="170" ry="50"/>',lx:200,ly:74},
- {id:'rooms',n:'Guest rooms',c:'#a8894f',d:'Room blocks 100–200. Your room number is on your pass.',shape:'<rect x="270" y="300" width="106" height="90" rx="10"/>',lx:323,ly:349},
- {id:'wash',s:'WC',n:'Washrooms',c:'#7d7a74',d:'Next to the Ballroom and behind the Lawn stage.',shape:'<rect x="24" y="290" width="60" height="40" rx="8"/>',lx:54,ly:314},
- {id:'parking',n:'Parking & main gate',c:'#5b5550',d:'Car parking and the station shuttle stop.',shape:'<rect x="24" y="356" width="226" height="40" rx="8"/>',lx:137,ly:380},
-];
-let mapSel=null;
-function renderMap(){
-  $('#legend').innerHTML=PLACES.map(p=>`<button data-pl="${p.id}" aria-pressed="${p.id===mapSel}"><i style="background:${p.c}"></i>${p.n}</button>`).join('');
-  $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(mapSel===b.dataset.pl?null:b.dataset.pl));
-  $('#map').className='map'+(mapSel?' focus':'');
-  $('#map').innerHTML=`<svg viewBox="0 0 400 410" role="img" aria-label="Illustrative map of Oleander, Karjat">
-    <rect width="400" height="410" fill="#eef0e2"/><path d="M200 120 V300 M60 280 H350" stroke="#d9d2bd" stroke-width="10" stroke-linecap="round" fill="none"/>
-    ${PLACES.map(p=>`<g class="zone ${p.id===mapSel?'hl':''}" data-pl="${p.id}" fill="${p.c}">${p.shape}<text x="${p.lx}" y="${p.ly}" text-anchor="middle" fill="#fff" style="fill:#fff">${p.s||p.n.split(' & ')[0]}</text></g>`).join('')}
-    <g transform="translate(372,392)"><text text-anchor="end" style="font-size:11px">N ↑</text></g></svg>`;
-  $$('#map .zone').forEach(g=>g.onclick=()=>focusPlace(g.dataset.pl));
-  const p=PLACES.find(x=>x.id===mapSel);
-  $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${p.n}</h3><p class="muted">${p.d}</p>`:`<p class="muted">Tap a place on the map to see what happens there. Your next event: <b>${evName(nextEvent())}</b> at ${nextEvent().venue}.</p>`;
+/* 3D venue map (js/map3d.js). Places come from the family panel (config/map), else the defaults. */
+let PLACES=null,mapSel=null,mapMod=null,map3d=null,mapBusy=null;
+async function renderMap(){
+  try{mapMod=mapMod||await import('./js/map3d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
+  const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null);
+  $('#legend').innerHTML=places.map(p=>`<button data-pl="${esc(p.id)}" aria-pressed="${p.id===mapSel}"><i style="background:${esc(p.color||'#8e3a5d')}"></i>${esc(p.name)}</button>`).join('');
+  $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(b.dataset.pl));
+  const p=places.find(x=>x.id===mapSel);
+  $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${esc(p.name)}</h3><p class="muted">${esc(p.desc||'')}</p>`
+    :`<p class="muted">Tap a pin or a name above. Your next event: <b>${esc(evName(nextEvent()))}</b> at ${esc(nextEvent().venue)}.</p>`;
+  if($('#m-map').hidden)return;                      // build the 3D scene only when the map is on screen
+  if(!map3d){
+    mapBusy=mapBusy||mapMod.createMap($('#map'),{places,onSelect:id=>{mapSel=id;renderMap()}}).then(m=>map3d=m)
+      .catch(e=>{console.error(e);$('#map').innerHTML='<p class="muted" style="padding:24px">This phone can\'t show the 3D map. Use the list above.</p>'});
+    await mapBusy;
+  }else map3d.setPlaces(places);
+  if(map3d&&mapSel)map3d.focus(mapSel);
 }
 function focusPlace(id){mapSel=id;renderMap()}
 
@@ -887,6 +883,7 @@ function cloudRefresh(what){
   else if(what==='photos')renderPhotos();
   else if(what==='contacts')renderContacts();
   else if(what==='guest')renderAll();
+  else if(what==='map')renderMap();
   else if(what==='events'){buildDays();renderAll()}
   else renderAll();
 }
