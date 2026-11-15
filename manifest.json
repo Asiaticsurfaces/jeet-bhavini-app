@@ -1,0 +1,14 @@
+{
+  "name": "Jeet & Bhavini",
+  "short_name": "Jeet & Bhavini",
+  "description": "Wedding guest app · 1–2 December 2026 · Oleander, Karjat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf6ee",
+  "theme_color": "#fbf6ee",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

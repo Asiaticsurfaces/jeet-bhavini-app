@@ -1,0 +1,20 @@
+# Always use HTTPS (needed for install-to-home-screen and notifications)
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [L,R=301]
+
+DirectoryIndex index.html
+
+# The page itself is always fresh, so guests get updates straight away
+<IfModule mod_headers.c>
+<FilesMatch "\.(html|json)$">
+  Header set Cache-Control "no-cache"
+</FilesMatch>
+# Images are cached for a week
+<FilesMatch "\.(png|jpg|jpeg|webp)$">
+  Header set Cache-Control "public, max-age=604800"
+</FilesMatch>
+</IfModule>
+
+AddType application/manifest+json .webmanifest
+AddDefaultCharset UTF-8

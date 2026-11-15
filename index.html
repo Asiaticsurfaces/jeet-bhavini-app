@@ -1,0 +1,864 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fbf6ee">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jeet & Bhavini">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Jeet &amp; Bhavini</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@400;500;600&family=Noto+Serif+Gujarati:wght@500;600&display=swap">
+<style>
+/* Layout: one ivory "invitation paper" column, phone-width, with an arched photo hero and a floating bottom bar.
+   Single deliberate light theme that matches the printed/online invite. */
+:root{
+  color-scheme:light;
+  --paper:#fbf6ee; --card:#fffaf2; --ink:#33322e; --muted:#6b6862; --line:#e8dfcd;
+  --plum:#8e3a5d; --plum-deep:#5e1f3a; --plum-soft:#f4e4ea;
+  --gold:#a8894f; --gold-deep:#7b5a2a; --gold-soft:#f3ead6;
+  --sage:#2f6449; --sage-soft:#e4ede5;
+  --shadow:0 10px 30px rgba(94,31,58,.10);
+  --display:"Cormorant Garamond","Noto Serif Gujarati","Iowan Old Style",Palatino,Georgia,serif;
+  --body:"Jost","Noto Serif Gujarati","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --script:"Alex Brush","Great Vibes","Apple Chancery",cursive;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(rgba(168,137,79,.06) 1px,transparent 1px);background-size:6px 6px}
+.app{max-width:440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 130px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;color:var(--plum-deep)}
+h1{font-size:34px;line-height:1.05} h2{font-size:26px;line-height:1.1} h3{font-size:21px;line-height:1.15}
+p{margin:0}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-deep);font-weight:600}
+.muted{color:var(--muted)} .small{font-size:13px}
+.screen{display:flex;flex-direction:column;gap:20px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;align-items:center}
+.between{justify-content:space-between}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow)}
+.ornament{display:flex;align-items:center;gap:10px;color:var(--gold)}
+.ornament::before,.ornament::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.ornament span{font-size:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font:500 14px var(--body);letter-spacing:.02em;border:0;border-radius:999px;padding:11px 18px;background:var(--plum);color:#fff;cursor:pointer;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum)}
+.btn.gold{background:var(--gold);color:#fff}
+.btn.sm{padding:7px 14px;font-size:13px}
+.btn:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+input[type=text],textarea{width:100%;font:15px var(--body);padding:12px 16px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 11px;border-radius:999px;background:var(--gold-soft);color:var(--gold-deep)}
+.chip.plum{background:var(--plum-soft);color:var(--plum)} .chip.sage{background:var(--sage-soft);color:var(--sage)}
+.linkbtn{border:0;background:transparent;color:var(--plum);font:500 13px var(--body);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:3px}
+
+/* Top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:40px;height:auto}
+.brand b{font:600 18px var(--display);color:var(--plum-deep);display:block;line-height:1}
+.brand small{font-size:11px;color:var(--muted);letter-spacing:.08em}
+.lang{display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px}
+.lang button{border:0;background:transparent;border-radius:999px;padding:4px 10px;font:600 12px var(--body);color:var(--muted);cursor:pointer}
+.lang button[aria-pressed=true]{background:var(--plum);color:#fff}
+
+/* Hero */
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+.invocation{display:flex;flex-direction:column;align-items:center;gap:4px}
+.invocation img{width:44px}
+.invocation span{font:500 14px "Noto Serif Gujarati",var(--display);color:var(--gold-deep)}
+.arch{position:relative;width:min(300px,100%);aspect-ratio:3/4;border-radius:999px 999px 26px 26px;overflow:hidden;box-shadow:0 0 0 6px var(--card),0 0 0 7px var(--gold),var(--shadow)}
+.arch img{width:100%;height:100%;object-fit:cover;object-position:50% 40%}
+.names{font:400 52px/1 var(--script);color:var(--plum);margin-top:6px}
+.names i{font-style:normal;color:var(--gold);font-size:40px;margin:0 6px}
+.dateline{font:500 13px var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--ink)}
+.countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;margin-top:4px}
+.locket{aspect-ratio:1;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 1.5px var(--gold),inset 0 0 0 5px var(--card),inset 0 0 0 6px var(--gold-soft);display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:100%}
+.locket b{font:600 26px/1 var(--display);color:var(--plum-deep);font-variant-numeric:tabular-nums}
+.locket small{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+
+/* Up next */
+.next{display:flex;gap:14px;align-items:center}
+.next .thumb{width:68px;height:68px;border-radius:16px;background:var(--gold-soft);flex:none;display:grid;place-items:center;overflow:hidden}
+.next .thumb img{width:90%;height:90%;object-fit:contain}
+
+/* Pass */
+.pass{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pass div{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.pass span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.pass b{display:block;font:600 26px/1.1 var(--display);color:var(--plum-deep);font-variant-numeric:tabular-nums}
+
+/* Switch */
+.switch{position:relative;width:50px;height:30px;flex:none;border-radius:30px;border:0;background:var(--line);cursor:pointer;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.switch[aria-checked=true]{background:var(--sage)} .switch[aria-checked=true]::after{transform:translateX(20px)}
+
+/* Live */
+.live{border-radius:22px;padding:20px;color:#f8ece2;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;
+  background:radial-gradient(120% 100% at 100% 0%,#8e3a5d 0%,#5e1f3a 55%,#3b1426 100%)}
+.live h3{color:#fff;font-size:24px}
+.live .badge{align-self:flex-start;font:600 10.5px var(--body);letter-spacing:.16em;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14)}
+.live .badge.on{background:#d93a55}
+.live .time{font:600 40px/1 var(--display);color:#f3d79b}
+.live .btn.ghost{color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.6)}
+
+/* Feed */
+.post{display:flex;gap:12px;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.post .dot{width:9px;height:9px;border-radius:50%;margin-top:7px;flex:none}
+.post b{display:block;font-weight:600}
+.post time{font-size:12px;color:var(--muted)}
+
+/* Schedule */
+.days{display:flex;gap:8px}
+.days button{flex:1;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:10px 8px;font:500 13px var(--body);cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
+.days button b{font:600 24px var(--display)}
+.days button[aria-pressed=true]{background:var(--plum);border-color:var(--plum);color:#fff}
+.days button[aria-pressed=true] b{color:#fff}
+.event{border-radius:24px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.event .art{height:190px;display:grid;place-items:center;padding:14px;background:
+  radial-gradient(80% 90% at 50% 100%,var(--gold-soft),transparent 70%),var(--paper);border-bottom:1px solid var(--line);position:relative}
+.event .art::before,.event .art::after{content:"";position:absolute;left:18px;right:18px;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--gold-deep),#d6b878,var(--gold-deep))}
+.event .art::before{top:10px} .event .art::after{bottom:10px}
+.event .art img{max-height:150px;max-width:100%;object-fit:contain}
+.event .body{padding:18px;display:flex;flex-direction:column;gap:12px}
+.event .tag{font:italic 500 17px var(--display);color:var(--gold-deep)}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:0}
+.meta dt{color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding-top:2px}
+.meta dd{margin:0;font-weight:500}
+.moments{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.moments div{border-radius:14px;padding:10px 12px;background:var(--plum-soft)}
+.moments b{display:block;font:600 24px/1.1 var(--display);color:var(--plum)}
+.moments span{font-size:12px;color:var(--plum-deep)}
+.rsvp{display:flex;gap:8px}
+.rsvp button{flex:1;border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px;font:500 13px var(--body);cursor:pointer}
+.rsvp button[aria-pressed=true]{background:var(--sage);border-color:var(--sage);color:#fff}
+.bell{border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px 14px;font:500 13px var(--body);cursor:pointer;white-space:nowrap}
+.bell[aria-pressed=true]{background:var(--gold-soft);border-color:var(--gold);color:var(--gold-deep)}
+.suggest{font-size:11px;color:var(--muted);font-style:italic}
+
+/* Camera */
+.cam{border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px;color:#f3e7d8;background:linear-gradient(160deg,#3b2a20,#1f1612)}
+.cam .counter{font:600 46px/1 var(--display);font-variant-numeric:tabular-nums;color:#e3c27f}
+.shutter{width:80px;height:80px;border-radius:50%;background:var(--plum);cursor:pointer;align-self:center;box-shadow:0 0 0 5px #f3e7d8,0 0 0 7px var(--gold)}
+.tabs{display:flex;background:var(--gold-soft);border-radius:999px;padding:4px}
+.tabs button{flex:1;border:0;background:transparent;padding:8px;border-radius:999px;font:500 13px var(--body);color:var(--gold-deep);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--card);color:var(--plum-deep);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.grid{columns:2;column-gap:12px}
+.photo{break-inside:avoid;margin:0 0 12px;background:#fff;padding:7px 7px 2px;border-radius:4px;box-shadow:0 6px 18px rgba(51,50,46,.14)}
+.photo .img{width:100%;aspect-ratio:var(--ar,3/4);border-radius:2px;background-size:cover;background-position:center}
+.photo .img.dev{filter:sepia(.9) blur(7px) brightness(.75)}
+.photo figcaption{font:400 21px var(--script);color:var(--plum-deep);display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.photo figcaption small{font:500 10.5px var(--body);color:var(--muted);text-align:right}
+.selfie{width:64px;height:64px;border-radius:50%;background-size:cover;background-position:center;flex:none;box-shadow:0 0 0 3px var(--gold)}
+.scan{height:6px;border-radius:6px;background:var(--line);overflow:hidden}
+.scan i{display:block;height:100%;width:0;background:var(--plum);transition:width 1.8s ease-out}
+
+.progress{height:5px;background:var(--line);border-radius:5px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--gold);transition:width .3s}
+
+/* Info */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:18px;padding:16px 14px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;font:inherit}
+.tile b{font:600 19px var(--display);color:var(--plum-deep)}
+.tile small{color:var(--muted);font-size:12px}
+.tile.urgent{background:var(--plum);border-color:var(--plum)} .tile.urgent b,.tile.urgent small{color:#fff}
+.helpcats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.helpcats button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px;font:500 14px var(--body);cursor:pointer;text-align:left}
+.helpcats button[aria-pressed=true]{border-color:var(--plum);background:var(--plum-soft);color:var(--plum-deep)}
+.ticket{padding:14px 16px;border-radius:16px;background:var(--sage-soft)}
+.seat-result{padding:16px;border-radius:16px;background:var(--sage-soft)}
+.seat-result b{font:600 30px var(--display);color:var(--sage)}
+.wish{padding:14px 16px;border-radius:16px;background:var(--gold-soft)}
+.wish p{font:italic 500 17px var(--display);margin-bottom:4px}
+details{border-bottom:1px solid var(--line);padding:12px 0}
+summary{font-weight:500;cursor:pointer}
+details p{margin-top:6px;color:var(--muted)}
+.back{border:0;background:transparent;color:var(--plum);font:500 14px var(--body);cursor:pointer;padding:0;align-self:flex-start}
+.helpbtn{border:0;background:var(--plum-soft);color:var(--plum);font:600 12.5px var(--body);padding:8px 12px;border-radius:999px;cursor:pointer}
+
+/* Login */
+.login{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;padding-block:calc(24px + env(safe-area-inset-top,0px)) 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.login .inner{max-width:400px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;position:relative}
+.login .mono{width:150px}
+.login .garland{position:fixed;top:0;width:44px;opacity:.95;pointer-events:none}
+.login .garland.l{left:max(6px,env(safe-area-inset-left,0px))} .login .garland.r{right:max(6px,env(safe-area-inset-right,0px))}
+.guest-hit{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:12px 16px;font:inherit;cursor:pointer}
+.guest-hit small{color:var(--muted)}
+
+/* Bottom nav */
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none}
+nav.bar .inner{pointer-events:auto;max-width:408px;margin:0 auto 12px;background:rgba(255,250,242,.94);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 30px rgba(94,31,58,.16);display:grid;grid-template-columns:repeat(5,1fr);align-items:center;height:66px}
+nav.bar button{border:0;background:transparent;color:var(--muted);font:500 10.5px var(--body);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 0}
+nav.bar button svg{width:22px;height:22px}
+nav.bar button[aria-current=page]{color:var(--plum)}
+nav.bar .fab{width:64px;height:64px;border-radius:50%;background:var(--plum);color:#fff;justify-self:center;margin-top:-34px;box-shadow:0 0 0 5px var(--paper),0 0 0 6px var(--gold),0 8px 20px rgba(94,31,58,.3)}
+nav.bar .fab[aria-current=page]{color:#fff;background:var(--plum-deep)}
+nav.bar .fab svg{width:27px;height:27px}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--plum-deep);color:#fff;padding:10px 18px;border-radius:999px;font-weight:500;font-size:14px;z-index:50;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+.notif{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));width:min(408px,calc(100% - 32px));z-index:40;background:rgba(255,250,242,.97);border:1px solid var(--line);border-radius:20px;box-shadow:0 14px 40px rgba(0,0,0,.22);padding:12px 14px;display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.notif img{width:38px;height:38px;border-radius:10px;background:var(--card);object-fit:contain;flex:none;border:1px solid var(--line)}
+.notif small{color:var(--muted)}
+/* Happening now */
+.nowbar{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;cursor:pointer;color:#fff;font:inherit;
+  padding:12px 16px;border-radius:18px;background:linear-gradient(120deg,var(--plum-deep),var(--plum));box-shadow:var(--shadow)}
+.nowbar .pulse{width:10px;height:10px;border-radius:50%;background:#ffd36b;flex:none;box-shadow:0 0 0 0 rgba(255,211,107,.7);animation:pulse 1.8s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 10px rgba(255,211,107,0)}100%{box-shadow:0 0 0 0 rgba(255,211,107,0)}}
+.nowbar small{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#f3d9a8;font-weight:600}
+.nowbar b{display:block;font-weight:500;font-size:14.5px;line-height:1.35}
+.nowbar .go{margin-left:auto;font-size:20px;opacity:.8}
+/* Pickup */
+.driver{display:flex;gap:12px;align-items:center}
+.driver .av{width:48px;height:48px;border-radius:50%;background:var(--gold-soft);display:grid;place-items:center;font:600 20px var(--display);color:var(--gold-deep);flex:none}
+.plate{font:600 12px var(--body);letter-spacing:.08em;padding:3px 8px;border-radius:6px;background:#fff;border:1.5px solid var(--ink);display:inline-block;margin-top:4px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.steps div{height:5px;border-radius:5px;background:var(--line)} .steps div.on{background:var(--sage)}
+.steplbl{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:11px;color:var(--muted)} .steplbl span:nth-child(2){text-align:center} .steplbl span:last-child{text-align:right}
+/* QR */
+.qrwrap{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.qrbox{background:#fff;padding:12px;border-radius:18px;border:1px solid var(--line);line-height:0}
+.qrbox svg,.qrbox img{width:200px;height:200px}
+/* Event extras */
+.event details{border:0;border-top:1px solid var(--line);padding:10px 0 0}
+.event details summary{font:600 15px var(--body);color:var(--plum-deep);list-style:none;display:flex;justify-content:space-between}
+.event details summary::-webkit-details-marker{display:none}
+.event details summary::after{content:"+";color:var(--gold)} .event details[open] summary::after{content:"–"}
+.pack{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:14px;cursor:pointer}
+.pack input{width:20px;height:20px;accent-color:var(--sage);flex:none}
+.pack.done span{text-decoration:line-through;color:var(--muted)}
+.rite{padding:10px 0;border-bottom:1px dashed var(--line)} .rite:last-child{border:0}
+.rite b{font:600 17px var(--display);color:var(--plum-deep)} .rite p{margin:2px 0 0;color:var(--muted);font-size:14px}
+/* Travel form */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:500 14px var(--body);cursor:pointer}
+.chips button[aria-pressed=true]{border-color:var(--plum);background:var(--plum-soft);color:var(--plum-deep)}
+.field{display:flex;flex-direction:column;gap:6px} .field>span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Map */
+.map{border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#eef0e2;box-shadow:var(--shadow)}
+.map svg{display:block;width:100%;height:auto}
+.map .zone{cursor:pointer;transition:opacity .2s}
+.map .zone rect,.map .zone ellipse{stroke:#fff;stroke-width:3}
+.map.focus .zone{opacity:.35} .map.focus .zone.hl{opacity:1}
+.map text{font:600 12px Jost,system-ui,sans-serif;fill:#3b2a33;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.legend button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font:500 13px var(--body);color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:6px}
+.legend button i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend button[aria-pressed=true]{border-color:var(--plum);color:var(--plum-deep);background:var(--plum-soft)}
+/* Family */
+.tile.fam{background:var(--gold-soft);border-color:#e3d3ad} .tile.fam b{color:var(--gold-deep)}
+.ftabs{display:flex;background:var(--gold-soft);border-radius:999px;padding:4px}
+.ftabs button{flex:1;border:0;background:transparent;padding:8px;border-radius:999px;font:500 13px var(--body);color:var(--gold-deep);cursor:pointer}
+.ftabs button[aria-pressed=true]{background:var(--card);color:var(--plum-deep);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.duty{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.duty input{width:22px;height:22px;accent-color:var(--sage);flex:none;margin-top:2px}
+.duty.done b{text-decoration:line-through;color:var(--muted)}
+.vendor{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.vendor .ic{width:40px;height:40px;border-radius:12px;background:var(--plum-soft);display:grid;place-items:center;font-size:19px;flex:none}
+.arr{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+.stat b{display:block;font:600 26px var(--display);color:var(--plum-deep)} .stat span{font-size:11px;color:var(--muted)}
+.demo-note{font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <!-- HOME -->
+  <section class="screen" id="s-home">
+    <div class="topbar">
+      <div class="brand"><img src="assets/postcard_jb_monogram.png" alt="JB monogram"><div><b><span data-t="namaste">Namaste</span>, <span id="hello">Guest</span></b><small>1–2 DEC 2026 · KARJAT</small></div></div>
+      <div class="lang" role="group" aria-label="Language"><button data-lang="en" aria-pressed="true">EN</button><button data-lang="gu" aria-pressed="false">ગુ</button></div>
+    </div>
+
+    <button class="nowbar" id="nowbar"></button>
+
+    <div class="hero">
+      <div class="invocation"><img src="assets/ganesha_motif.png" alt="Shri Ganesha"><span>॥ શ્રી ગણેશાય નમઃ ॥</span></div>
+      <div class="arch"><img src="assets/gallery-01-cafe-window.jpg" alt="Jeet and Bhavini laughing together by a cafe window"></div>
+      <div class="names">Jeet<i>&amp;</i>Bhavini</div>
+      <div class="dateline">1 – 2 December 2026 · Oleander, Karjat</div>
+      <div class="countdown" id="countdown" aria-label="Countdown to the Hastamelap"></div>
+      <p class="small muted" data-t="untilHm">until the Hastamelap · 5:41 PM, 2 December</p>
+    </div>
+
+    <div class="row between"><button class="helpbtn" id="homeHelp" data-t="needHelp">Need help?</button><button class="linkbtn" id="switchGuest">Not you?</button></div>
+
+    <div class="card stack">
+      <p class="eyebrow" data-t="upNext">Up next</p>
+      <div class="next" id="upnext"></div>
+    </div>
+
+    <div class="card stack">
+      <p class="eyebrow" data-t="pass">Your wedding pass</p>
+      <div class="pass" id="pass"></div>
+      <button class="btn ghost sm" id="qrBtn" style="align-self:flex-start">Show check-in QR</button>
+      <div id="qrOut" hidden></div>
+    </div>
+
+    <div class="card stack" id="pickup"></div>
+
+    <div class="live" id="live"></div>
+
+    <div class="card stack">
+      <div class="row between">
+        <div><h3 data-t="alerts">Event alerts</h3><p class="muted small" id="alertSub"></p></div>
+        <button class="switch" id="alertSw" role="switch" aria-checked="false" aria-label="Event alerts"></button>
+      </div>
+      <button class="btn ghost sm" id="testAlert" style="align-self:flex-start">Preview an alert</button>
+    </div>
+
+    <div class="ornament"><span>✦</span></div>
+    <div class="row between"><h2 data-t="news">Live updates</h2><span class="chip plum" id="newCount"></span></div>
+    <div class="stack" id="feed"></div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section class="screen" id="s-schedule" hidden>
+    <div class="row between"><div><p class="eyebrow">Celebration journey</p><h1 data-t="schedule">Our Events</h1></div><span class="chip sage" id="rsvpCount"></span></div>
+    <div class="days" id="days" role="group" aria-label="Choose a day"></div>
+    <div id="events" class="screen"></div>
+  </section>
+
+  <!-- CAMERA -->
+  <section class="screen" id="s-camera" hidden>
+    <div><p class="eyebrow">Shaadi roll</p><h1 data-t="camera">Wedding Camera</h1></div>
+    <div class="cam">
+      <div class="row between" style="align-items:flex-end">
+        <div><p class="eyebrow" style="color:#cdb48a">Shots left today</p><div class="counter" id="shots">24</div></div>
+        <p class="small" style="max-width:190px;color:#d9c7b2">Like a disposable camera. Your photos develop at 9&nbsp;am the next morning.</p>
+      </div>
+      <label class="shutter" for="shot" aria-label="Take or choose a photo"></label>
+      <input id="shot" type="file" accept="image/*" capture="environment" hidden>
+      <p class="demo-note" style="color:#bba68b">Tap the shutter to take a photo</p>
+    </div>
+
+    <div class="card stack">
+      <h3 data-t="findMe">Find photos of me</h3>
+      <p class="muted small">Upload one selfie and get every wedding photo you appear in, from guests and the photographer.</p>
+      <label class="btn" for="selfie">Upload a selfie</label>
+      <input id="selfie" type="file" accept="image/*" capture="user" hidden>
+      <div id="faceOut" class="stack"></div>
+    </div>
+
+    <div class="tabs" role="group" aria-label="Photo view">
+      <button aria-pressed="true" data-ph="feed">Guest feed</button>
+      <button aria-pressed="false" data-ph="mine">Your photos</button>
+    </div>
+    <div class="row between"><span class="muted small" id="phNote"></span><button class="btn ghost sm" id="develop">Develop now (demo)</button></div>
+    <div class="grid" id="photos"></div>
+  </section>
+
+  <!-- INFO -->
+  <section class="screen" id="s-more" hidden>
+    <div id="moreHome" class="screen">
+      <div><p class="eyebrow">Everything you need</p><h1 data-t="info">Guest Info</h1></div>
+      <div class="tiles">
+        <button class="tile urgent" data-go="help"><b data-t="needHelp">Need help?</b><small>Cab, room, medical</small></button>
+        <button class="tile" data-go="lost"><b data-t="lost">Lost &amp; found</b><small>Report or claim items</small></button>
+        <button class="tile" data-go="seat"><b data-t="seat">Find my seat</b><small>Table &amp; tablemates</small></button>
+        <button class="tile" data-go="wishes"><b data-t="wishes">Blessings</b><small>Leave a message</small></button>
+        <button class="tile" data-go="travel"><b data-t="arrival">My arrival</b><small>Travel &amp; pickup</small></button>
+        <button class="tile" data-go="map"><b data-t="map">Venue map</b><small>Find every place</small></button>
+        <button class="tile" data-go="stay"><b>Travel &amp; stay</b><small>Oleander, Karjat</small></button>
+        <button class="tile" data-go="faq"><b>FAQs</b><small>Dress, gifts, food</small></button>
+        <button class="tile" data-go="songs"><b>Song requests</b><small>For the Sangeet</small></button>
+        <button class="tile" data-go="contacts"><b>Contacts</b><small>Who to call</small></button>
+        <button class="tile fam" data-go="family" style="grid-column:1/-1"><b>🔒 Family only</b><small>Duties, vendors and arrivals</small></button>
+      </div>
+    </div>
+
+    <div id="m-help" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1 data-t="needHelp">Need help?</h1>
+      <p class="muted">Pick what's wrong. The hospitality team sees your name and room number, and calls you back.</p>
+      <div class="helpcats" id="helpCats" role="group" aria-label="What do you need help with?"></div>
+      <textarea id="helpText" rows="3" placeholder="Add details (optional), e.g. 'Need a cab to Karjat station at 6 pm'"></textarea>
+      <button class="btn" id="helpSend">Send to hospitality team</button>
+      <div class="stack" id="tickets"></div>
+    </div>
+
+    <div id="m-lost" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1 data-t="lost">Lost &amp; found</h1>
+      <p class="muted">Found items are kept at the hospitality desk in the Oleander lobby.</p>
+      <h3>Found so far</h3>
+      <div class="stack" id="found"></div>
+      <h3>Lost something?</h3>
+      <input type="text" id="lostItem" placeholder="What did you lose? e.g. one gold jhumka">
+      <input type="text" id="lostWhere" placeholder="Where did you last have it? e.g. Sangeet lawn">
+      <button class="btn" id="lostBtn">Report it</button>
+      <div class="stack" id="myLost"></div>
+    </div>
+
+    <div id="m-seat" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1 data-t="seat">Find my seat</h1>
+      <input type="text" id="seatQ" placeholder="Type your name" autocomplete="off">
+      <div id="seatOut"></div>
+    </div>
+
+    <div id="m-wishes" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1 data-t="wishes">Blessings</h1>
+      <textarea id="wishText" rows="3" placeholder="Write a blessing for Jeet & Bhavini"></textarea>
+      <div class="row"><input type="text" id="wishName" placeholder="Your name"><button class="btn" id="wishBtn">Post</button></div>
+      <div class="stack" id="wishes"></div>
+    </div>
+
+    <div id="m-travel" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <div><p class="eyebrow">Help us plan your pickup</p><h1 data-t="arrival">My arrival</h1></div>
+      <p class="muted">Tell us how you're coming. The family sees one list and arranges cabs from Karjat station.</p>
+      <div class="field"><span>How are you coming?</span><div class="chips" id="tMode" role="group" aria-label="Travel mode"></div></div>
+      <div class="two">
+        <label class="field"><span>Arriving on</span><select id="tDay"><option value="30">Mon, 30 Nov</option><option value="1" selected>Tue, 1 Dec</option><option value="2">Wed, 2 Dec</option></select></label>
+        <label class="field"><span>Arrival time</span><input type="time" id="tTime" value="08:30"></label>
+      </div>
+      <label class="field"><span id="tFromLbl">Train / flight number</span><input type="text" id="tFrom" placeholder="e.g. 11007 Deccan Express"></label>
+      <div class="two">
+        <label class="field"><span>People with you</span><input type="number" id="tPeople" min="1" max="12" value="2"></label>
+        <label class="field"><span>Leaving on</span><select id="tLeave"><option value="2">Wed, 2 Dec night</option><option value="3" selected>Thu, 3 Dec</option></select></label>
+      </div>
+      <div class="card"><div class="row between"><div><h3 style="font-size:19px">Pickup from Karjat station</h3><p class="muted small">Free shuttle for guests</p></div><button class="switch" id="tPickup" role="switch" aria-checked="true" aria-label="Need pickup"></button></div></div>
+      <button class="btn" id="tSave">Save my arrival</button>
+      <div id="tDone"></div>
+    </div>
+
+    <div id="m-map" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <div><p class="eyebrow">Oleander, Karjat</p><h1 data-t="map">Venue map</h1></div>
+      <div class="legend" id="legend" role="group" aria-label="Highlight a place"></div>
+      <div class="map" id="map"></div>
+      <p class="demo-note">Illustrative layout. We'll replace it with the real Oleander plan.</p>
+      <div class="card stack" id="mapInfo"></div>
+    </div>
+
+    <div id="m-family" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <div><p class="eyebrow">Jabuani &amp; Nakrani families</p><h1>Family only</h1></div>
+      <div id="famLock" class="card stack">
+        <p>Only family members and volunteers can open this.</p>
+        <input type="text" id="famPin" inputmode="numeric" maxlength="4" placeholder="Family PIN">
+        <button class="btn" id="famGo">Open</button>
+        <p class="demo-note">Preview PIN: 1202</p>
+      </div>
+      <div id="famBody" class="screen" hidden>
+        <div class="ftabs" role="group" aria-label="Family section"><button data-ft="duties" aria-pressed="true">Duties</button><button data-ft="vendors" aria-pressed="false">Vendors</button><button data-ft="arrivals" aria-pressed="false">Arrivals</button></div>
+        <div id="famOut" class="stack"></div>
+      </div>
+    </div>
+
+    <div id="m-stay" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1>Travel &amp; stay</h1>
+      <div class="card stack"><h3>Venue</h3><p>Oleander, Karjat. All events are at the Ballroom, the Lawn or the Lake Side.</p><a class="btn ghost sm" style="align-self:flex-start" href="https://maps.google.com/?q=Oleander%20Karjat" target="_blank" rel="noopener">Open in Maps</a></div>
+      <div class="card stack"><h3>Your room</h3><p>Your room number appears on your wedding pass once the family assigns it.</p></div>
+      <div class="card stack"><h3>Getting there</h3><p>Karjat is about 2 hours from Mumbai and 2.5 hours from Pune. Pickup details from Karjat station will be shared here.</p><span class="chip">Details coming soon</span></div>
+    </div>
+
+    <div id="m-faq" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1>FAQs</h1>
+      <div>
+        <details><summary>What should I wear?</summary><p>Each event in the Schedule tab has a dress code.</p></details>
+        <details><summary>What time is the Hastamelap?</summary><p>5:41 PM on Wednesday, 2 December, at Oleander Lake Side. Jaan Prastan is at 3:30 PM.</p></details>
+        <details><summary>Can family abroad watch?</summary><p>Yes. The Hastamelap streams live from the Home screen. Copy the link and send it to them.</p></details>
+        <details><summary>Gifts?</summary><p>Your blessings are what matter most to us.</p></details>
+      </div>
+    </div>
+
+    <div id="m-songs" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1>Song requests</h1>
+      <p class="muted">For the Sangeet on 1 December. Vote up the ones you want to hear.</p>
+      <div class="row"><input type="text" id="songQ" placeholder="Song name"><button class="btn" id="songBtn">Add</button></div>
+      <div class="stack" id="songs"></div>
+    </div>
+
+    <div id="m-contacts" class="screen" hidden>
+      <button class="back" data-go="home">← Guest info</button>
+      <h1>Contacts</h1>
+      <div class="card stack"><b>Hospitality desk</b><p class="muted small">Rooms, cabs, anything at the venue · number coming soon</p></div>
+      <div class="card stack"><b>Jabuani family</b><p class="muted small">Groom's side · number coming soon</p></div>
+      <div class="card stack"><b>Nakrani family</b><p class="muted small">Bride's side · number coming soon</p></div>
+    </div>
+  </section>
+
+  <p class="demo-note" style="margin-top:24px">Preview · guest names, rooms and tables are samples</p>
+</div>
+
+<nav class="bar" aria-label="Main">
+  <div class="inner">
+    <button data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span data-t="nHome">Home</span></button>
+    <button data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span data-t="nEvents">Events</span></button>
+    <button data-tab="camera" class="fab" aria-label="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+    <button data-tab="help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg><span data-t="nHelp">Help</span></button>
+    <button data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span data-t="nInfo">Info</span></button>
+  </div>
+</nav>
+<div class="toast" id="toast" hidden></div>
+<div class="notif" id="notif" hidden role="status"></div>
+
+<div class="login" id="login" hidden>
+  <img class="garland l" src="assets/mogra_long.png" alt="">
+  <img class="garland r" src="assets/mogra_long.png" alt="">
+  <div class="inner">
+    <img class="mono" src="assets/postcard_jb_monogram.png" alt="Jeet and Bhavini monogram">
+    <p class="eyebrow">Jabuani family welcomes you</p>
+    <div class="names" style="font-size:46px">Jeet<i>&amp;</i>Bhavini</div>
+    <p class="dateline">1 – 2 December 2026</p>
+    <div class="ornament" style="width:100%"><span>✦</span></div>
+    <h2>Find your invite</h2>
+    <p class="muted">Type your name to see your room, your table and your events.</p>
+    <input type="text" id="loginQ" placeholder="Your name" autocomplete="off">
+    <div class="stack" id="loginHits" style="width:100%"></div>
+    <p class="demo-note">Preview guests: Riya, Kunal, Neha</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const store={get(k,d){try{return JSON.parse(localStorage.getItem('jb_'+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem('jb_'+k,JSON.stringify(v))}catch(e){}}};
+function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2400)}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- language (key labels) ---------- */
+const GU={namaste:'નમસ્તે',untilHm:'હસ્તમેળાપ સુધી · સાંજે 5:41, 2 ડિસેમ્બર',needHelp:'મદદ જોઈએ છે?',upNext:'હવે પછી',pass:'તમારો લગ્ન પાસ',alerts:'કાર્યક્રમ સૂચનાઓ',news:'તાજા સમાચાર',arrival:'મારું આગમન',map:'સ્થળનો નકશો',schedule:'અમારા પ્રસંગો',camera:'લગ્ન કૅમેરા',findMe:'મારા ફોટા શોધો',info:'મહેમાન માહિતી',lost:'ખોવાયેલું-મળેલું',seat:'મારી બેઠક શોધો',wishes:'આશીર્વાદ',nHome:'ઘર',nEvents:'પ્રસંગો',nHelp:'મદદ',nInfo:'માહિતી'};
+const EN={};$$('[data-t]').forEach(el=>{EN[el.dataset.t]??=el.textContent});
+let lang=store.get('lang','en');
+function applyLang(){$$('[data-t]').forEach(el=>el.textContent=(lang==='gu'?GU:EN)[el.dataset.t]||EN[el.dataset.t]);
+  $$('.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===lang));renderSchedule()}
+$$('.lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;store.set('lang',lang);applyLang()});
+
+/* ---------- wedding data (from the invite) ---------- */
+const EVENTS=[
+ {id:'mameru',day:'1',name:'Mameru',gu:'મામેરું',tag:'Where Blessings Begin',start:'2026-12-01T09:00:00+05:30',hrs:3,time:'9:00 AM',venue:'Oleander Ballroom',img:'assets/user_mameru_final.png',dress:'Pastel traditional',note:'Hosted by Mr. Devendra Keshavlal Bhadani & family.',
+  pack:['Pastel traditional outfit','Light shawl, mornings are cool in December','Comfortable footwear'],
+  rites:[['Mameru','The maternal uncle (mama) and his family arrive with gifts of clothes, jewellery and sweets, and bless the family before the wedding.']]},
+ {id:'sangeet',day:'1',name:'Sangeet',gu:'સંગીત',tag:'An Evening of Song & Dance',start:'2026-12-01T19:00:00+05:30',hrs:4,time:'7:00 PM',venue:'Oleander Lawn',img:'assets/user_sangeet_final.png',dress:'Glam Indo-western',note:'Performances, dhol and an open dance floor. Add your song requests in Guest Info.',
+  pack:['Glam Indo-western outfit','Flat shoes or block heels, it\'s on the lawn','Shawl or jacket, Karjat nights get cold','Phone charged for the wedding camera'],
+  rites:[['Sangeet','An evening of music and dance. Both families perform for the couple, then the dance floor opens for everyone.']]},
+ {id:'mandap',day:'2',name:'Mandap Ropan',gu:'મંડપ રોપણ',tag:'Raising the Sacred Canopy',start:'2026-12-02T08:00:00+05:30',hrs:2,time:'8:00 AM',venue:'Oleander Ballroom',img:'assets/user_mandap_clean.png',dress:'Yellows & greens',note:'A morning puja to raise the mandap.',
+  pack:['Yellow or green outfit','Head covering for the puja (optional)','Water bottle'],
+  rites:[['Ganesh Sthapana','A prayer to Lord Ganesha so the wedding goes smoothly.'],['Mandap Ropan','The family plants the first pillar of the wedding canopy (mandap) with a small puja.']]},
+ {id:'wedding',day:'2',name:'Wedding',gu:'લગ્ન',tag:'The Joining of Hands',start:'2026-12-02T15:30:00+05:30',hrs:5,time:'3:30 PM onwards',venue:'Oleander Lake Side',img:'assets/user_lagna_scene_final.png',dress:'Traditional, reds & golds',moments:[['3:30 PM','Jaan Prastan'],['5:41 PM','Hastamelap']],note:'Please be seated by 5:15 PM for the Hastamelap.',
+  pack:['Traditional outfit in reds or golds','Comfortable footwear for the Jaan (lots of dancing)','Sunglasses for the afternoon','Shawl for the evening by the lake'],
+  rites:[['Jaan Prastan','The groom\'s procession arrives with dhol and dancing. The bride\'s mother welcomes him at the entrance.'],['Varmala','The couple exchange flower garlands.'],['Hastamelap','The bride\'s hand is placed in the groom\'s. This is the moment they are joined, at 5:41 PM.'],['Mangal Fera','The couple walk around the sacred fire, taking their wedding vows.'],['Kansar','The couple feed each other a sweet, their first meal together.']]},
+];
+const DAYS=[{id:'1',dow:'Tue',d:'1',m:'Dec'},{id:'2',dow:'Wed',d:'2',m:'Dec'}];
+const HASTAMELAP=new Date('2026-12-02T17:41:00+05:30');
+const POSTS=[
+ {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
+ {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
+ {t:'Welcome to Oleander, Karjat!',b:'Check in at the hospitality desk in the lobby. Your welcome kit is in your room.',ago:'Just now',c:'var(--plum)'},
+ {t:'Song requests are open',b:'Tell the Sangeet DJ what to play. Guest Info → Song requests.',ago:'2 h ago',c:'var(--gold)'},
+ {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
+];
+const GUESTS=[
+ {n:'Riya Shah',side:"Groom's side",room:'214',table:4,events:EVENTS.map(e=>e.id)},
+ {n:'Kunal Mehta',side:"Bride's side",room:'118',table:7,events:['sangeet','mandap','wedding']},
+ {n:'Neha Patel',side:"Groom's friend",room:null,table:12,events:['sangeet','wedding']},
+];
+const SEATS=[['Riya Shah',4],['Amit Shah',4],['Kunal Mehta',7],['Pooja Mehta',7],['Neha Patel',12],['Rahul Joshi',12]];
+const PREWED=[
+ {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-03-beach-hands.jpg',ar:'3/4'},
+ {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-08-boat-colour.jpg',ar:'4/5'},
+ {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-09-vintage-car.jpg',ar:'3/4'},
+ {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-01-cafe-window.jpg',ar:'2/3'},
+];
+let ME=store.get('guest',null);
+const myEvents=()=>EVENTS.filter(e=>!ME||ME.events.includes(e.id));
+const nextEvent=()=>myEvents().find(e=>new Date(e.start).getTime()+e.hrs*36e5>Date.now())||myEvents()[myEvents().length-1];
+const NOWS=[
+ {t:'Varmala starts in 10 min. Please come to Lake Side.',place:'lake'},
+ {t:'Dinner is open on the Lawn. Jain counter on the left.',place:'lawn'},
+ {t:'Shuttle to the hotel leaves from the Lake Side gate in 15 min.',place:'parking'},
+];
+let nowI=0;
+const DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
+let travel=store.get('travel',null);
+const STREAM_URL='https://www.youtube.com/';  // replace with the real live-stream link
+const evName=e=>lang==='gu'?e.gu:e.name;
+
+/* ---------- navigation ---------- */
+const TABS=['home','schedule','camera','more'];
+function show(tab){
+  let btn=tab;if(tab==='help')tab='more';
+  if(!TABS.includes(tab))tab=btn='home';
+  TABS.forEach(t=>$('#s-'+t).hidden=t!==tab);
+  if(tab==='more')goMore(btn==='help'?'help':'home');
+  $$('nav.bar button').forEach(b=>b.dataset.tab===btn?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
+  window.scrollTo(0,0);
+}
+$$('nav.bar button').forEach(b=>b.onclick=()=>{location.hash=b.dataset.tab;show(b.dataset.tab)});
+addEventListener('hashchange',()=>show(location.hash.slice(1)));
+
+/* ---------- home ---------- */
+function tick(){
+  const ms=Math.max(0,HASTAMELAP-Date.now());const d=Math.floor(ms/864e5),h=Math.floor(ms/36e5)%24,m=Math.floor(ms/6e4)%60,s=Math.floor(ms/1e3)%60;
+  $('#countdown').innerHTML=[[d,'Days'],[h,'Hours'],[m,'Min'],[s,'Sec']].map(([v,l])=>`<div class="locket"><b>${String(v).padStart(2,'0')}</b><small>${l}</small></div>`).join('');
+}
+tick();setInterval(tick,1000);
+function renderHome(){
+  const nx=nextEvent();
+  $('#hello').textContent=ME?ME.n.split(' ')[0]:'Guest';
+  $('#upnext').innerHTML=`<div class="thumb"><img src="${nx.img}" alt=""></div>
+   <div style="min-width:0;flex:1"><h3>${evName(nx)}</h3><div class="muted small">${DAYS.find(d=>d.id===nx.day).dow}, ${nx.day} Dec · ${nx.time}<br>${nx.venue}</div></div>
+   <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
+  $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>Table</span><b>${ME.table}</b></div>
+     <div><span>Events</span><b>${ME.events.length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`
+    :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room, table and events.</p>';
+  $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
+  $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
+  renderAlerts();renderLive();renderNow();renderPickup();
+}
+function renderNow(){
+  const n=NOWS[nowI%NOWS.length];
+  $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now · sample</small><b>${esc(n.t)}</b></span><span class="go">›</span>`;
+  $('#nowbar').onclick=()=>{location.hash='more';show('more');goMore('map');focusPlace(n.place)};
+}
+setInterval(()=>{nowI++;renderNow()},6000);
+function renderPickup(){
+  const el=$('#pickup');
+  if(!travel){el.innerHTML=`<p class="eyebrow">Your pickup</p><h3>How are you reaching Karjat?</h3><p class="muted small">Add your train, flight or car details and we'll arrange a pickup from Karjat station.</p><button class="btn sm" style="align-self:flex-start" data-open="travel">Add arrival details</button>`}
+  else if(!travel.pickup||travel.mode==='Car'){el.innerHTML=`<p class="eyebrow">Your arrival</p><h3>${travel.mode} · ${dayLbl(travel.day)}, ${fmtT(travel.time)}</h3><p class="muted small">${travel.people} ${travel.people==1?'person':'people'} · No pickup needed. Parking is at the main gate.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
+  else{const st=DRIVER.stage;el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip sage">${['Assigned','On the way','Arrived'][st]}</span></div>
+    <div class="driver"><div class="av">${DRIVER.n[0]}</div><div style="flex:1;min-width:0"><b>${DRIVER.n}</b><div class="muted small">${DRIVER.car} · ${DRIVER.eta}</div><span class="plate">${DRIVER.plate}</span></div><a class="btn sm" href="tel:+910000000000">Call</a></div>
+    <div class="steps">${[0,1,2].map(i=>`<div class="${i<=st?'on':''}"></div>`).join('')}</div>
+    <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At Karjat station</span></div>
+    <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}. Sample driver shown.</p>`}
+  $$('[data-open]').forEach(b=>b.onclick=()=>{location.hash='more';show('more');goMore(b.dataset.open)});
+}
+const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec'})[d];
+const fmtT=t=>{const[h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`};
+$('#qrBtn').onclick=()=>{
+  if(!ME)return;const o=$('#qrOut');if(!o.hidden){o.hidden=true;$('#qrBtn').textContent='Show check-in QR';return}
+  const data=`JB2026|${ME.n}|ROOM ${ME.room||'-'}|TABLE ${ME.table}`;let img='';
+  try{const q=qrcode(0,'M');q.addData(data);q.make();img=q.createSvgTag({cellSize:5,margin:2,scalable:true})}catch(e){img='<p class="muted small" style="line-height:1.4;width:200px">QR loads when online</p>'}
+  o.innerHTML=`<div class="qrwrap"><div class="qrbox">${img}</div><b>${esc(ME.n)}</b><p class="muted small">Show this at the hotel desk to check in${ME.room?` to room ${ME.room}`:''}. Volunteers scan it to find your details.</p></div>`;
+  o.hidden=false;$('#qrBtn').textContent='Hide QR';
+};
+$('#feed').innerHTML=POSTS.map(p=>`<div class="post"><span class="dot" style="background:${p.c}"></span><div><b>${p.t}</b><span>${p.b}</span><br><time>${p.ago}${p.k?` · ${p.k}`:''}</time></div></div>`).join('');
+$('#newCount').textContent=POSTS.length+' new';
+
+let alerts=store.get('alerts',{on:false,ev:{}});
+function renderAlerts(){
+  $('#alertSw').setAttribute('aria-checked',alerts.on);
+  const n=myEvents().filter(e=>alerts.ev[e.id]!==false).length;
+  $('#alertSub').textContent=alerts.on?`On for ${n} event${n===1?'':'s'}: 30 min before, plus live updates`:'Turn on so you never miss a ceremony';
+  $('#testAlert').hidden=!alerts.on;
+}
+$('#alertSw').onclick=()=>{alerts.on=!alerts.on;store.set('alerts',alerts);renderAlerts();renderSchedule();toast(alerts.on?'Alerts on':'Alerts off')};
+function notify(title,body){
+  const el=$('#notif');el.innerHTML=`<img src="assets/postcard_jb_monogram.png" alt=""><div style="min-width:0"><b>${esc(title)}</b><br><span class="small">${esc(body)}</span><br><small>Jeet &amp; Bhavini · now</small></div>`;
+  el.hidden=false;clearTimeout(notify.t);notify.t=setTimeout(()=>el.hidden=true,5000);
+}
+$('#notif').onclick=()=>$('#notif').hidden=true;
+$('#testAlert').onclick=()=>{const e=nextEvent();notify(`${e.name} starts in 30 minutes`,`Please make your way to ${e.venue}.`)};
+
+function renderLive(){
+  const now=Date.now(),start=HASTAMELAP.getTime(),end=start+2*36e5;
+  const live=now>=start-30*6e4&&now<=end,over=now>end,days=Math.ceil((start-now)/864e5);
+  $('#live').innerHTML=`<span class="badge ${live?'on':''}">${live?'● LIVE NOW':over?'REPLAY':'LIVE STREAM'}</span>
+   <h3>${live?'Watch the Hastamelap live':over?'Watch the Hastamelap again':'Can\'t be in Karjat? Watch live'}</h3>
+   ${live||over?'':`<div class="time">5:41 PM</div><p class="small" style="opacity:.9">Wednesday, 2 December · in ${days} days<br>Share this link with family abroad.</p>`}
+   <div class="row" style="flex-wrap:wrap"><a class="btn gold sm" href="${STREAM_URL}" target="_blank" rel="noopener">${live||over?'Watch now':'Open stream page'}</a>
+   <button class="btn ghost sm" id="copyStream">Copy link</button></div>`;
+  $('#copyStream').onclick=()=>navigator.clipboard.writeText(STREAM_URL).then(()=>toast('Link copied'),()=>toast(STREAM_URL));
+}
+$('#homeHelp').onclick=()=>{location.hash='more';show('more');goMore('help')};
+
+/* ---------- schedule ---------- */
+let curDay=null;let rsvp=store.get('rsvp',{});let packed=store.get('packed',{});
+function renderSchedule(){
+  const mine=myEvents();const days=DAYS.filter(d=>mine.some(e=>e.day===d.id));
+  if(!days.some(d=>d.id===curDay))curDay=(days.find(d=>d.id===nextEvent().day)||days[0]).id;
+  $('#days').innerHTML=days.map(d=>`<button aria-pressed="${d.id===curDay}" data-day="${d.id}"><span>${d.dow}</span><b>${d.d}</b><span>${d.m}</span></button>`).join('');
+  $$('#days button').forEach(b=>b.onclick=()=>{curDay=b.dataset.day;renderSchedule()});
+  $('#events').innerHTML=mine.filter(e=>e.day===curDay).map(e=>{const on=alerts.on&&alerts.ev[e.id]!==false;return `
+   <article class="event"><div class="art"><img src="${e.img}" alt=""></div>
+   <div class="body">
+     <div><h2>${evName(e)}</h2><p class="tag">${e.tag}</p></div>
+     ${e.moments?`<div class="moments">${e.moments.map(([t,n])=>`<div><b>${t}</b><span>${n}</span></div>`).join('')}</div>`:''}
+     <dl class="meta"><dt>When</dt><dd>${DAYS.find(d=>d.id===e.day).dow}, ${e.day} Dec · ${e.time}</dd><dt>Where</dt><dd>${e.venue}, Karjat</dd><dt>Wear</dt><dd>${e.dress} <span class="suggest">(suggested)</span></dd></dl>
+     <p class="muted small">${e.note}</p>
+     <details><summary>What to bring</summary><div>${e.pack.map((x,i)=>{const k=e.id+i;return `<label class="pack ${packed[k]?'done':''}"><input type="checkbox" data-pk="${k}" ${packed[k]?'checked':''}><span>${x}</span></label>`}).join('')}</div></details>
+     <details><summary>What happens here</summary><div>${e.rites.map(([n,d])=>`<div class="rite"><b>${n}</b><p>${d}</p></div>`).join('')}</div></details>
+     <div class="rsvp" role="group" aria-label="RSVP for ${e.name}">${['Going','Maybe','Can\'t'].map(o=>`<button data-ev="${e.id}" data-v="${o}" aria-pressed="${rsvp[e.id]===o}">${o}</button>`).join('')}</div>
+     <div class="row"><a class="btn ghost sm" style="flex:1" href="https://maps.google.com/?q=${encodeURIComponent('Oleander Karjat')}" target="_blank" rel="noopener">Directions</a>
+     <button class="bell" data-bell="${e.id}" aria-pressed="${on}">${on?'Reminder on':'Remind me'}</button></div>
+   </div></article>`}).join('');
+  $$('[data-pk]').forEach(c=>c.onchange=()=>{packed[c.dataset.pk]=c.checked;store.set('packed',packed);c.parentElement.classList.toggle('done',c.checked)});
+  $$('.rsvp button').forEach(b=>b.onclick=()=>{rsvp[b.dataset.ev]=b.dataset.v;store.set('rsvp',rsvp);renderSchedule();toast('RSVP saved')});
+  $$('[data-bell]').forEach(b=>b.onclick=()=>{const id=b.dataset.bell;
+    if(!alerts.on){alerts.on=true;alerts.ev[id]=true}else alerts.ev[id]=alerts.ev[id]===false;
+    store.set('alerts',alerts);renderSchedule();renderAlerts();toast(alerts.ev[id]!==false?'We\'ll remind you 30 min before':'Reminder off')});
+  $('#rsvpCount').textContent=`${mine.filter(e=>rsvp[e.id]==='Going').length}/${mine.length} going`;
+}
+
+/* ---------- camera ---------- */
+let myPhotos=[];let developed=false;let phView='feed';
+let shots=store.get('shots',24);$('#shots').textContent=shots;
+$('#shot').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  if(shots<=0)return toast('No shots left today. More at midnight!');
+  const url=URL.createObjectURL(f);const img=new Image();
+  img.onload=()=>{myPhotos.unshift({src:url,by:'You',ev:nextEvent().name,ar:`${img.naturalWidth}/${img.naturalHeight}`,mine:true});shots--;store.set('shots',shots);$('#shots').textContent=shots;phView='mine';renderPhotos();toast('Shot taken. It develops tomorrow at 9 am')};
+  img.src=url;
+};
+$$('.tabs button').forEach(b=>b.onclick=()=>{phView=b.dataset.ph;renderPhotos()});
+$('#develop').onclick=()=>{developed=!developed;renderPhotos()};
+const photoHTML=(p,blur)=>`<figure class="photo"><div class="img ${blur?'dev':''}" style="--ar:${p.ar};background-image:url('${p.src}')"></div><figcaption>${esc(p.by)}<small>${esc(p.ev)}</small></figcaption></figure>`;
+function renderPhotos(){
+  $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ph===phView));
+  const list=phView==='feed'?[...myPhotos,...PREWED]:myPhotos;
+  $('#develop').textContent=developed?'Hide again (demo)':'Develop now (demo)';
+  $('#develop').hidden=!myPhotos.length;
+  $('#phNote').textContent=phView==='mine'?`${myPhotos.length} photo${myPhotos.length===1?'':'s'} · ${developed?'developed':'developing'}`:'From every guest and the photographer';
+  $('#photos').innerHTML=list.length?list.map(p=>photoHTML(p,p.mine&&!developed)).join(''):'<p class="muted">No photos yet. Tap the shutter above to take your first one.</p>';
+}
+$('#selfie').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);e.target.value='';
+  $('#faceOut').innerHTML=`<div class="row"><div class="selfie" style="background-image:url(${url})"></div><div style="flex:1"><b>Scanning wedding photos…</b><div class="scan" style="margin-top:8px"><i id="scanBar"></i></div></div></div>`;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>$('#scanBar').style.width='100%'));
+  setTimeout(()=>{const hits=[...myPhotos.map(p=>({...p,mine:false})),PREWED[0],PREWED[2]];
+    $('#faceOut').innerHTML=`<div class="row"><div class="selfie" style="background-image:url(${url})"></div><div><b>Found ${hits.length} photos of you</b><p class="muted small">Preview result. The real app matches faces automatically.</p></div></div><div class="grid">${hits.map(p=>photoHTML(p,false)).join('')}</div>`;
+  },2000);
+};
+
+/* ---------- info ---------- */
+const subs=['help','lost','seat','wishes','travel','map','family','stay','faq','songs','contacts'];
+function goMore(g){if(g==='family')renderFamily();if(g==='map')renderMap();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0)}
+$$('[data-go]').forEach(b=>b.onclick=()=>goMore(b.dataset.go));
+const CATS=['Cab or transport','Room issue','Medical','Food / dietary','Lost something','Something else'];
+let helpCat=null;let tickets=store.get('tickets',[]);
+function renderHelp(){
+  $('#helpCats').innerHTML=CATS.map(c=>`<button aria-pressed="${c===helpCat}" data-cat="${c}">${c}</button>`).join('');
+  $$('#helpCats button').forEach(b=>b.onclick=()=>{if(b.dataset.cat==='Lost something')return goMore('lost');helpCat=b.dataset.cat;renderHelp()});
+  $('#tickets').innerHTML=tickets.map(t=>`<div class="ticket"><div class="row between"><b>${esc(t.cat)}</b><span class="chip sage">#${t.id}</span></div>
+    ${t.text?`<p style="margin-top:6px">${esc(t.text)}</p>`:''}<p class="muted small" style="margin-top:6px">Sent ${t.at} · The team will call you within 10 minutes${t.cat==='Medical'?'. In an emergency call 112':''}.</p></div>`).join('');
+}
+$('#helpSend').onclick=()=>{
+  if(!helpCat)return toast('Pick what you need help with');
+  tickets.unshift({id:'JB-'+(101+tickets.length),cat:helpCat,text:$('#helpText').value.trim(),at:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})});
+  store.set('tickets',tickets);helpCat=null;$('#helpText').value='';renderHelp();toast('Sent to the hospitality team (preview)');
+};
+const FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, table 5']];
+let lost=store.get('lost',[]);
+function renderLost(){
+  $('#found').innerHTML=FOUND.map(([i,w])=>`<div class="post" style="align-items:center"><div style="flex:1;min-width:0"><b>${i}</b><span class="muted small">${w}</span></div><button class="btn ghost sm" data-claim>It's mine</button></div>`).join('');
+  $$('[data-claim]').forEach(b=>b.onclick=()=>toast('Collect it from the lobby desk'));
+  $('#myLost').innerHTML=lost.map(l=>`<div class="wish"><b>${esc(l.item)}</b><p class="small" style="font:400 13px var(--body)">Last seen: ${esc(l.where||'not sure')} · Searching</p></div>`).join('');
+}
+$('#lostBtn').onclick=()=>{const item=$('#lostItem').value.trim();if(!item)return toast('Tell us what you lost');lost.unshift({item,where:$('#lostWhere').value.trim()});store.set('lost',lost);$('#lostItem').value='';$('#lostWhere').value='';renderLost();toast('Reported. We\'ll alert you if it turns up')};
+$('#seatQ').oninput=e=>{
+  const q=e.target.value.trim().toLowerCase();
+  if(q.length<2){$('#seatOut').innerHTML='<p class="muted">Start typing your first or last name.</p>';return}
+  const hits=SEATS.filter(s=>s[0].toLowerCase().includes(q));
+  $('#seatOut').innerHTML=hits.length?hits.map(([n,t])=>{const mates=SEATS.filter(s=>s[1]===t&&s[0]!==n).map(s=>s[0]).join(', ');
+    return `<div class="seat-result" style="margin-bottom:10px"><p class="eyebrow">${esc(n)}</p><b>Table ${t}</b><p>Sitting with: ${mates||'new friends!'}</p></div>`}).join('')
+    :'<p class="muted">No match. Tap Need help and the team will sort it out.</p>';
+};
+let wishes=store.get('wishes',[]);
+function renderWishes(){$('#wishes').innerHTML=wishes.length?wishes.map(x=>`<div class="wish"><p>“${esc(x.w)}”</p><b class="small">— ${esc(x.n)}</b></div>`).join(''):'<p class="muted">Be the first to bless Jeet & Bhavini.</p>'}
+$('#wishBtn').onclick=()=>{const w=$('#wishText').value.trim();if(!w)return toast('Write a blessing first');wishes.unshift({n:$('#wishName').value.trim()||'A guest',w});store.set('wishes',wishes);$('#wishText').value='';renderWishes();toast('Blessing posted')};
+let songs=store.get('songs',[]);
+function renderSongs(){songs.sort((a,b)=>b.v-a.v);$('#songs').innerHTML=songs.length?songs.map((x,i)=>`<div class="post" style="align-items:center"><span style="flex:1">${esc(x.s)}</span><button class="btn ghost sm" data-i="${i}">▲ ${x.v}</button></div>`).join(''):'<p class="muted">No requests yet. Add the first one.</p>';
+  $$('#songs button').forEach(b=>b.onclick=()=>{songs[b.dataset.i].v++;store.set('songs',songs);renderSongs()})}
+$('#songBtn').onclick=()=>{const s=$('#songQ').value.trim();if(!s)return;songs.push({s,v:1});store.set('songs',songs);$('#songQ').value='';renderSongs();toast('Added to the DJ list')};
+
+/* ---------- arrival form ---------- */
+const MODES=['Train','Flight','Car','Bus'];
+let tMode=travel?.mode||'Train',tPick=travel?travel.pickup:true;
+function renderTravel(){
+  $('#tMode').innerHTML=MODES.map(m=>`<button data-m="${m}" aria-pressed="${m===tMode}">${m}</button>`).join('');
+  $$('#tMode button').forEach(b=>b.onclick=()=>{tMode=b.dataset.m;if(tMode==='Car')tPick=false;renderTravel()});
+  $('#tFromLbl').textContent={Train:'Train name / number',Flight:'Flight number (Mumbai or Pune airport)',Car:'Coming from (city)',Bus:'Bus operator / from'}[tMode];
+  $('#tFrom').placeholder={Train:'e.g. 11007 Deccan Express',Flight:'e.g. 6E 2131 to Mumbai',Car:'e.g. Ahmedabad',Bus:'e.g. from Surat'}[tMode];
+  $('#tPickup').setAttribute('aria-checked',tPick);
+  if(travel){$('#tDay').value=travel.day;$('#tTime').value=travel.time;$('#tFrom').value=travel.from;$('#tPeople').value=travel.people;$('#tLeave').value=travel.leave}
+  $('#tDone').innerHTML=travel?`<div class="ticket"><b>Saved</b><p class="small" style="margin-top:4px">${travel.mode} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}${travel.pickup?' · pickup requested':''}. You'll get your driver's details on the Home screen.</p></div>`:'';
+}
+$('#tPickup').onclick=()=>{tPick=!tPick;$('#tPickup').setAttribute('aria-checked',tPick)};
+$('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime').value||'08:00',from:$('#tFrom').value.trim(),people:Math.max(1,+$('#tPeople').value||1),leave:$('#tLeave').value,pickup:tPick};
+  store.set('travel',travel);renderTravel();renderPickup();toast('Arrival saved. Thank you!')};
+
+/* ---------- venue map ---------- */
+const PLACES=[
+ {id:'lobby',n:'Lobby & help desk',c:'#c99a5b',d:'Check-in, welcome kits, lost & found and the hospitality team.',shape:'<rect x="150" y="300" width="100" height="56" rx="10"/>',lx:200,ly:333},
+ {id:'ballroom',n:'Ballroom',c:'#8e3a5d',d:'Mameru (1 Dec, 9 AM) and Mandap Ropan (2 Dec, 8 AM).',shape:'<rect x="24" y="170" width="140" height="100" rx="14"/>',lx:94,ly:225},
+ {id:'lawn',n:'Lawn',c:'#5f8f5a',d:'Sangeet (1 Dec, 7 PM) and dinner.',shape:'<rect x="186" y="150" width="190" height="120" rx="14"/>',lx:281,ly:215},
+ {id:'lake',n:'Lake Side',c:'#4f86a8',d:'Wedding: Jaan 3:30 PM, Hastamelap 5:41 PM (2 Dec). Shuttle gate is here too.',shape:'<ellipse cx="200" cy="70" rx="170" ry="50"/>',lx:200,ly:74},
+ {id:'rooms',n:'Guest rooms',c:'#a8894f',d:'Room blocks 100–200. Your room number is on your pass.',shape:'<rect x="270" y="300" width="106" height="90" rx="10"/>',lx:323,ly:349},
+ {id:'wash',s:'WC',n:'Washrooms',c:'#7d7a74',d:'Next to the Ballroom and behind the Lawn stage.',shape:'<rect x="24" y="290" width="60" height="40" rx="8"/>',lx:54,ly:314},
+ {id:'parking',n:'Parking & main gate',c:'#5b5550',d:'Car parking and the station shuttle stop.',shape:'<rect x="24" y="356" width="226" height="40" rx="8"/>',lx:137,ly:380},
+];
+let mapSel=null;
+function renderMap(){
+  $('#legend').innerHTML=PLACES.map(p=>`<button data-pl="${p.id}" aria-pressed="${p.id===mapSel}"><i style="background:${p.c}"></i>${p.n}</button>`).join('');
+  $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(mapSel===b.dataset.pl?null:b.dataset.pl));
+  $('#map').className='map'+(mapSel?' focus':'');
+  $('#map').innerHTML=`<svg viewBox="0 0 400 410" role="img" aria-label="Illustrative map of Oleander, Karjat">
+    <rect width="400" height="410" fill="#eef0e2"/><path d="M200 120 V300 M60 280 H350" stroke="#d9d2bd" stroke-width="10" stroke-linecap="round" fill="none"/>
+    ${PLACES.map(p=>`<g class="zone ${p.id===mapSel?'hl':''}" data-pl="${p.id}" fill="${p.c}">${p.shape}<text x="${p.lx}" y="${p.ly}" text-anchor="middle" fill="#fff" style="fill:#fff">${p.s||p.n.split(' & ')[0]}</text></g>`).join('')}
+    <g transform="translate(372,392)"><text text-anchor="end" style="font-size:11px">N ↑</text></g></svg>`;
+  $$('#map .zone').forEach(g=>g.onclick=()=>focusPlace(g.dataset.pl));
+  const p=PLACES.find(x=>x.id===mapSel);
+  $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${p.n}</h3><p class="muted">${p.d}</p>`:`<p class="muted">Tap a place on the map to see what happens there. Your next event: <b>${evName(nextEvent())}</b> at ${nextEvent().venue}.</p>`;
+}
+function focusPlace(id){mapSel=id;renderMap()}
+
+/* ---------- family only ---------- */
+const DUTIES=[
+ {who:'Ravi (cousin)',t:'Jaan arrangements: dhol, ghodi, safas',when:'2 Dec · 2:30 PM · Lake Side gate'},
+ {who:'Priya (cousin)',t:'Mameru gift trays ready and counted',when:'1 Dec · 8:00 AM · Ballroom'},
+ {who:'Amit (friend)',t:'Station pickups coordinator',when:'30 Nov – 1 Dec · all day'},
+ {who:'Hetal masi',t:'Welcome aarti thali and kumkum',when:'2 Dec · 3:15 PM · Lake Side'},
+ {who:'Kunal (friend)',t:'Sangeet sound check with DJ',when:'1 Dec · 5:00 PM · Lawn'},
+ {who:'Mehul kaka',t:'Pandit ji pickup and puja samagri',when:'2 Dec · 7:00 AM'},
+];
+const VENDORS=[['🌸','Decorator','Mandap, Lawn and Lake Side'],['🎧','DJ & sound','Sangeet and Jaan'],['🍽️','Caterer','All meals · Jain counter'],['📷','Photographer','Photos and video'],['🥁','Dhol & band','Jaan Prastan'],['🙏','Pandit ji','Mandap Ropan and Wedding'],['🚐','Transport','Station shuttles and cabs'],['🏨','Oleander manager','Rooms and venue']];
+let famOpen=store.get('famOpen',false),famTab='duties',dutyDone=store.get('dutyDone',{});
+function renderFamily(){
+  $('#famLock').hidden=famOpen;$('#famBody').hidden=!famOpen;if(!famOpen)return;
+  $$('.ftabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ft===famTab));
+  const o=$('#famOut');
+  if(famTab==='duties'){const n=DUTIES.filter((d,i)=>dutyDone[i]).length;
+    o.innerHTML=`<p class="muted small">${n} of ${DUTIES.length} done · sample names</p>`+DUTIES.map((d,i)=>`<label class="duty ${dutyDone[i]?'done':''}"><input type="checkbox" data-du="${i}" ${dutyDone[i]?'checked':''}><div><b>${d.t}</b><div class="muted small">${d.who} · ${d.when}</div></div></label>`).join('');
+    $$('[data-du]').forEach(c=>c.onchange=()=>{dutyDone[c.dataset.du]=c.checked;store.set('dutyDone',dutyDone);renderFamily()})}
+  else if(famTab==='vendors'){o.innerHTML=VENDORS.map(([i,n,d])=>`<div class="vendor"><span class="ic">${i}</span><div style="flex:1;min-width:0"><b>${n}</b><div class="muted small">${d} · number coming soon</div></div><button class="btn ghost sm" data-call>Call</button></div>`).join('');
+    $$('[data-call]').forEach(b=>b.onclick=()=>toast('Add vendor numbers to enable calling'))}
+  else{const list=[...(travel?[{n:ME?ME.n:'You',...travel}]:[]),{n:'Kunal Mehta',mode:'Train',day:'1',time:'07:40',people:3,pickup:true,from:'Deccan Express'},{n:'Riya Shah',mode:'Car',day:'30',time:'18:00',people:4,pickup:false,from:'Ahmedabad'},{n:'Neha Patel',mode:'Flight',day:'1',time:'10:15',people:1,pickup:true,from:'6E 2131'}].filter((x,i)=>i===0&&travel||!ME||x.n!==ME.n);
+    const ppl=list.reduce((s,x)=>s+(+x.people),0),pk=list.filter(x=>x.pickup).length;
+    o.innerHTML=`<div class="stat"><div><b>${list.length}</b><span>Families</span></div><div><b>${ppl}</b><span>People</span></div><div><b>${pk}</b><span>Pickups</span></div></div>`+
+     list.map(x=>`<div class="arr"><b>${esc(x.n)}</b><span class="chip ${x.pickup?'sage':''}">${x.pickup?'Pickup':'Own'}</span><span class="muted small">${x.mode} · ${esc(x.from||'')} · ${x.people} ppl</span><span class="muted small">${dayLbl(x.day)}, ${fmtT(x.time)}</span></div>`).join('')}
+}
+$('#famGo').onclick=()=>{if($('#famPin').value==='1202'){famOpen=true;store.set('famOpen',true);renderFamily()}else toast('Wrong PIN')};
+$$('.ftabs button').forEach(b=>b.onclick=()=>{famTab=b.dataset.ft;renderFamily()});
+
+/* ---------- guest login ---------- */
+function renderLogin(){
+  const q=$('#loginQ').value.trim().toLowerCase();
+  const hits=q.length<2?[]:GUESTS.filter(g=>g.n.toLowerCase().includes(q));
+  $('#loginHits').innerHTML=(q.length<2?'':hits.length?hits.map(g=>`<button class="guest-hit" data-g="${GUESTS.indexOf(g)}"><span><b>${g.n}</b><br><small>${g.side}</small></span><span class="chip sage">That's me</span></button>`).join('')
+    :'<p class="muted">We couldn\'t find that name. Try your first name only.</p>')
+    +'<button class="linkbtn" id="skipLogin">Browse without signing in</button>';
+  $$('[data-g]').forEach(b=>b.onclick=()=>{ME=GUESTS[+b.dataset.g];store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`)});
+  $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
+}
+function openLogin(){$('#login').hidden=false;$('#loginQ').value='';renderLogin()}
+function closeLogin(){$('#login').hidden=true;renderAll()}
+$('#loginQ').oninput=renderLogin;
+$('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
+
+function renderAll(){
+  renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
+  $('#seatQ').value=ME?ME.n.split(' ')[0]:'';$('#seatQ').dispatchEvent(new Event('input'));
+}
+renderAll();applyLang();
+if(!ME&&!store.get('skipLogin',false))openLogin();
+show(location.hash.slice(1)||'home');
+</script>
