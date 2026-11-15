@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fbf6ee">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<title>Family panel · Jeet &amp; Bhavini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Jost:wght@400;500;600&display=swap">
+<style>
+:root{color-scheme:light;--paper:#fbf6ee;--card:#fffaf2;--ink:#33322e;--muted:#6b6862;--line:#e8dfcd;--plum:#8e3a5d;--plum-deep:#5e1f3a;--plum-soft:#f4e4ea;
+  --gold:#a8894f;--gold-deep:#7b5a2a;--gold-soft:#f3ead6;--sage:#2f6449;--sage-soft:#e4ede5;--red:#b3261e;--red-soft:#fbe7e5;
+  --display:"Cormorant Garamond",Georgia,serif;--body:"Jost",system-ui,sans-serif}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--body)}
+.wrap{max-width:860px;margin:0 auto;padding:14px max(16px,env(safe-area-inset-left)) 60px}
+h1,h2,h3{font-family:var(--display);color:var(--plum-deep);margin:0;font-weight:600}
+h1{font-size:30px}h2{font-size:24px}h3{font-size:19px}
+p{margin:0}.muted{color:var(--muted)}.small{font-size:13px}
+.top{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:12px}
+.top img{width:38px}.brand{display:flex;gap:10px;align-items:center}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin:0 -2px 14px;scrollbar-width:none}
+.tabs button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:500 14px var(--body);cursor:pointer;position:relative}
+.tabs button[aria-pressed=true]{background:var(--plum);border-color:var(--plum);color:#fff}
+.tabs .badge{position:absolute;top:-5px;right:-4px;background:var(--red);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;line-height:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.stack{display:flex;flex-direction:column;gap:10px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+input,select,textarea{width:100%;font:15px var(--body);padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:999px;padding:10px 16px;background:var(--plum);color:#fff;font:500 14px var(--body);cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum)}
+.btn.sm{padding:6px 12px;font-size:13px}.btn.sage{background:var(--sage)}.btn.danger{background:transparent;color:var(--red);box-shadow:inset 0 0 0 1.5px var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-block;font-size:12px;font-weight:500;padding:3px 10px;border-radius:999px;background:var(--gold-soft);color:var(--gold-deep)}
+.chip.sage{background:var(--sage-soft);color:var(--sage)}.chip.plum{background:var(--plum-soft);color:var(--plum)}.chip.red{background:var(--red-soft);color:var(--red)}
+.item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.item.open{border-left:4px solid var(--red)}.item.working{border-left:4px solid var(--gold)}.item.done{opacity:.6}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
+.stats b{display:block;font:600 26px var(--display);color:var(--plum-deep)}.stats span{font-size:12px;color:var(--muted)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.photos figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.photos img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.photos .hid img{opacity:.3}
+.photos figcaption{padding:6px 8px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--plum-deep);color:#fff;padding:10px 18px;border-radius:999px;z-index:9;max-width:90vw}
+.center{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.center img{width:120px}
+.err{color:var(--red);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="gate" class="center">
+    <img src="assets/postcard_jb_monogram.png" alt="JB monogram">
+    <h1>Family panel</h1>
+    <p class="muted" id="gateMsg">Loading…</p>
+    <button class="btn" id="signIn" hidden>Sign in with Google</button>
+    <a class="muted small" href="./">← Back to the guest app</a>
+  </div>
+
+  <div id="panel" hidden>
+    <div class="top">
+      <div class="brand"><img src="assets/postcard_jb_monogram.png" alt=""><div><h2 style="font-size:22px">Family panel</h2><p class="muted small" id="whoami"></p></div></div>
+      <button class="btn ghost sm" id="signOut">Sign out</button>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+
+    <!-- LIVE -->
+    <section data-sec="live" class="stack">
+      <div class="card">
+        <h3>Happening now banner</h3>
+        <p class="muted small">Shows at the top of every guest's Home screen.</p>
+        <input id="nowText" maxlength="140" placeholder="e.g. Varmala starts in 10 min. Please come to Lake Side.">
+        <div class="row">
+          <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Lobby &amp; help desk</option><option value="ballroom">Ballroom</option><option value="lawn">Lawn</option><option value="lake">Lake Side</option><option value="rooms">Guest rooms</option><option value="parking">Parking &amp; main gate</option></select>
+          <button class="btn" id="nowSave">Show to guests</button><button class="btn ghost" id="nowOff">Hide banner</button>
+        </div>
+        <p class="small" id="nowState"></p>
+      </div>
+      <div class="card">
+        <h3>Post a live update</h3>
+        <input id="postTitle" maxlength="80" placeholder="Title, e.g. Dinner is open">
+        <textarea id="postBody" rows="2" maxlength="300" placeholder="Details, e.g. Buffet is ready on the Lawn. Jain counter on the left."></textarea>
+        <div class="row"><select id="postKind" style="flex:1"><option>Info</option><option>Ceremony</option><option>Food</option><option>Shuttle</option></select><button class="btn" id="postSend">Post</button></div>
+      </div>
+      <h3>Posted updates</h3>
+      <div class="stack" id="postList"></div>
+    </section>
+
+    <!-- HELP -->
+    <section data-sec="help" class="stack" hidden>
+      <p class="muted">Help requests from guests. Call them back, then mark it resolved.</p>
+      <div class="stack" id="ticketList"></div>
+    </section>
+
+    <!-- LOST -->
+    <section data-sec="lost" class="stack" hidden>
+      <div class="card">
+        <h3>Add a found item</h3>
+        <p class="muted small">Guests see this list under Lost &amp; found.</p>
+        <div class="grid2"><input id="foundItem" placeholder="Item, e.g. gold jhumka"><input id="foundWhere" placeholder="Where found, e.g. Sangeet lawn"></div>
+        <button class="btn" id="foundAdd" style="align-self:flex-start">Add</button>
+      </div>
+      <div class="grid2" style="align-items:start">
+        <div class="stack"><h3>Guests are looking for</h3><div class="stack" id="lostList"></div></div>
+        <div class="stack"><h3>Found items</h3><div class="stack" id="foundList"></div></div>
+      </div>
+    </section>
+
+    <!-- PICKUPS -->
+    <section data-sec="pickups" class="stack" hidden>
+      <div class="stats" id="arrStats"></div>
+      <p class="muted small">Assign a driver and the guest sees the name, car, number plate and a Call button on their Home screen. Drivers come from the Drivers tab of the Excel.</p>
+      <div class="stack" id="arrList"></div>
+    </section>
+
+    <!-- GUESTS -->
+    <section data-sec="guests" class="stack" hidden>
+      <div class="card">
+        <h3>Import the guest list</h3>
+        <p class="muted small">Choose the filled-in <b>Wedding guest list.xlsx</b>. It updates guests, volunteers, vendors, help contacts and drivers. You can import again any time after changes.</p>
+        <input type="file" id="xlsx" accept=".xlsx,.xls">
+        <div id="importOut" class="stack"></div>
+      </div>
+      <div class="stats" id="guestStats"></div>
+      <input id="guestQ" placeholder="Search by name, phone or room">
+      <div class="tablewrap"><table><thead><tr><th>Guest</th><th>Phone</th><th>Side</th><th>People</th><th>Room</th><th>Events</th><th>RSVP</th></tr></thead><tbody id="guestRows"></tbody></table></div>
+    </section>
+
+    <!-- PHOTOS -->
+    <section data-sec="photos" class="stack" hidden>
+      <div class="card">
+        <h3>Add photographer photos</h3>
+        <p class="muted small">JPEGs only (not RAW). They appear for guests straight away, labelled Photographer.</p>
+        <div class="row"><select id="phEvent" style="flex:1"><option>Mameru</option><option>Sangeet</option><option>Mandap Ropan</option><option>Wedding</option></select><input type="file" id="phFiles" accept="image/jpeg,image/png" multiple style="flex:2"></div>
+        <p class="small" id="phProgress"></p>
+      </div>
+      <div class="row between"><p class="muted small" id="phCount"></p><select id="phFilter" style="width:auto"><option value="all">All photos</option><option value="guest">Guest camera</option><option value="photographer">Photographer</option><option value="hidden">Hidden</option></select></div>
+      <div class="photos" id="photoGrid"></div>
+    </section>
+
+    <!-- TEAM -->
+    <section data-sec="team" class="stack" hidden>
+      <h3>Duties</h3><div class="stack" id="dutyList"></div>
+      <h3>Vendors</h3><div class="stack" id="vendorList"></div>
+      <h3>Drivers</h3><div class="stack" id="driverList"></div>
+      <h3>Help contacts (shown to guests)</h3><div class="stack" id="contactList"></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+import { FIREBASE_CONFIG } from './js/config.js';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const toast = t => { const e = $('#toast'); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 2600); };
+const normPhone = v => String(v ?? '').replace(/\D/g, '').slice(-10);
+const fail = e => { console.error(e); toast(e?.code === 'permission-denied' ? 'Not allowed for this account' : 'Something went wrong. Try again'); };
+
+if (!FIREBASE_CONFIG) {
+  $('#gateMsg').innerHTML = 'Firebase isn\'t connected yet. Once the project config is added to <code>js/config.js</code>, family can sign in here.';
+} else start().catch(e => { console.error(e); $('#gateMsg').textContent = 'Couldn\'t load. Check your internet and refresh.'; });
+
+async function start() {
+  const G = 'https://www.gstatic.com/firebasejs/10.14.1';
+  const [{ initializeApp }, A, F, S] = await Promise.all([
+    import(`${G}/firebase-app.js`), import(`${G}/firebase-auth.js`), import(`${G}/firebase-firestore.js`), import(`${G}/firebase-storage.js`)]);
+  const app = initializeApp(FIREBASE_CONFIG);
+  const auth = A.getAuth(app), db = F.getFirestore(app), st = S.getStorage(app);
+  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp, writeBatch, Timestamp } = F;
+  const ms = t => (t && t.toMillis ? t.toMillis() : 0);
+  const when = t => t ? new Date(ms(t)).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  const list = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
+  const byNew = (a, b) => ms(b.createdAt) - ms(a.createdAt);
+
+  $('#signIn').onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch(e => { if (e.code !== 'auth/popup-closed-by-user') fail(e); });
+  $('#signOut').onclick = () => A.signOut(auth).then(() => location.reload());
+
+  A.onAuthStateChanged(auth, async u => {
+    if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
+    $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true;
+    try { const a = await getDoc(doc(db, 'admins', u.email)); if (!a.exists()) throw { code: 'permission-denied' }; }
+    catch (e) {
+      $('#gateMsg').innerHTML = `<b>${esc(u.email)}</b> isn't on the family list yet. Ask Jeet to add this email in Firebase → Firestore → <code>admins</code>.`;
+      $('#signIn').hidden = false; $('#signIn').textContent = 'Use a different account'; return;
+    }
+    $('#gate').hidden = true; $('#panel').hidden = false; $('#whoami').textContent = u.email;
+    run(u);
+  });
+
+  function run(u) {
+    // ---------- tabs ----------
+    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']];
+    let cur = location.hash.slice(1) || 'live';
+    const badges = {};
+    function tabs() {
+      $('#tabs').innerHTML = TABS.map(([k, n]) => `<button data-k="${k}" aria-pressed="${k === cur}">${n}${badges[k] ? `<span class="badge">${badges[k]}</span>` : ''}</button>`).join('');
+      $$('#tabs button').forEach(b => b.onclick = () => { cur = b.dataset.k; location.hash = cur; tabs(); });
+      $$('[data-sec]').forEach(s => s.hidden = s.dataset.sec !== cur);
+    }
+    tabs();
+
+    // ---------- live ----------
+    onSnapshot(doc(db, 'config', 'now'), s => {
+      const n = s.exists() ? s.data() : {};
+      $('#nowState').innerHTML = n.on && n.text ? `<span class="chip sage">Showing now</span> ${esc(n.text)}` : '<span class="chip">Banner is hidden</span>';
+      if (document.activeElement !== $('#nowText')) $('#nowText').value = n.text || '';
+      $('#nowPlace').value = n.place || '';
+    });
+    $('#nowSave').onclick = () => { const text = $('#nowText').value.trim(); if (!text) return toast('Write the message first');
+      setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, on: true, by: u.email, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
+    $('#nowOff').onclick = () => setDoc(doc(db, 'config', 'now'), { on: false, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast('Banner hidden')).catch(fail);
+    $('#postSend').onclick = () => { const title = $('#postTitle').value.trim(); if (!title) return toast('Add a title');
+      addDoc(collection(db, 'posts'), { title, body: $('#postBody').value.trim(), kind: $('#postKind').value, by: u.email, createdAt: serverTimestamp() })
+        .then(() => { $('#postTitle').value = ''; $('#postBody').value = ''; toast('Posted to all guests'); }).catch(fail); };
+    onSnapshot(collection(db, 'posts'), s => {
+      const P = list(s).sort(byNew);
+      $('#postList').innerHTML = P.length ? P.map(p => `<div class="item"><div class="row between"><b>${esc(p.title)}</b><span class="chip">${esc(p.kind || 'Info')}</span></div>${p.body ? `<p>${esc(p.body)}</p>` : ''}<div class="row between"><span class="muted small">${when(p.createdAt)} · ${esc(p.by || '')}</span><button class="btn danger sm" data-del="${p.id}">Delete</button></div></div>`).join('') : '<p class="muted">Nothing posted yet.</p>';
+      $$('#postList [data-del]').forEach(b => b.onclick = () => confirm('Delete this update for everyone?') && deleteDoc(doc(db, 'posts', b.dataset.del)).catch(fail));
+    });
+
+    // ---------- help ----------
+    onSnapshot(collection(db, 'tickets'), s => {
+      const order = { open: 0, working: 1, done: 2 };
+      const T = list(s).sort((a, b) => (order[a.status] ?? 0) - (order[b.status] ?? 0) || byNew(a, b));
+      badges.help = T.filter(t => t.status === 'open').length || 0; tabs();
+      $('#ticketList').innerHTML = T.length ? T.map(t => `<div class="item ${t.status || 'open'}">
+        <div class="row between"><b>${esc(t.cat)}</b><span class="chip ${t.status === 'done' ? 'sage' : t.status === 'working' ? '' : 'red'}">${t.status === 'done' ? 'Resolved' : t.status === 'working' ? 'On it' : 'New'}</span></div>
+        ${t.text ? `<p>${esc(t.text)}</p>` : ''}
+        <p class="small">${esc(t.name || 'Guest')}${t.room ? ` · Room ${esc(t.room)}` : ''} · <span class="muted">${when(t.createdAt)}</span></p>
+        <div class="row">${t.phone ? `<a class="btn sm" href="tel:+91${esc(t.phone)}">Call ${esc(t.phone)}</a>` : '<span class="muted small">Guest hasn\'t opened their pass, so there is no number.</span>'}
+          ${t.status !== 'working' && t.status !== 'done' ? `<button class="btn ghost sm" data-st="working" data-id="${t.id}">On it</button>` : ''}
+          ${t.status !== 'done' ? `<button class="btn sage sm" data-st="done" data-id="${t.id}">Resolved</button>` : `<button class="btn ghost sm" data-st="open" data-id="${t.id}">Reopen</button>`}</div></div>`).join('') : '<p class="muted">No help requests. 🎉</p>';
+      $$('#ticketList [data-st]').forEach(b => b.onclick = () => updateDoc(doc(db, 'tickets', b.dataset.id), { status: b.dataset.st, handledBy: u.email }).catch(fail));
+    });
+
+    // ---------- lost & found ----------
+    onSnapshot(collection(db, 'lost'), s => {
+      const L = list(s).sort((a, b) => (a.status === 'found') - (b.status === 'found') || byNew(a, b));
+      badges.lost = L.filter(l => l.status !== 'found').length || 0; tabs();
+      $('#lostList').innerHTML = L.length ? L.map(l => `<div class="item ${l.status === 'found' ? 'done' : ''}"><b>${esc(l.item)}</b><p class="small">Last seen: ${esc(l.where || 'not sure')}</p>
+        <p class="small">${esc(l.name || 'Guest')}${l.room ? ` · Room ${esc(l.room)}` : ''} · <span class="muted">${when(l.createdAt)}</span></p>
+        <div class="row">${l.phone ? `<a class="btn ghost sm" href="tel:+91${esc(l.phone)}">Call</a>` : ''}${l.status !== 'found' ? `<button class="btn sage sm" data-found="${l.id}">Mark found</button>` : '<span class="chip sage">Found</span>'}</div></div>`).join('') : '<p class="muted">No reports.</p>';
+      $$('[data-found]').forEach(b => b.onclick = () => updateDoc(doc(db, 'lost', b.dataset.found), { status: 'found' }).then(() => toast('The guest sees "Found" in their app')).catch(fail));
+    });
+    $('#foundAdd').onclick = () => { const item = $('#foundItem').value.trim(); if (!item) return toast('What was found?');
+      addDoc(collection(db, 'found'), { item, where: $('#foundWhere').value.trim(), createdAt: serverTimestamp() }).then(() => { $('#foundItem').value = ''; $('#foundWhere').value = ''; toast('Added'); }).catch(fail); };
+    onSnapshot(collection(db, 'found'), s => {
+      const L = list(s).sort(byNew);
+      $('#foundList').innerHTML = L.length ? L.map(f => `<div class="item"><div class="row between"><b>${esc(f.item)}</b><button class="btn danger sm" data-fdel="${f.id}">Returned</button></div><p class="small muted">${esc(f.where || '')}</p></div>`).join('') : '<p class="muted">Nothing found yet.</p>';
+      $$('[data-fdel]').forEach(b => b.onclick = () => deleteDoc(doc(db, 'found', b.dataset.fdel)).catch(fail));
+    });
+
+    // ---------- pickups ----------
+    let DRIVERS = [], ARR = [];
+    const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec' })[d] || d;
+    onSnapshot(collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
+    onSnapshot(collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
+    function renderArr() {
+      const A2 = [...ARR].sort((a, b) => (+((a.day === '30') ? 0 : a.day) - +((b.day === '30') ? 0 : b.day)) || String(a.time).localeCompare(String(b.time)));
+      const ppl = A2.reduce((n, a) => n + (+a.people || 1), 0), pk = A2.filter(a => a.pickup && a.mode !== 'Car'), un = pk.filter(a => !a.driver?.n);
+      $('#arrStats').innerHTML = `<div><b>${A2.length}</b><span>Families sent details</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>No driver yet</span></div>`;
+      badges.pickups = un.length || 0; tabs();
+      const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('');
+      $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${a.pickup && a.mode !== 'Car' && !a.driver?.n ? 'open' : ''}">
+        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span></div>
+        <p class="small">${esc(a.mode)} · ${esc(a.from || '')} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
+        ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
+        ${a.pickup && a.mode !== 'Car' ? `<div class="grid2"><select data-drv="${a.id}">${opts(a.driver)}</select>
+          <div class="row"><input data-eta="${a.id}" placeholder="ETA, e.g. 7:50 AM" value="${esc(a.driver?.eta || '')}" style="flex:1">
+          <select data-stage="${a.id}" style="width:auto">${['Assigned', 'On the way', 'Arrived'].map((n, i) => `<option value="${i}" ${(a.driver?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
+          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update driver' : 'Assign driver'}</button>` : ''}</div>`).join('') : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
+      $$('[data-assign]').forEach(b => b.onclick = () => {
+        const id = b.dataset.assign, d = DRIVERS.find(x => x.id === $(`[data-drv="${id}"]`).value);
+        if (!d) return toast('Choose a driver');
+        updateDoc(doc(db, 'arrivals', id), { driver: { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-eta="${id}"]`).value.trim(), stage: +$(`[data-stage="${id}"]`).value } })
+          .then(() => toast('The guest can now see their driver')).catch(fail);
+      });
+    }
+
+    // ---------- guests ----------
+    let GUESTS = [], RSVP = [];
+    onSnapshot(collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); });
+    onSnapshot(collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
+    $('#guestQ').oninput = () => renderGuests();
+    const EVK = [['mameru', 'Mameru'], ['sangeet', 'Sangeet'], ['mandap', 'Mandap Ropan'], ['wedding', 'Wedding']];
+    function renderGuests() {
+      const people = GUESTS.reduce((n, g) => n + (+g.people || 1), 0);
+      const rs = Object.fromEntries(RSVP.filter(r => r.phone).map(r => [r.phone, r.answers || {}]));
+      const evCount = k => GUESTS.filter(g => g.events?.[k] !== false).reduce((n, g) => n + (+g.people || 1), 0);
+      const going = k => RSVP.filter(r => r.answers?.[k] === 'Going').length;
+      $('#guestStats').innerHTML = `<div><b>${GUESTS.length}</b><span>Families</span></div><div><b>${people}</b><span>People invited</span></div><div><b>${GUESTS.filter(g => g.room).length}</b><span>With a room</span></div>` +
+        EVK.map(([k, n]) => `<div><b>${evCount(k)}</b><span>${n} invited · ${going(k)} said going</span></div>`).join('');
+      const q = $('#guestQ').value.trim().toLowerCase();
+      const rows = GUESTS.filter(g => !q || [g.name, g.id, g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
+      $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td><a href="tel:+91${esc(g.id)}">${esc(g.id)}</a></td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
+        <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td></tr>`).join('')
+        : `<tr><td colspan="7" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Import the Excel above.'}</td></tr>`;
+    }
+
+    $('#xlsx').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return; e.target.value = '';
+      const out = $('#importOut'); out.innerHTML = '<p class="muted">Reading the file…</p>';
+      try {
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const rows = name => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { range: 1, defval: '' }) : [];
+        const val = (r, ...keys) => { for (const k of keys) { const hit = Object.keys(r).find(x => x.trim().toLowerCase().startsWith(k)); if (hit && String(r[hit]).trim() !== '') return String(r[hit]).trim(); } return ''; };
+        const sample = r => /sample/i.test(Object.values(r).join(' '));
+        const yn = v => !/^n/i.test(String(v).trim());
+        const errors = [], guests = new Map(), notes = [];
+        rows('Guests').forEach((r, i) => {
+          const name = val(r, 'guest name'); if (!name || sample(r)) return;
+          const phone = normPhone(val(r, 'phone'));
+          if (phone.length !== 10) return errors.push(`Row ${i + 3}: ${name} — phone "${val(r, 'phone')}" isn't 10 digits`);
+          if (guests.has(phone)) return errors.push(`Row ${i + 3}: ${name} — same phone as ${guests.get(phone).name}`);
+          guests.set(phone, { name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(1, parseInt(val(r, 'no. of people', 'people')) || 1),
+            room: val(r, 'room'), lang: val(r, 'language') || 'EN',
+            events: { mameru: yn(val(r, 'mameru')), sangeet: yn(val(r, 'sangeet')), mandap: yn(val(r, 'mandap')), wedding: yn(val(r, 'wedding')) } });
+          const n = val(r, 'notes'); if (n) notes.push([phone, n]);
+        });
+        const duties = rows('Volunteers').filter(r => val(r, 'volunteer') && !sample(r)).map(r => ({ who: val(r, 'volunteer'), phone: normPhone(val(r, 'phone')), task: val(r, 'duty'), date: val(r, 'date'), time: val(r, 'time'), place: val(r, 'place'), done: false }));
+        const vendors = rows('Vendors').filter(r => val(r, 'role') && !sample(r)).map(r => ({ role: val(r, 'role'), name: val(r, 'business'), phone: normPhone(val(r, 'phone')), note: val(r, 'notes') }));
+        const drivers = rows('Drivers').filter(r => val(r, 'driver') && !sample(r)).map(r => ({ name: val(r, 'driver'), phone: normPhone(val(r, 'phone')), car: val(r, 'car'), plate: val(r, 'number') }));
+        const contacts = rows('Help contacts').filter(r => val(r, 'shown') && !sample(r)).map(r => ({ label: val(r, 'shown'), phone: normPhone(val(r, 'phone')), note: [val(r, 'name'), val(r, 'notes')].filter(Boolean).join(' · ') }));
+        const gone = GUESTS.filter(g => !guests.has(g.id));
+        const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
+        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people), <b>${duties.length}</b> duties, <b>${vendors.length}</b> vendors, <b>${drivers.length}</b> drivers, <b>${contacts.length}</b> help contacts.</p>
+          ${gone.length ? `<p class="err">${gone.length} guest(s) already in the app are not in this file and will be removed: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>` : ''}
+          ${errors.length ? `<div class="err"><b>${errors.length} row(s) skipped:</b><br>${errors.map(esc).join('<br>')}</div>` : ''}
+          <button class="btn" id="doImport" ${guests.size ? '' : 'disabled'}>Import into the app</button>`;
+        $('#doImport').onclick = async () => {
+          $('#doImport').disabled = true; $('#doImport').textContent = 'Importing…';
+          const ops = [];
+          for (const [ph, g] of guests) ops.push(b => b.set(doc(db, 'guests', ph), { ...g, updatedAt: serverTimestamp() }));
+          for (const g of gone) ops.push(b => b.delete(doc(db, 'guests', g.id)));
+          for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
+          for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
+            const old = await getDocs(collection(db, col));
+            old.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+            items.forEach(x => ops.push(b => b.set(doc(collection(db, col)), x)));
+          }
+          if (contacts.length) ops.push(b => b.set(doc(db, 'config', 'contacts'), { list: contacts }));
+          for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db); ops.slice(i, i + 400).forEach(fn => fn(b)); await b.commit(); }
+          out.innerHTML = `<p class="chip sage">Imported ${guests.size} families</p>`; toast('Guest list imported');
+        };
+      } catch (err) { console.error(err); out.innerHTML = '<p class="err">Couldn\'t read that file. Make sure it\'s the guest list Excel.</p>'; }
+    };
+
+    // ---------- photos ----------
+    let PH = [];
+    onSnapshot(collection(db, 'photos'), s => { PH = list(s).sort(byNew); renderPhotos(); });
+    $('#phFilter').onchange = renderPhotos;
+    function renderPhotos() {
+      const f = $('#phFilter').value;
+      const L = PH.filter(p => f === 'all' || (f === 'hidden' ? p.hidden : (p.source || 'guest') === f));
+      $('#phCount').textContent = `${PH.length} photos · ${PH.filter(p => p.hidden).length} hidden`;
+      $('#photoGrid').innerHTML = L.length ? L.map(p => `<figure class="${p.hidden ? 'hid' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
+        <figcaption><span>${esc(p.source === 'photographer' ? 'Photographer' : p.name || 'Guest')}<br><span class="muted">${esc(p.event || '')}</span></span>
+        <button class="btn ${p.hidden ? 'sage' : 'danger'} sm" data-ph="${p.id}" data-h="${p.hidden ? 0 : 1}">${p.hidden ? 'Show' : 'Hide'}</button></figcaption></figure>`).join('') : '<p class="muted">No photos yet.</p>';
+      $$('[data-ph]').forEach(b => b.onclick = () => updateDoc(doc(db, 'photos', b.dataset.ph), { hidden: b.dataset.h === '1' }).catch(fail));
+    }
+    $('#phFiles').onchange = async e => {
+      const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+      const ev = $('#phEvent').value; let n = 0;
+      for (const f of files) {
+        $('#phProgress').textContent = `Uploading ${++n} of ${files.length}…`;
+        try {
+          const bmp = await createImageBitmap(f); const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+          const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+          c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+          const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+          const path = `photos/${u.uid}/${Date.now()}-${n}.jpg`, r = S.ref(st, path);
+          await S.uploadBytes(r, blob, { contentType: 'image/jpeg' });
+          await addDoc(collection(db, 'photos'), { uid: u.uid, name: 'Photographer', source: 'photographer', event: ev, path, url: await S.getDownloadURL(r),
+            w: c.width, h: c.height, hidden: false, revealAt: Timestamp.now(), createdAt: serverTimestamp() });
+        } catch (err) { fail(err); }
+      }
+      $('#phProgress').textContent = `Done: ${files.length} photo(s) added to ${ev}.`;
+    };
+
+    // ---------- team ----------
+    let DUT = [], VEN = [], CON = [];
+    onSnapshot(collection(db, 'duties'), s => { DUT = list(s); renderTeam(); });
+    onSnapshot(collection(db, 'vendors'), s => { VEN = list(s); renderTeam(); });
+    onSnapshot(doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
+    const tel = p => p ? `<a class="btn ghost sm" href="tel:+91${esc(p)}">Call</a>` : '';
+    function renderTeam() {
+      const done = DUT.filter(d => d.done).length;
+      $('#dutyList').innerHTML = DUT.length ? `<p class="muted small">${done} of ${DUT.length} done</p>` + DUT.map(d => `<label class="item ${d.done ? 'done' : ''}" style="flex-direction:row;align-items:flex-start;gap:12px"><input type="checkbox" data-duty="${d.id}" ${d.done ? 'checked' : ''} style="width:20px;height:20px;margin-top:3px;flex:none"><div style="flex:1"><b>${esc(d.task)}</b><p class="small muted">${esc(d.who)} · ${esc([d.date, d.time, d.place].filter(Boolean).join(' · '))}</p></div>${tel(d.phone)}</label>`).join('') : '<p class="muted">Import the Excel to add duties.</p>';
+      $$('[data-duty]').forEach(c => c.onchange = () => updateDoc(doc(db, 'duties', c.dataset.duty), { done: c.checked }).catch(fail));
+      $('#vendorList').innerHTML = VEN.length ? VEN.map(v => `<div class="item"><div class="row between"><div><b>${esc(v.role)}</b>${v.name ? ` · ${esc(v.name)}` : ''}<p class="small muted">${esc(v.note || '')}</p></div>${tel(v.phone)}</div></div>`).join('') : '<p class="muted">No vendors yet.</p>';
+      $('#driverList').innerHTML = DRIVERS.length ? DRIVERS.map(d => `<div class="item"><div class="row between"><div><b>${esc(d.name)}</b><p class="small muted">${esc([d.car, d.plate].filter(Boolean).join(' · '))}</p></div>${tel(d.phone)}</div></div>`).join('') : '<p class="muted">No drivers yet.</p>';
+      $('#contactList').innerHTML = CON.length ? CON.map(c => `<div class="item"><div class="row between"><div><b>${esc(c.label)}</b><p class="small muted">${esc(c.note || '')}</p></div>${tel(c.phone)}</div></div>`).join('') : '<p class="muted">No help contacts yet.</p>';
+    }
+  }
+}
+</script>
+</body>
+</html>

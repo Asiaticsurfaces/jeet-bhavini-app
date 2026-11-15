@@ -52,9 +52,11 @@ service cloud.firestore {
     // Arrival details, one per guest device; family assigns the driver.
     match /arrivals/{uid} {
       allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
-      allow create, update: if (signedIn() && request.auth.uid == uid
-                                && !request.resource.data.keys().hasAny(['driver']))
-                            || isAdmin();
+      // Guests can't set or change their own driver; family can.
+      allow create: if (signedIn() && request.auth.uid == uid
+                         && !request.resource.data.keys().hasAny(['driver'])) || isAdmin();
+      allow update: if (signedIn() && request.auth.uid == uid
+                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver'])) || isAdmin();
       allow delete: if isAdmin();
     }
     match /rsvps/{uid} {
@@ -82,13 +84,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Wedding camera. A guest's shots are private until they "develop"
-    // (revealAt, 9 AM next day) and family hasn't hidden them.
+    // Wedding camera. Everyone sees photos family hasn't hidden; the app
+    // keeps guest shots blurred until they "develop" (revealAt, 9 AM next day).
     match /photos/{id} {
-      allow create: if creatingMine();
+      allow create: if creatingMine() && request.resource.data.hidden == false;
       allow read: if mine() || isAdmin()
-        || (signedIn() && resource.data.hidden == false
-            && request.time >= resource.data.revealAt);
+        || (signedIn() && resource.data.hidden == false);
       allow update, delete: if isAdmin();
     }
 

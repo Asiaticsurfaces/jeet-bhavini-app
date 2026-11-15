@@ -434,6 +434,11 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
         <button class="btn" id="famGo">Open</button>
         <p class="demo-note">Preview PIN: 1202</p>
       </div>
+      <div id="famCloud" class="card stack" hidden>
+        <p>Family members manage everything from the family panel: live updates, help requests, pickups, guests and photos.</p>
+        <a class="btn" href="admin.html">Open family panel</a>
+        <p class="muted small">Sign in with your Google account. Only family on the list can open it.</p>
+      </div>
       <div id="famBody" class="screen" hidden>
         <div class="ftabs" role="group" aria-label="Family section"><button data-ft="duties" aria-pressed="true">Duties</button><button data-ft="vendors" aria-pressed="false">Vendors</button><button data-ft="arrivals" aria-pressed="false">Arrivals</button></div>
         <div id="famOut" class="stack"></div>
@@ -470,9 +475,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <div id="m-contacts" class="screen" hidden>
       <button class="back" data-go="home">← Guest info</button>
       <h1>Contacts</h1>
-      <div class="card stack"><b>Hospitality desk</b><p class="muted small">Rooms, cabs, anything at the venue · number coming soon</p></div>
-      <div class="card stack"><b>Jabuani family</b><p class="muted small">Groom's side · number coming soon</p></div>
-      <div class="card stack"><b>Nakrani family</b><p class="muted small">Bride's side · number coming soon</p></div>
+      <div class="stack" id="contactList"></div>
     </div>
   </section>
 
@@ -501,10 +504,11 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <p class="dateline">1 – 2 December 2026</p>
     <div class="ornament" style="width:100%"><span>✦</span></div>
     <h2>Find your invite</h2>
-    <p class="muted">Type your name to see your room and your events.</p>
-    <input type="text" id="loginQ" placeholder="Your name" autocomplete="off">
+    <p class="muted">Enter the mobile number the family has for you, to see your room and your events.</p>
+    <input type="tel" id="loginQ" placeholder="Your mobile number" autocomplete="tel" inputmode="numeric" maxlength="14">
+    <button class="btn" id="loginGo" style="width:100%">Open my invite</button>
     <div class="stack" id="loginHits" style="width:100%"></div>
-    <p class="demo-note">Preview guests: Riya, Kunal, Neha</p>
+    <p class="demo-note" id="loginDemo">Preview numbers: 9820012345 (Riya), 9820054321 (Kunal), 9820099999 (Neha)</p>
   </div>
 </div>
 
@@ -540,7 +544,7 @@ const EVENTS=[
 ];
 const DAYS=[{id:'1',dow:'Tue',d:'1',m:'Dec'},{id:'2',dow:'Wed',d:'2',m:'Dec'}];
 const HASTAMELAP=new Date('2026-12-02T17:41:00+05:30');
-const POSTS=[
+let POSTS=[
  {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
  {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
  {t:'Welcome to Oleander, Karjat!',b:'Check in at the hospitality desk in the lobby. Your welcome kit is in your room.',ago:'Just now',c:'var(--plum)'},
@@ -548,10 +552,14 @@ const POSTS=[
  {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
 ];
 const GUESTS=[
- {n:'Riya Shah',side:"Groom's side",room:'214',party:3,events:EVENTS.map(e=>e.id)},
- {n:'Kunal Mehta',side:"Bride's side",room:'118',party:2,events:['sangeet','mandap','wedding']},
- {n:'Neha Patel',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
+ {n:'Riya Shah',phone:'9820012345',side:"Groom's side",room:'214',party:3,events:EVENTS.map(e=>e.id)},
+ {n:'Kunal Mehta',phone:'9820054321',side:"Bride's side",room:'118',party:2,events:['sangeet','mandap','wedding']},
+ {n:'Neha Patel',phone:'9820099999',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
 ];
+let CONTACTS=[['Hospitality desk','','Rooms, cabs, anything at the venue'],['Jabuani family','',"Groom's side"],['Nakrani family','',"Bride's side"]];
+/* When js/cloud.js connects to Firebase it sets window.CLOUD; until then the app runs on sample data. */
+const CLOUD_ON=()=>!!window.CLOUD;
+const normPhone=v=>String(v||'').replace(/\D/g,'').slice(-10);
 const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-03-beach-hands.jpg',ar:'3/4'},
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-08-boat-colour.jpg',ar:'4/5'},
@@ -561,15 +569,15 @@ const PREWED=[
 let ME=store.get('guest',null);
 const myEvents=()=>EVENTS.filter(e=>!ME||ME.events.includes(e.id));
 const nextEvent=()=>myEvents().find(e=>new Date(e.start).getTime()+e.hrs*36e5>Date.now())||myEvents()[myEvents().length-1];
-const NOWS=[
+let NOWS=[
  {t:'Varmala starts in 10 min. Please come to Lake Side.',place:'lake'},
  {t:'Dinner is open on the Lawn. Jain counter on the left.',place:'lawn'},
  {t:'Shuttle to the hotel leaves from the Lake Side gate in 15 min.',place:'parking'},
 ];
 let nowI=0;
-const DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
+let DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
 let travel=store.get('travel',null);
-const STREAM_URL='https://www.youtube.com/';  // replace with the real live-stream link
+let STREAM_URL='https://www.youtube.com/';  // replace with the real live-stream link
 const evName=e=>lang==='gu'?e.gu:e.name;
 
 /* ---------- navigation ---------- */
@@ -605,20 +613,22 @@ function renderHome(){
   renderAlerts();renderLive();renderNow();renderPickup();
 }
 function renderNow(){
+  $('#nowbar').hidden=!NOWS.length;if(!NOWS.length)return;
   const n=NOWS[nowI%NOWS.length];
-  $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now · sample</small><b>${esc(n.t)}</b></span><span class="go">›</span>`;
-  $('#nowbar').onclick=()=>{location.hash='more';show('more');goMore('map');focusPlace(n.place)};
+  $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now${CLOUD_ON()?'':' · sample'}</small><b>${esc(n.t)}</b></span><span class="go">›</span>`;
+  $('#nowbar').onclick=()=>{location.hash='more';show('more');goMore('map');focusPlace(n.place||null)};
 }
 setInterval(()=>{nowI++;renderNow()},6000);
 function renderPickup(){
   const el=$('#pickup');
   if(!travel){el.innerHTML=`<p class="eyebrow">Your pickup</p><h3>How are you reaching Karjat?</h3><p class="muted small">Add your train, flight or car details and we'll arrange a pickup from Karjat station.</p><button class="btn sm" style="align-self:flex-start" data-open="travel">Add arrival details</button>`}
   else if(!travel.pickup||travel.mode==='Car'){el.innerHTML=`<p class="eyebrow">Your arrival</p><h3>${travel.mode} · ${dayLbl(travel.day)}, ${fmtT(travel.time)}</h3><p class="muted small">${travel.people} ${travel.people==1?'person':'people'} · No pickup needed. Parking is at the main gate.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
-  else{const st=DRIVER.stage;el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip sage">${['Assigned','On the way','Arrived'][st]}</span></div>
-    <div class="driver"><div class="av">${DRIVER.n[0]}</div><div style="flex:1;min-width:0"><b>${DRIVER.n}</b><div class="muted small">${DRIVER.car} · ${DRIVER.eta}</div><span class="plate">${DRIVER.plate}</span></div><a class="btn sm" href="tel:+910000000000">Call</a></div>
+  else if(!DRIVER){el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip">Requested</span></div><h3>Pickup from Karjat station</h3><p class="muted small">${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}. Your driver's name and number appear here once the family assigns one.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
+  else{const st=DRIVER.stage||0;el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip sage">${['Assigned','On the way','Arrived'][st]}</span></div>
+    <div class="driver"><div class="av">${DRIVER.n[0]}</div><div style="flex:1;min-width:0"><b>${esc(DRIVER.n)}</b><div class="muted small">${esc(DRIVER.car||'')}${DRIVER.eta?' · '+esc(DRIVER.eta):''}</div>${DRIVER.plate?`<span class="plate">${esc(DRIVER.plate)}</span>`:''}</div>${DRIVER.phone?`<a class="btn sm" href="tel:+91${esc(DRIVER.phone)}">Call</a>`:''}</div>
     <div class="steps">${[0,1,2].map(i=>`<div class="${i<=st?'on':''}"></div>`).join('')}</div>
     <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At Karjat station</span></div>
-    <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}. Sample driver shown.</p>`}
+    <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}.${CLOUD_ON()?'':' Sample driver shown.'}</p>`}
   $$('[data-open]').forEach(b=>b.onclick=()=>{location.hash='more';show('more');goMore(b.dataset.open)});
 }
 const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec'})[d];
@@ -630,8 +640,11 @@ $('#qrBtn').onclick=()=>{
   o.innerHTML=`<div class="qrwrap"><div class="qrbox">${img}</div><b>${esc(ME.n)}</b><p class="muted small">Show this at the hotel desk to check in${ME.room?` to room ${ME.room}`:''}. Volunteers scan it to find your details.</p></div>`;
   o.hidden=false;$('#qrBtn').textContent='Hide QR';
 };
-$('#feed').innerHTML=POSTS.map(p=>`<div class="post"><span class="dot" style="background:${p.c}"></span><div><b>${p.t}</b><span>${p.b}</span><br><time>${p.ago}${p.k?` · ${p.k}`:''}</time></div></div>`).join('');
-$('#newCount').textContent=POSTS.length+' new';
+function renderFeed(){
+  $('#feed').innerHTML=POSTS.length?POSTS.map(p=>`<div class="post"><span class="dot" style="background:${p.c}"></span><div><b>${esc(p.t)}</b><span>${esc(p.b)}</span><br><time>${esc(p.ago)}${p.k?` · ${esc(p.k)}`:''}</time></div></div>`).join(''):'<p class="muted">No updates yet. The family will post here during the wedding.</p>';
+  $('#newCount').textContent=POSTS.length?POSTS.length+' new':'';$('#newCount').hidden=!POSTS.length;
+}
+renderFeed();
 
 let alerts=store.get('alerts',{on:false,ev:{}});
 function renderAlerts(){
@@ -681,7 +694,7 @@ function renderSchedule(){
      <button class="bell" data-bell="${e.id}" aria-pressed="${on}">${on?'Reminder on':'Remind me'}</button></div>
    </div></article>`}).join('');
   $$('[data-pk]').forEach(c=>c.onchange=()=>{packed[c.dataset.pk]=c.checked;store.set('packed',packed);c.parentElement.classList.toggle('done',c.checked)});
-  $$('.rsvp button').forEach(b=>b.onclick=()=>{rsvp[b.dataset.ev]=b.dataset.v;store.set('rsvp',rsvp);renderSchedule();toast('RSVP saved')});
+  $$('.rsvp button').forEach(b=>b.onclick=()=>{rsvp[b.dataset.ev]=b.dataset.v;store.set('rsvp',rsvp);renderSchedule();if(CLOUD_ON())CLOUD.saveRsvp(rsvp).catch(cloudErr);toast('RSVP saved')});
   $$('[data-bell]').forEach(b=>b.onclick=()=>{const id=b.dataset.bell;
     if(!alerts.on){alerts.on=true;alerts.ev[id]=true}else alerts.ev[id]=alerts.ev[id]===false;
     store.set('alerts',alerts);renderSchedule();renderAlerts();toast(alerts.ev[id]!==false?'We\'ll remind you 30 min before':'Reminder off')});
@@ -689,11 +702,12 @@ function renderSchedule(){
 }
 
 /* ---------- camera ---------- */
-let myPhotos=[];let developed=false;let phView='feed';
+let myPhotos=[];let feedPhotos=[];let developed=false;let phView='feed';
 let shots=store.get('shots',24);$('#shots').textContent=shots;
 $('#shot').onchange=e=>{
   const f=e.target.files[0];if(!f)return;e.target.value='';
   if(shots<=0)return toast('No shots left today. More at midnight!');
+  if(CLOUD_ON()){toast('Uploading…');CLOUD.uploadPhoto(f,nextEvent().name).then(()=>{shots--;store.set('shots',shots);$('#shots').textContent=shots;phView='mine';renderPhotos();toast('Shot taken. It develops tomorrow at 9 am')}).catch(cloudErr);return}
   const url=URL.createObjectURL(f);const img=new Image();
   img.onload=()=>{myPhotos.unshift({src:url,by:'You',ev:nextEvent().name,ar:`${img.naturalWidth}/${img.naturalHeight}`,mine:true});shots--;store.set('shots',shots);$('#shots').textContent=shots;phView='mine';renderPhotos();toast('Shot taken. It develops tomorrow at 9 am')};
   img.src=url;
@@ -703,11 +717,13 @@ $('#develop').onclick=()=>{developed=!developed;renderPhotos()};
 const photoHTML=(p,blur)=>`<figure class="photo"><div class="img ${blur?'dev':''}" style="--ar:${p.ar};background-image:url('${p.src}')"></div><figcaption>${esc(p.by)}<small>${esc(p.ev)}</small></figcaption></figure>`;
 function renderPhotos(){
   $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ph===phView));
-  const list=phView==='feed'?[...myPhotos,...PREWED]:myPhotos;
+  const cloud=CLOUD_ON(),now=Date.now();
+  const isDev=p=>cloud?now>=p.revealAt:developed;
+  const list=phView==='feed'?(cloud?[...feedPhotos.filter(p=>now>=p.revealAt),...PREWED]:[...myPhotos,...PREWED]):myPhotos;
   $('#develop').textContent=developed?'Hide again (demo)':'Develop now (demo)';
-  $('#develop').hidden=!myPhotos.length;
-  $('#phNote').textContent=phView==='mine'?`${myPhotos.length} photo${myPhotos.length===1?'':'s'} · ${developed?'developed':'developing'}`:'From every guest and the photographer';
-  $('#photos').innerHTML=list.length?list.map(p=>photoHTML(p,p.mine&&!developed)).join(''):'<p class="muted">No photos yet. Tap the shutter above to take your first one.</p>';
+  $('#develop').hidden=cloud||!myPhotos.length;
+  $('#phNote').textContent=phView==='mine'?`${myPhotos.length} photo${myPhotos.length===1?'':'s'}${myPhotos.some(p=>!isDev(p))?' · some still developing (ready 9 am)':''}`:'From every guest and the photographer';
+  $('#photos').innerHTML=list.length?list.map(p=>photoHTML(p,p.mine&&!isDev(p))).join(''):'<p class="muted">No photos yet. Tap the shutter above to take your first one.</p>';
 }
 $('#selfie').onchange=e=>{
   const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);e.target.value='';
@@ -727,29 +743,35 @@ let helpCat=null;let tickets=store.get('tickets',[]);
 function renderHelp(){
   $('#helpCats').innerHTML=CATS.map(c=>`<button aria-pressed="${c===helpCat}" data-cat="${c}">${c}</button>`).join('');
   $$('#helpCats button').forEach(b=>b.onclick=()=>{if(b.dataset.cat==='Lost something')return goMore('lost');helpCat=b.dataset.cat;renderHelp()});
-  $('#tickets').innerHTML=tickets.map(t=>`<div class="ticket"><div class="row between"><b>${esc(t.cat)}</b><span class="chip sage">#${t.id}</span></div>
+  $('#tickets').innerHTML=tickets.map(t=>`<div class="ticket"><div class="row between"><b>${esc(t.cat)}</b><span class="chip ${t.status==='done'?'':'sage'}">${t.status==='done'?'Resolved':t.status==='working'?'On it':'#'+esc(String(t.id).slice(0,6))}</span></div>
     ${t.text?`<p style="margin-top:6px">${esc(t.text)}</p>`:''}<p class="muted small" style="margin-top:6px">Sent ${t.at} · The team will call you within 10 minutes${t.cat==='Medical'?'. In an emergency call 112':''}.</p></div>`).join('');
 }
 $('#helpSend').onclick=()=>{
   if(!helpCat)return toast('Pick what you need help with');
-  tickets.unshift({id:'JB-'+(101+tickets.length),cat:helpCat,text:$('#helpText').value.trim(),at:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})});
+  const text=$('#helpText').value.trim();
+  if(CLOUD_ON()){const cat=helpCat;CLOUD.addTicket(cat,text).then(()=>{helpCat=null;$('#helpText').value='';renderHelp();toast('Sent. The team will call you back')}).catch(cloudErr);return}
+  tickets.unshift({id:'JB-'+(101+tickets.length),cat:helpCat,text,at:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})});
   store.set('tickets',tickets);helpCat=null;$('#helpText').value='';renderHelp();toast('Sent to the hospitality team (preview)');
 };
-const FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, near the stage']];
+let FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, near the stage']];
 let lost=store.get('lost',[]);
 function renderLost(){
-  $('#found').innerHTML=FOUND.map(([i,w])=>`<div class="post" style="align-items:center"><div style="flex:1;min-width:0"><b>${i}</b><span class="muted small">${w}</span></div><button class="btn ghost sm" data-claim>It's mine</button></div>`).join('');
+  $('#found').innerHTML=FOUND.length?FOUND.map(([i,w])=>`<div class="post" style="align-items:center"><div style="flex:1;min-width:0"><b>${i}</b><span class="muted small">${w}</span></div><button class="btn ghost sm" data-claim>It's mine</button></div>`).join(''):'<p class="muted">Nothing handed in yet.</p>';
   $$('[data-claim]').forEach(b=>b.onclick=()=>toast('Collect it from the lobby desk'));
-  $('#myLost').innerHTML=lost.map(l=>`<div class="wish"><b>${esc(l.item)}</b><p class="small" style="font:400 13px var(--body)">Last seen: ${esc(l.where||'not sure')} · Searching</p></div>`).join('');
+  $('#myLost').innerHTML=lost.map(l=>`<div class="wish"><b>${esc(l.item)}</b><p class="small" style="font:400 13px var(--body)">Last seen: ${esc(l.where||'not sure')} · ${l.status==='found'?'Found! Collect it from the lobby desk':'Searching'}</p></div>`).join('');
 }
-$('#lostBtn').onclick=()=>{const item=$('#lostItem').value.trim();if(!item)return toast('Tell us what you lost');lost.unshift({item,where:$('#lostWhere').value.trim()});store.set('lost',lost);$('#lostItem').value='';$('#lostWhere').value='';renderLost();toast('Reported. We\'ll alert you if it turns up')};
+$('#lostBtn').onclick=()=>{const item=$('#lostItem').value.trim();if(!item)return toast('Tell us what you lost');
+  if(CLOUD_ON()){CLOUD.addLost(item,$('#lostWhere').value.trim()).then(()=>{$('#lostItem').value='';$('#lostWhere').value='';toast('Reported. We\'ll alert you if it turns up')}).catch(cloudErr);return}
+  lost.unshift({item,where:$('#lostWhere').value.trim()});store.set('lost',lost);$('#lostItem').value='';$('#lostWhere').value='';renderLost();toast('Reported. We\'ll alert you if it turns up')};
 let wishes=store.get('wishes',[]);
 function renderWishes(){$('#wishes').innerHTML=wishes.length?wishes.map(x=>`<div class="wish"><p>“${esc(x.w)}”</p><b class="small">— ${esc(x.n)}</b></div>`).join(''):'<p class="muted">Be the first to bless Jeet & Bhavini.</p>'}
-$('#wishBtn').onclick=()=>{const w=$('#wishText').value.trim();if(!w)return toast('Write a blessing first');wishes.unshift({n:$('#wishName').value.trim()||'A guest',w});store.set('wishes',wishes);$('#wishText').value='';renderWishes();toast('Blessing posted')};
+$('#wishBtn').onclick=()=>{const w=$('#wishText').value.trim();if(!w)return toast('Write a blessing first');const n=$('#wishName').value.trim()||(ME?ME.n.split(' ')[0]:'A guest');
+  if(CLOUD_ON()){CLOUD.addWish(n,w).then(()=>{$('#wishText').value='';toast('Blessing posted')}).catch(cloudErr);return}
+  wishes.unshift({n,w});store.set('wishes',wishes);$('#wishText').value='';renderWishes();toast('Blessing posted')};
 let songs=store.get('songs',[]);
 function renderSongs(){songs.sort((a,b)=>b.v-a.v);$('#songs').innerHTML=songs.length?songs.map((x,i)=>`<div class="post" style="align-items:center"><span style="flex:1">${esc(x.s)}</span><button class="btn ghost sm" data-i="${i}">▲ ${x.v}</button></div>`).join(''):'<p class="muted">No requests yet. Add the first one.</p>';
-  $$('#songs button').forEach(b=>b.onclick=()=>{songs[b.dataset.i].v++;store.set('songs',songs);renderSongs()})}
-$('#songBtn').onclick=()=>{const s=$('#songQ').value.trim();if(!s)return;songs.push({s,v:1});store.set('songs',songs);$('#songQ').value='';renderSongs();toast('Added to the DJ list')};
+  $$('#songs button').forEach(b=>b.onclick=()=>{const x=songs[b.dataset.i];if(CLOUD_ON()){if(x.id)CLOUD.voteSong(x.id).catch(cloudErr);b.disabled=true;return}x.v++;store.set('songs',songs);renderSongs()})}
+$('#songBtn').onclick=()=>{const s=$('#songQ').value.trim();if(!s)return;if(CLOUD_ON()){CLOUD.addSong(s).then(()=>{$('#songQ').value='';toast('Added to the DJ list')}).catch(cloudErr);return}songs.push({s,v:1});store.set('songs',songs);$('#songQ').value='';renderSongs();toast('Added to the DJ list')};
 
 /* ---------- arrival form ---------- */
 const MODES=['Train','Flight','Car','Bus'];
@@ -765,7 +787,7 @@ function renderTravel(){
 }
 $('#tPickup').onclick=()=>{tPick=!tPick;$('#tPickup').setAttribute('aria-checked',tPick)};
 $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime').value||'08:00',from:$('#tFrom').value.trim(),people:Math.max(1,+$('#tPeople').value||1),leave:$('#tLeave').value,pickup:tPick};
-  store.set('travel',travel);renderTravel();renderPickup();toast('Arrival saved. Thank you!')};
+  store.set('travel',travel);renderTravel();renderPickup();if(CLOUD_ON())CLOUD.saveArrival(travel).catch(cloudErr);toast('Arrival saved. Thank you!')};
 
 /* ---------- venue map ---------- */
 const PLACES=[
@@ -804,6 +826,8 @@ const DUTIES=[
 const VENDORS=[['🌸','Decorator','Mandap, Lawn and Lake Side'],['🎧','DJ & sound','Sangeet and Jaan'],['🍽️','Caterer','All meals · Jain counter'],['📷','Photographer','Photos and video'],['🥁','Dhol & band','Jaan Prastan'],['🙏','Pandit ji','Mandap Ropan and Wedding'],['🚐','Transport','Station shuttles and cabs'],['🏨','Oleander manager','Rooms and venue']];
 let famOpen=store.get('famOpen',false),famTab='duties',dutyDone=store.get('dutyDone',{});
 function renderFamily(){
+  if(CLOUD_ON()){$('#famLock').hidden=true;$('#famBody').hidden=true;$('#famCloud').hidden=false;return}
+  $('#famCloud').hidden=true;
   $('#famLock').hidden=famOpen;$('#famBody').hidden=!famOpen;if(!famOpen)return;
   $$('.ftabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ft===famTab));
   const o=$('#famOut');
@@ -821,24 +845,52 @@ $('#famGo').onclick=()=>{if($('#famPin').value==='1202'){famOpen=true;store.set(
 $$('.ftabs button').forEach(b=>b.onclick=()=>{famTab=b.dataset.ft;renderFamily()});
 
 /* ---------- guest login ---------- */
-function renderLogin(){
-  const q=$('#loginQ').value.trim().toLowerCase();
-  const hits=q.length<2?[]:GUESTS.filter(g=>g.n.toLowerCase().includes(q));
-  $('#loginHits').innerHTML=(q.length<2?'':hits.length?hits.map(g=>`<button class="guest-hit" data-g="${GUESTS.indexOf(g)}"><span><b>${g.n}</b><br><small>${g.side}</small></span><span class="chip sage">That's me</span></button>`).join('')
-    :'<p class="muted">We couldn\'t find that name. Try your first name only.</p>')
-    +'<button class="linkbtn" id="skipLogin">Browse without signing in</button>';
-  $$('[data-g]').forEach(b=>b.onclick=()=>{ME=GUESTS[+b.dataset.g];store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`)});
-  $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
+function guestWelcome(g){ME=g;store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`);if(CLOUD_ON())CLOUD.onGuest(ME)}
+async function tryLogin(){
+  const ph=normPhone($('#loginQ').value);
+  if(ph.length!==10){$('#loginHits').innerHTML='<p class="muted">Enter your 10-digit mobile number.</p>';return}
+  $('#loginGo').disabled=true;$('#loginHits').innerHTML='<p class="muted">Looking for your invite…</p>';
+  try{
+    const g=CLOUD_ON()?await CLOUD.findGuest(ph):GUESTS.find(x=>x.phone===ph);
+    if(g)return guestWelcome(g);
+    $('#loginHits').innerHTML='<p class="muted">We couldn\'t find that number. Try the number the family messaged you on, or tap Need help after browsing.</p>';
+  }catch(e){$('#loginHits').innerHTML='<p class="muted">Couldn\'t connect. Check your internet and try again.</p>'}
+  finally{$('#loginGo').disabled=false;renderLoginFoot()}
 }
+function renderLoginFoot(){
+  if(!$('#skipLogin'))$('#loginHits').insertAdjacentHTML('beforeend','<button class="linkbtn" id="skipLogin">Browse without signing in</button>');
+  $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
+  $('#loginDemo').hidden=CLOUD_ON();
+}
+function renderLogin(){$('#loginHits').innerHTML='';renderLoginFoot()}
 function openLogin(){$('#login').hidden=false;$('#loginQ').value='';renderLogin()}
 function closeLogin(){$('#login').hidden=true;renderAll()}
-$('#loginQ').oninput=renderLogin;
+$('#loginGo').onclick=tryLogin;$('#loginQ').onkeydown=e=>{if(e.key==='Enter')tryLogin()};
 $('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
 
+function renderContacts(){
+  $('#contactList').innerHTML=CONTACTS.map(([n,ph,d])=>`<div class="card stack"><div class="row between"><b>${esc(n)}</b>${ph?`<a class="btn sm" href="tel:+91${esc(normPhone(ph))}">Call</a>`:''}</div><p class="muted small">${esc(d||'')}${ph?'':' · number coming soon'}</p></div>`).join('');
+}
+function cloudErr(e){console.error(e);toast(e&&e.code==='permission-denied'?'Not allowed. Please sign in again':'Couldn\'t send. Check your internet')}
+/* Called by js/cloud.js whenever shared data changes. */
+function cloudRefresh(what){
+  if(what==='posts')renderFeed();
+  else if(what==='now')renderNow();
+  else if(what==='help')renderHelp();
+  else if(what==='lost')renderLost();
+  else if(what==='wishes')renderWishes();
+  else if(what==='songs')renderSongs();
+  else if(what==='arrival'){renderTravel();renderPickup()}
+  else if(what==='photos')renderPhotos();
+  else if(what==='contacts')renderContacts();
+  else if(what==='guest')renderAll();
+  else renderAll();
+}
 function renderAll(){
-  renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
+  renderContacts();renderFeed();renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
 }
 renderAll();applyLang();
 if(!ME&&!store.get('skipLogin',false))openLogin();
 show(location.hash.slice(1)||'home');
 </script>
+<script type="module" src="js/cloud.js"></script>
