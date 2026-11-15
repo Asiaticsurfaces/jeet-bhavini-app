@@ -1,17 +1,22 @@
 rules_version = '2';
 // Jeet & Bhavini wedding app — who can read and write what.
 //
-// Everyone in the app is signed in: guests anonymously (they unlock their
-// pass with their phone number), family with Google. A family member is
-// anyone whose email has a doc in /admins.
+// Everyone in the app is signed in: guests verify their mobile number by
+// SMS OTP (or browse anonymously), family by OTP or Google. A family member
+// is anyone whose phone ("+91…") or email has a doc in /admins.
 service cloud.firestore {
   match /databases/{db}/documents {
 
     function signedIn() { return request.auth != null; }
+    function myPhone() { return request.auth.token.get('phone_number', ''); }
+    function myEmail() {
+      return request.auth.token.get('email_verified', false) == true
+        ? request.auth.token.get('email', '') : '';
+    }
     function isAdmin() {
-      return signedIn() && request.auth.token.email != null
-        && request.auth.token.email_verified == true
-        && exists(/databases/$(db)/documents/admins/$(request.auth.token.email));
+      return signedIn() && (
+        (myPhone() != '' && exists(/databases/$(db)/documents/admins/$(myPhone())))
+        || (myEmail() != '' && exists(/databases/$(db)/documents/admins/$(myEmail()))));
     }
     function mine() { return signedIn() && resource.data.uid == request.auth.uid; }
     function creatingMine() { return signedIn() && request.resource.data.uid == request.auth.uid; }
@@ -21,17 +26,22 @@ service cloud.firestore {
     // nobody else can self-register. After that, admins add each other.
     match /admins/{email} {
       allow read: if isAdmin()
-        || (signedIn() && request.auth.token.email == email);
+        || (signedIn() && (email == myPhone() || email == myEmail()));
       allow create: if isAdmin()
-        || (signedIn() && request.auth.token.email == email
-            && request.auth.token.email_verified == true
+        || (signedIn() && email != '' && (email == myPhone() || email == myEmail())
             && !exists(/databases/$(db)/documents/config/adminsLocked));
       allow update, delete: if isAdmin();
     }
 
-    // Guest pass, keyed by 10-digit phone. A guest can fetch ONE record if
-    // they know the number, but nobody can list or search the guest list.
+    // Guest pass, keyed by 10-digit phone: only the OTP-verified owner of
+    // that number (or family) can read it. Nobody can list the guest list.
     match /guests/{phone} {
+      allow get: if isAdmin() || (signedIn() && myPhone() == '+91' + phone);
+      allow list, write: if isAdmin();
+    }
+    // Empty marker per invited number, so the app can say "not on the list"
+    // before spending an SMS. Reveals nothing but that the number is invited.
+    match /guestPhones/{phone} {
       allow get: if signedIn();
       allow list, write: if isAdmin();
     }
