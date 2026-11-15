@@ -602,6 +602,7 @@ function tick(){
   $('#countdown').innerHTML=[[d,'Days'],[h,'Hours'],[m,'Min'],[s,'Sec']].map(([v,l])=>`<div class="locket"><b>${String(v).padStart(2,'0')}</b><small>${l}</small></div>`).join('');
 }
 tick();setInterval(tick,1000);
+function stayText(a,b){const f=d=>d?new Date(d+'T00:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'UTC'}):'';return a&&b?`${f(a)} → ${f(b)}`:f(a);}
 function renderHome(){
   const nx=nextEvent();
   $('#hello').textContent=ME?ME.n.split(' ')[0]:'Guest';
@@ -609,7 +610,8 @@ function renderHome(){
    <div style="min-width:0;flex:1"><h3>${esc(evName(nx))}</h3><div class="muted small">${dayText(nx.day)} · ${nx.time}<br>${esc(nx.venue)}</div></div>
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
   $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>People</span><b>${ME.party||1}</b></div>
-     <div><span>Events</span><b>${myEvents().length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`
+     <div><span>Events</span><b>${myEvents().length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>
+     ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
   $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;

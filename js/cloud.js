@@ -70,6 +70,7 @@ async function start() {
       const ev = g.events || {};
       return {
         n: g.name, phone, room: g.room || null, party: g.people || 1,
+        roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '',
         side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
         skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
         lang: g.lang || 'EN',

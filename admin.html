@@ -58,6 +58,27 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 .permgrid label input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--plum)}
 .permgrid label small{display:block;color:var(--muted);font-size:12px}
 .pchips{display:flex;flex-wrap:wrap;gap:4px}
+/* rooms */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:560px){.grid3{grid-template-columns:1fr 1fr}}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}.fld>span{font-size:13px;color:var(--muted)}
+.nights{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.nights button{flex:none;text-align:left;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;padding:8px 12px;font:500 13px var(--body);cursor:pointer}
+.nights button b{display:block;font:600 20px var(--display);color:var(--plum-deep);font-variant-numeric:tabular-nums}
+.nights button[aria-pressed=true]{border-color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum);background:var(--plum-soft)}
+.wing{display:flex;flex-direction:column;gap:10px}
+.wing>header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:4px}
+.area{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-deep)}
+.roomgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.room{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.room.full{background:var(--sage-soft);border-color:#cfdccf}
+.room .no{font:600 24px/1 var(--display);color:var(--plum-deep)}
+.beds{display:flex;gap:4px}.bed{width:20px;height:12px;border-radius:4px;background:var(--line)}.bed.on{background:var(--plum)}.bed.over{background:var(--red)}
+.occ{display:flex;justify-content:space-between;gap:6px;align-items:flex-start;font-size:13px;border-top:1px dashed var(--line);padding-top:6px}
+.occ.away{opacity:.5}
+.occ button{border:0;background:none;color:var(--plum);font:500 12px var(--body);cursor:pointer;padding:2px 4px}
+.occ button.x{color:var(--red)}
+.linkbtn{border:0;background:none;color:var(--plum);font:500 13px var(--body);cursor:pointer;padding:0;text-align:left}
 </style>
 </head>
 <body>
@@ -137,6 +158,59 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <div class="stats" id="guestStats"></div>
       <input id="guestQ" placeholder="Search by name, phone or room">
       <div class="tablewrap"><table><thead><tr><th>Guest</th><th>Phone</th><th>Side</th><th>People</th><th>Room</th><th>Events</th><th>RSVP</th></tr></thead><tbody id="guestRows"></tbody></table></div>
+    </section>
+
+    <!-- ROOMS -->
+    <section data-sec="rooms" class="stack" hidden>
+      <div class="stats" id="roomStats"></div>
+      <div class="card">
+        <div class="row between"><h3>Beds free each night</h3><span class="small muted">Tap a night to see the rooms for it</span></div>
+        <div class="nights" id="nightBar"></div>
+      </div>
+
+      <div class="card" id="stayForm">
+        <h3 id="stayTitle">Allot a room</h3>
+        <div class="grid2">
+          <label class="fld"><span>Guest family (from the guest list)</span><select id="sGuest"></select></label>
+          <label class="fld"><span>Name on the room</span><input id="sName" maxlength="60" placeholder="e.g. Riya Shah + 2"></label>
+        </div>
+        <div class="grid3">
+          <label class="fld"><span>People in this room</span><input id="sPeople" type="number" min="1" max="12" value="1"></label>
+          <label class="fld"><span>Check-in</span><select id="sIn"></select></label>
+          <label class="fld"><span>Check-out</span><select id="sOut"></select></label>
+        </div>
+        <label class="fld"><span>Room</span><select id="sRoom"></select></label>
+        <input id="sNote" maxlength="100" placeholder="Note (optional), e.g. elderly, needs ground floor">
+        <p class="small" id="sMsg"></p>
+        <div class="row"><button class="btn" id="sSave">Allot room</button><button class="btn ghost" id="sCancel" hidden>Cancel</button></div>
+      </div>
+
+      <div class="row">
+        <input id="rQ" placeholder="Search room, guest or phone" style="flex:2;min-width:180px">
+        <select id="rWing" style="flex:1;width:auto;min-width:120px"></select>
+        <select id="rArea" style="flex:1;width:auto;min-width:120px"></select>
+        <label class="row small" style="flex-wrap:nowrap"><input type="checkbox" id="rFree" style="width:18px;height:18px"> Only rooms with free beds</label>
+      </div>
+      <div class="stack" id="roomBoard" style="gap:18px"></div>
+
+      <div class="card"><h3>Guests still without a room</h3><p class="muted small">Families from the guest list who have fewer people allotted than invited.</p><div class="stack" id="noRoom"></div></div>
+
+      <div class="card" id="roomAdd">
+        <div class="row between"><h3 id="raTitle">Add rooms</h3><button class="btn ghost sm" id="raToggle">+ Add rooms</button></div>
+        <div class="stack" id="raBody" hidden>
+          <div class="grid2">
+            <label class="fld"><span>Wing / building</span><input id="raWing" list="wingList" maxlength="40" placeholder="e.g. Wing A, Lake Villa"></label>
+            <label class="fld"><span>Area / floor (optional)</span><input id="raArea" list="areaList" maxlength="40" placeholder="e.g. Ground floor, Garden side"></label>
+          </div>
+          <div class="grid2">
+            <label class="fld"><span>Room numbers</span><input id="raNums" placeholder="e.g. 101-110, 201, 202"></label>
+            <label class="fld"><span>Beds (people) per room</span><input id="raBeds" type="number" min="1" max="12" value="4"></label>
+          </div>
+          <p class="muted small" id="raHint">Use a dash for a range. Rooms already in this wing are skipped.</p>
+          <div class="row"><button class="btn" id="raSave">Add rooms</button><button class="btn danger" id="raDelete" hidden>Delete room</button><button class="btn ghost" id="raCancel">Cancel</button></div>
+        </div>
+        <datalist id="wingList"></datalist><datalist id="areaList"></datalist>
+      </div>
     </section>
 
     <!-- PHOTOS -->
@@ -266,8 +340,9 @@ async function start() {
     ['photos', 'Photos', 'See all photos, hide them, add photographer photos'],
     ['team', 'Team', 'Duties, vendors and drivers (add / edit), contacts'],
     ['events', 'Events & map', 'Add and edit the wedding events and the venue map'],
+    ['rooms', 'Rooms', 'Add rooms and allot them to guests by day'],
   ];
-  const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team'], event: ['live'] };
+  const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team', 'rooms'], event: ['live'] };
   const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
     : (d.perms || Object.fromEntries((PRESETS[d.role] || []).map(k => [k, true])));
   A.onAuthStateChanged(auth, async u => {
@@ -299,7 +374,7 @@ async function start() {
     // Subscribe only to data this person is allowed to read.
     const sub = (perm, ref, fn) => { if (can[perm]) onSnapshot(ref, fn, e => console.warn(perm, e.code)); };
     // ---------- tabs ----------
-    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['events', 'Events'], ['team', 'Team']]
+    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['rooms', 'Rooms'], ['photos', 'Photos'], ['events', 'Events'], ['team', 'Team']]
       .filter(([k]) => can[k]);
     if (!TABS.length) { $('#tabs').innerHTML = ''; $$('[data-sec]').forEach(x => x.hidden = true);
       $('#panel').insertAdjacentHTML('beforeend', '<p class="muted">You don\'t have any permissions yet. Ask Jeet to tick what you need.</p>'); return; }
@@ -510,8 +585,9 @@ async function start() {
     }
 
     // ---------- guests ----------
-    let GUESTS = [], RSVP = [];
-    sub('guests', collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); });
+    let GUESTS = [], RSVP = [], ROOMS = [], STAYS = [], onGuests = () => {};
+    // The Rooms tab needs the guest list too.
+    if (can.guests || can.rooms) onSnapshot(collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); onGuests(); }, e => console.warn('guests', e.code));
     sub('guests', collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
     $('#guestQ').oninput = () => renderGuests();
     const EVK = [['mameru', 'Mameru'], ['sangeet', 'Sangeet'], ['mandap', 'Mandap Ropan'], ['wedding', 'Wedding']];
@@ -527,6 +603,221 @@ async function start() {
       $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}</td><td><a href="tel:+91${esc(g.id)}">${esc(g.id)}</a></td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
         <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td></tr>`).join('')
         : `<tr><td colspan="7" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Import the Excel above.'}</td></tr>`;
+    }
+
+    // ---------- rooms ----------
+    // rooms/{id}: { wing, area, number, beds }
+    // stays/{id}: { roomId, guestId (phone, optional), name, people, in, out, note }  (in/out = check-in/out dates)
+    // Each allotment also writes the guest's pass: guests/{phone}.room, roomWhere, stayIn, stayOut.
+    if (can.rooms) {
+      const DAYS = ['2026-11-29', '2026-11-30', '2026-12-01', '2026-12-02', '2026-12-03', '2026-12-04'];
+      const NIGHTS = DAYS.slice(0, -1);
+      const dLbl = (d, wd = true) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-IN', { ...(wd ? { weekday: 'short' } : {}), day: 'numeric', month: 'short', timeZone: 'UTC' });
+      const nightsOf = s => NIGHTS.filter(n => n >= s.in && n < s.out);
+      const span = s => { const n = nightsOf(s).length; return `${dLbl(s.in, false)} → ${dLbl(s.out, false)} · ${n} night${n === 1 ? '' : 's'}`; };
+      const whereOf = r => r ? [r.wing, r.area].filter(Boolean).join(' · ') : '';
+      const natural = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      const used = (roomId, n, skip) => STAYS.filter(s => s.roomId === roomId && s.id !== skip && s.in <= n && n < s.out).reduce((t, s) => t + (+s.people || 1), 0);
+      // People of a family with a bed, on their busiest night (so a room change mid-stay isn't counted twice).
+      const allotted = (gid, skip) => Math.max(0, ...NIGHTS.map(n => STAYS.filter(s => s.guestId === gid && s.id !== skip && s.in <= n && n < s.out).reduce((t, s) => t + (+s.people || 1), 0)));
+      const leftOf = g => (+g.people || 1) - allotted(g.id);
+      let night = '2026-12-01', editStay = null, editRoom = null;
+
+      $('#sIn').innerHTML = NIGHTS.map(d => `<option value="${d}">${dLbl(d)}</option>`).join('');
+      $('#sOut').innerHTML = DAYS.slice(1).map(d => `<option value="${d}">${dLbl(d)}</option>`).join('');
+      $('#sIn').value = '2026-12-01'; $('#sOut').value = '2026-12-03';
+
+      // What the guest's pass shows, worked out from all their allotments.
+      const guestPatch = (gid, stays, rooms = ROOMS) => {
+        const mine = stays.filter(s => s.guestId === gid);
+        const rs = [...new Set(mine.map(s => s.roomId))].map(id => rooms.find(r => r.id === id)).filter(Boolean);
+        return { room: rs.map(r => String(r.number)).join(', '), roomWhere: [...new Set(rs.map(whereOf).filter(Boolean))].join('; '),
+          stayIn: mine.map(s => s.in).sort()[0] || '', stayOut: mine.map(s => s.out).sort().at(-1) || '' };
+      };
+      const commit = async (changes, gids) => {
+        let next = STAYS.slice(); const b = writeBatch(db);
+        for (const c of changes) {
+          next = next.filter(s => s.id !== (c.del || c.id));
+          if (c.del) b.delete(doc(db, 'stays', c.del));
+          else { next.push({ id: c.id, ...c.data }); b.set(doc(db, 'stays', c.id), c.data); }
+        }
+        for (const g of new Set(gids.filter(Boolean))) if (GUESTS.some(x => x.id === g)) b.update(doc(db, 'guests', g), guestPatch(g, next));
+        await b.commit();
+      };
+
+      // ----- allot form -----
+      const formNights = () => NIGHTS.filter(n => n >= $('#sIn').value && n < $('#sOut').value);
+      const freeFor = (r, ns) => ns.length ? Math.min(...ns.map(n => r.beds - used(r.id, n, editStay))) : r.beds;
+      function guestOpts() {
+        const v = $('#sGuest').value;
+        $('#sGuest').innerHTML = '<option value="">— Not on the guest list —</option>' + [...GUESTS].sort((a, b) => natural(a.name, b.name)).map(g => {
+          const left = (+g.people || 1) - allotted(g.id, editStay);
+          return `<option value="${esc(g.id)}">${esc(g.name)} · ${g.people || 1} people${left > 0 ? ` · ${left} need a room` : ' · all have rooms'}</option>`; }).join('');
+        if (GUESTS.some(g => g.id === v)) $('#sGuest').value = v;
+      }
+      function roomOpts(pick) {
+        const v = pick || $('#sRoom').value, ns = formNights(), need = +$('#sPeople').value || 1;
+        const wings = [...new Set(ROOMS.map(r => r.wing))].sort(natural);
+        $('#sRoom').innerHTML = '<option value="">— Choose a room —</option>' + wings.map(w => `<optgroup label="${esc(w)}">` +
+          ROOMS.filter(r => r.wing === w).sort((a, b) => natural(a.area, b.area) || natural(a.number, b.number)).map(r => { const f = freeFor(r, ns);
+            return `<option value="${r.id}">${esc(r.number)}${r.area ? ' · ' + esc(r.area) : ''} — ${f <= 0 ? 'full' : `${f} of ${r.beds} free`}${f > 0 && f < need ? ' (too small)' : ''}</option>`; }).join('') + '</optgroup>').join('');
+        if (ROOMS.some(r => r.id === v)) $('#sRoom').value = v;
+        checkForm();
+      }
+      function checkForm() {
+        const m = $('#sMsg'), r = ROOMS.find(x => x.id === $('#sRoom').value), ns = formNights(), need = +$('#sPeople').value || 1;
+        m.className = 'small';
+        if ($('#sOut').value <= $('#sIn').value) { m.className = 'err'; m.textContent = 'Check-out has to be after check-in.'; return; }
+        if (!r) { m.textContent = `${ns.length} night${ns.length === 1 ? '' : 's'}: ${ns.map(n => dLbl(n, false)).join(', ')}.`; return; }
+        const short = ns.find(n => used(r.id, n, editStay) + need > r.beds);
+        if (short) { const f = r.beds - used(r.id, short, editStay); m.className = 'err';
+          m.textContent = `Room ${r.number} has ${f <= 0 ? 'no beds' : f === 1 ? 'only 1 bed' : `only ${f} beds`} free on ${dLbl(short)}. Choose another room or fewer people.`; return; }
+        const f = freeFor(r, ns) - need;
+        m.textContent = `Room ${r.number} (${whereOf(r)}): ${f <= 0 ? 'this fills the room' : `${f} bed${f === 1 ? '' : 's'} still free after this`}.`;
+      }
+      function resetForm() {
+        editStay = null; $('#stayTitle').textContent = 'Allot a room'; $('#sSave').textContent = 'Allot room'; $('#sCancel').hidden = true;
+        $('#sGuest').value = ''; $('#sName').value = ''; $('#sNote').value = ''; $('#sPeople').value = 1; $('#sRoom').value = '';
+        guestOpts(); roomOpts();
+      }
+      const toForm = () => $('#stayForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('#sGuest').onchange = () => { const g = GUESTS.find(x => x.id === $('#sGuest').value);
+        if (g) { $('#sName').value = g.name; const left = (+g.people || 1) - allotted(g.id, editStay); $('#sPeople').value = Math.max(1, Math.min(left > 0 ? left : 1, 12)); }
+        roomOpts(); };
+      ['#sIn', '#sOut', '#sPeople'].forEach(id => $(id).oninput = $(id).onchange = () => roomOpts());
+      $('#sRoom').onchange = checkForm;
+      $('#sCancel').onclick = resetForm;
+      $('#sSave').onclick = async () => {
+        const r = ROOMS.find(x => x.id === $('#sRoom').value); if (!r) return toast('Choose a room');
+        const name = $('#sName').value.trim(); if (!name) return toast('Type the name for this room');
+        const data = { roomId: r.id, guestId: $('#sGuest').value, name, people: Math.max(1, Math.min(12, Math.round(+$('#sPeople').value) || 1)),
+          in: $('#sIn').value, out: $('#sOut').value, note: $('#sNote').value.trim(), by: u.email, updatedAt: serverTimestamp() };
+        if (data.out <= data.in) return toast('Check-out has to be after check-in');
+        const short = NIGHTS.filter(n => n >= data.in && n < data.out).find(n => used(r.id, n, editStay) + data.people > r.beds);
+        if (short) return toast(`Room ${r.number} doesn't have ${data.people} beds free on ${dLbl(short)}`);
+        const old = editStay && STAYS.find(s => s.id === editStay), id = editStay || doc(collection(db, 'stays')).id;
+        $('#sSave').disabled = true;
+        try { await commit([{ id, data }], [data.guestId, old?.guestId]); toast(old ? 'Saved' : `${name} → room ${r.number}`); resetForm(); }
+        catch (e) { fail(e); } finally { $('#sSave').disabled = false; }
+      };
+      const editStayForm = s => {
+        editStay = s.id; $('#stayTitle').textContent = `Edit ${s.name}`; $('#sSave').textContent = 'Save changes'; $('#sCancel').hidden = false;
+        guestOpts(); $('#sGuest').value = GUESTS.some(g => g.id === s.guestId) ? s.guestId : '';
+        $('#sName').value = s.name; $('#sPeople').value = s.people || 1; $('#sIn').value = s.in; $('#sOut').value = s.out; $('#sNote').value = s.note || '';
+        roomOpts(s.roomId); toast('Change the room or days, then Save'); toForm();
+      };
+
+      // ----- add / edit rooms -----
+      const parseNums = t => t.split(/[,\s]+/).filter(Boolean).flatMap(x => {
+        const m = x.match(/^(\D*)(\d+)-\1?(\d+)$/);
+        if (!m) return [x];
+        const [, pre, a, b] = m, lo = +a, hi = +b; if (hi < lo || hi - lo > 200) return [x];
+        return Array.from({ length: hi - lo + 1 }, (_, i) => pre + String(lo + i).padStart(a.length, '0'));
+      });
+      const raOpen = r => { editRoom = r?.id || null; $('#raBody').hidden = false; $('#raToggle').hidden = true;
+        $('#raTitle').textContent = r ? `Edit room ${r.number}` : 'Add rooms'; $('#raSave').textContent = r ? 'Save room' : 'Add rooms'; $('#raDelete').hidden = !r;
+        if (r) { $('#raWing').value = r.wing; $('#raArea').value = r.area || ''; $('#raNums').value = r.number; $('#raBeds').value = r.beds; }
+        else { $('#raNums').value = ''; }
+        $('#raHint').textContent = r ? 'Change the number, wing, area or beds. Guests in this room see the change on their pass.' : 'Use a dash for a range, e.g. 101-110. Rooms already in this wing are skipped.';
+        $('#roomAdd').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      const raClose = () => { editRoom = null; $('#raBody').hidden = !!ROOMS.length ? true : false; $('#raToggle').hidden = !$('#raBody').hidden;
+        $('#raTitle').textContent = 'Add rooms'; $('#raSave').textContent = 'Add rooms'; $('#raDelete').hidden = true; $('#raNums').value = ''; };
+      $('#raToggle').onclick = () => raOpen(null);
+      $('#raCancel').onclick = raClose;
+      $('#raSave').onclick = async () => {
+        const wing = $('#raWing').value.trim(), area = $('#raArea').value.trim(), beds = Math.max(1, Math.min(12, Math.round(+$('#raBeds').value) || 4));
+        if (!wing) return toast('Type the wing or building');
+        const nums = parseNums($('#raNums').value.trim()); if (!nums.length) return toast('Type the room numbers');
+        const same = (r, n) => r.wing.toLowerCase() === wing.toLowerCase() && String(r.number).toLowerCase() === n.toLowerCase();
+        $('#raSave').disabled = true;
+        try {
+          if (editRoom) {
+            if (nums.length !== 1) return toast('Type one room number');
+            if (ROOMS.some(r => r.id !== editRoom && same(r, nums[0]))) return toast(`${wing} already has room ${nums[0]}`);
+            const most = Math.max(0, ...NIGHTS.map(n => used(editRoom, n)));
+            if (beds < most) return toast(`${most} people already stay in this room on one night`);
+            const data = { wing, area, number: nums[0], beds }, rooms2 = ROOMS.map(r => r.id === editRoom ? { ...r, ...data } : r);
+            const b = writeBatch(db); b.update(doc(db, 'rooms', editRoom), data);
+            new Set(STAYS.filter(s => s.roomId === editRoom).map(s => s.guestId)).forEach(g => g && GUESTS.some(x => x.id === g) && b.update(doc(db, 'guests', g), guestPatch(g, STAYS, rooms2)));
+            await b.commit(); toast('Room saved'); raClose();
+          } else {
+            const add = [...new Set(nums)].filter(n => !ROOMS.some(r => same(r, n)));
+            if (!add.length) return toast('Those rooms are already added');
+            const b = writeBatch(db);
+            add.forEach(n => b.set(doc(collection(db, 'rooms')), { wing, area, number: n, beds, createdAt: serverTimestamp() }));
+            await b.commit(); $('#raNums').value = '';
+            toast(`Added ${add.length} room${add.length === 1 ? '' : 's'} to ${wing}${nums.length > add.length ? ` (${nums.length - add.length} already there)` : ''}`);
+          }
+        } catch (e) { fail(e); } finally { $('#raSave').disabled = false; }
+      };
+      $('#raDelete').onclick = () => {
+        const r = ROOMS.find(x => x.id === editRoom); if (!r) return;
+        if (STAYS.some(s => s.roomId === r.id)) return toast('Move or remove the guests in this room first');
+        confirm(`Delete room ${r.number} (${whereOf(r)})?`) && deleteDoc(doc(db, 'rooms', r.id)).then(() => { toast('Room deleted'); raClose(); }).catch(fail);
+      };
+
+      // ----- board -----
+      ['#rQ', '#rWing', '#rArea', '#rFree'].forEach(id => $(id).oninput = $(id).onchange = () => renderRooms());
+      function renderRooms() {
+        const wings = [...new Set(ROOMS.map(r => r.wing))].sort(natural), areas = [...new Set(ROOMS.map(r => r.area).filter(Boolean))].sort(natural);
+        $('#wingList').innerHTML = wings.map(w => `<option value="${esc(w)}">`).join('');
+        $('#areaList').innerHTML = areas.map(a => `<option value="${esc(a)}">`).join('');
+        const fw = $('#rWing').value, fa = $('#rArea').value;
+        $('#rWing').innerHTML = '<option value="">All wings</option>' + wings.map(w => `<option ${w === fw ? 'selected' : ''}>${esc(w)}</option>`).join('');
+        $('#rArea').innerHTML = '<option value="">All areas</option>' + areas.map(a => `<option ${a === fa ? 'selected' : ''}>${esc(a)}</option>`).join('');
+        const beds = ROOMS.reduce((t, r) => t + (+r.beds || 0), 0);
+        const waiting = GUESTS.filter(g => leftOf(g) > 0);
+        $('#roomStats').innerHTML = `<div><b>${ROOMS.length}</b><span>Rooms</span></div><div><b>${beds}</b><span>Beds</span></div>
+          <div><b>${GUESTS.reduce((t, g) => t + Math.min(+g.people || 1, allotted(g.id)), 0) + STAYS.filter(s => !s.guestId).reduce((t, s) => t + (+s.people || 1), 0)}</b><span>People with a room</span></div>
+          <div><b>${waiting.reduce((t, g) => t + leftOf(g), 0)}</b><span>People still need a room</span></div>`;
+        $('#nightBar').innerHTML = NIGHTS.map(n => { const take = ROOMS.reduce((t, r) => t + used(r.id, n), 0);
+          return `<button data-night="${n}" aria-pressed="${n === night}"><span>Night of ${dLbl(n)}</span><b>${beds - take}</b><span class="muted">free of ${beds}</span></button>`; }).join('');
+        $$('[data-night]').forEach(b => b.onclick = () => { night = b.dataset.night; renderRooms(); });
+
+        const q = $('#rQ').value.trim().toLowerCase(), onlyFree = $('#rFree').checked;
+        const occOf = r => STAYS.filter(s => s.roomId === r.id).sort((a, b) => a.in.localeCompare(b.in) || natural(a.name, b.name));
+        const show = ROOMS.filter(r => (!fw || r.wing === fw) && (!fa || r.area === fa) && (!onlyFree || used(r.id, night) < r.beds)
+          && (!q || [r.number, r.wing, r.area, ...occOf(r).flatMap(s => [s.name, s.guestId])].join(' ').toLowerCase().includes(q)));
+        const card = r => {
+          const n = used(r.id, night), full = n >= r.beds, occ = occOf(r);
+          const dots = Array.from({ length: Math.max(r.beds, n) }, (_, i) => `<i class="bed ${i < n ? (i >= r.beds ? 'over' : 'on') : ''}"></i>`).join('');
+          return `<div class="room ${full ? 'full' : ''}">
+            <div class="row between"><span class="no">${esc(r.number)}</span><span class="chip ${full ? 'sage' : n ? '' : 'plum'}">${full ? 'Full' : n ? `${r.beds - n} free` : 'Empty'}</span></div>
+            <div class="row between"><div class="beds" aria-label="${n} of ${r.beds} beds taken">${dots}</div><span class="small muted">${n} of ${r.beds} · ${dLbl(night, false)}</span></div>
+            ${occ.map(s => `<div class="occ ${nightsOf(s).includes(night) ? '' : 'away'}"><div style="min-width:0"><b>${esc(s.name)}</b> · ${s.people || 1}<br><span class="muted small">${span(s)}${s.note ? ' · ' + esc(s.note) : ''}</span></div>
+              <div class="row" style="flex-wrap:nowrap;gap:0"><button data-sedit="${s.id}">Edit</button><button class="x" data-sdel="${s.id}">Remove</button></div></div>`).join('')}
+            <div class="row between"><button class="linkbtn" data-rallot="${r.id}">+ Allot</button><button class="linkbtn" style="color:var(--muted)" data-redit="${r.id}">Edit room</button></div></div>`;
+        };
+        if (!ROOMS.length) {
+          $('#roomBoard').innerHTML = '<div class="card"><b>No rooms yet</b><p class="muted small">Add the property\'s rooms below: the wing, the area, the room numbers and how many people fit in each. Then allot guests from here.</p></div>';
+          if (!editRoom) { $('#raBody').hidden = false; $('#raToggle').hidden = true; }
+        } else {
+          const ws = [...new Set(show.map(r => r.wing))].sort(natural);
+          $('#roomBoard').innerHTML = ws.length ? ws.map(w => { const inW = show.filter(r => r.wing === w);
+            const free = inW.reduce((t, r) => t + Math.max(0, r.beds - used(r.id, night)), 0);
+            const ars = [...new Set(inW.map(r => r.area || ''))].sort(natural);
+            return `<div class="wing"><header><h3>${esc(w)}</h3><span class="small muted">${inW.length} room${inW.length === 1 ? '' : 's'} · ${free} bed${free === 1 ? '' : 's'} free on ${dLbl(night)}</span></header>
+              ${ars.map(a => `${ars.length > 1 || a ? `<div class="area">${esc(a || 'Other rooms')}</div>` : ''}<div class="roomgrid">${inW.filter(r => (r.area || '') === a).sort((x, y) => natural(x.number, y.number)).map(card).join('')}</div>`).join('')}</div>`; }).join('')
+            : '<p class="muted">No rooms match.</p>';
+        }
+        $$('[data-rallot]').forEach(b => b.onclick = () => { if (editStay) resetForm(); roomOpts(b.dataset.rallot); toForm(); $('#sGuest').focus(); });
+        $$('[data-redit]').forEach(b => b.onclick = () => raOpen(ROOMS.find(r => r.id === b.dataset.redit)));
+        $$('[data-sedit]').forEach(b => b.onclick = () => editStayForm(STAYS.find(s => s.id === b.dataset.sedit)));
+        $$('[data-sdel]').forEach(b => b.onclick = () => { const s = STAYS.find(x => x.id === b.dataset.sdel), r = ROOMS.find(x => x.id === s?.roomId);
+          s && confirm(`Remove ${s.name} from room ${r?.number || ''}?`) && commit([{ del: s.id }], [s.guestId]).then(() => { if (editStay === s.id) resetForm(); toast('Removed'); }).catch(fail); });
+
+        $('#noRoom').innerHTML = waiting.length ? waiting.sort((a, b) => natural(a.name, b.name)).map(g => `<div class="item"><div class="row between"><div><b>${esc(g.name)}</b>
+            <p class="small muted">${esc([g.side, g.relation].filter(Boolean).join(' · '))}${g.side || g.relation ? ' · ' : ''}${leftOf(g)} of ${g.people || 1} need a room</p></div>
+            <button class="btn ghost sm" data-gallot="${esc(g.id)}">Allot</button></div></div>`).join('')
+          : `<p class="muted">${GUESTS.length ? 'Every family on the guest list has a room.' : 'The guest list is empty. Import it in the Guests tab, or allot rooms by name above.'}</p>`;
+        $$('[data-gallot]').forEach(b => b.onclick = () => { if (editStay) resetForm(); $('#sGuest').value = b.dataset.gallot; $('#sGuest').onchange(); toForm(); $('#sRoom').focus(); });
+        guestOpts(); roomOpts();
+        badges.rooms = 0;
+      }
+      onGuests = renderRooms;
+      sub('rooms', collection(db, 'rooms'), s => { ROOMS = list(s).map(r => ({ ...r, wing: r.wing || 'Rooms', beds: +r.beds || 4 })); renderRooms(); });
+      sub('rooms', collection(db, 'stays'), s => { STAYS = list(s); renderRooms(); });
+      renderRooms();
     }
 
     $('#xlsx').onchange = async e => {
@@ -563,7 +854,12 @@ async function start() {
         $('#doImport').onclick = async () => {
           $('#doImport').disabled = true; $('#doImport').textContent = 'Importing…';
           const ops = [];
-          for (const [ph, g] of guests) ops.push(b => b.set(doc(db, 'guests', ph), { ...g, updatedAt: serverTimestamp() }));
+          for (const [ph, g] of guests) {
+            // Keep rooms allotted in the Rooms tab (the Excel's Room column would wipe them).
+            const old = GUESTS.find(x => x.id === ph);
+            const keep = old && STAYS.some(s => s.guestId === ph) ? { room: old.room || '', roomWhere: old.roomWhere || '', stayIn: old.stayIn || '', stayOut: old.stayOut || '' } : {};
+            ops.push(b => b.set(doc(db, 'guests', ph), { ...g, ...keep, updatedAt: serverTimestamp() }));
+          }
           for (const g of gone) ops.push(b => b.delete(doc(db, 'guests', g.id)));
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {

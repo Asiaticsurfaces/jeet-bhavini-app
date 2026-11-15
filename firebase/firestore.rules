@@ -13,6 +13,7 @@ rules_version = '2';
 //   photos  – see all photos, hide/show, add photographer photos
 //   team    – duties (tick done), add/edit vendors and drivers, contacts
 //   events  – add and edit the wedding events (schedule) and the venue map
+//   rooms   – add rooms (wing / area / beds) and allot them to guests by day
 service cloud.firestore {
   match /databases/{db}/documents {
 
@@ -31,7 +32,7 @@ service cloud.firestore {
     // Older entries without `perms` fall back to their preset.
     function preset(r) {
       return r == 'event' ? {'live': true}
-        : r == 'family' ? {'help': true, 'lost': true, 'pickups': true, 'guests': true, 'photos': true, 'team': true}
+        : r == 'family' ? {'help': true, 'lost': true, 'pickups': true, 'guests': true, 'photos': true, 'team': true, 'rooms': true}
         : {};
     }
     function can(p) {
@@ -58,8 +59,11 @@ service cloud.firestore {
     // they know the number, but nobody outside the family can list it.
     match /guests/{phone} {
       allow get: if signedIn();
-      allow list: if can('guests');
+      allow list: if can('guests') || can('rooms');
       allow write: if isOwner();
+      // Rooms tab writes only the room shown on the guest's pass.
+      allow update: if can('rooms')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'roomWhere', 'stayIn', 'stayOut']);
     }
     match /guestNotes/{phone} {
       allow read: if can('guests');
@@ -144,5 +148,9 @@ service cloud.firestore {
 
     // Wedding schedule: everyone reads; the events permission edits.
     match /events/{id} { allow read: if signedIn(); allow write: if can('events'); }
+
+    // Room allotment (family panel → Rooms).
+    match /rooms/{id} { allow read, write: if can('rooms'); }
+    match /stays/{id} { allow read, write: if can('rooms'); }
   }
 }
