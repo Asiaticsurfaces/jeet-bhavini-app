@@ -504,20 +504,11 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <p class="dateline">1 – 2 December 2026</p>
     <div class="ornament" style="width:100%"><span>✦</span></div>
     <h2>Find your invite</h2>
-    <p class="muted">Enter the mobile number the family has for you. We'll send a one-time code by SMS.</p>
-    <div id="phoneBox" class="stack" style="width:100%">
-      <input type="tel" id="loginQ" placeholder="Your mobile number" autocomplete="tel" inputmode="numeric" maxlength="14">
-      <button class="btn" id="loginGo" style="width:100%">Send OTP</button>
-    </div>
-    <div id="otpBox" class="stack" style="width:100%" hidden>
-      <p class="small" id="otpSent"></p>
-      <input type="text" id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" style="text-align:center;letter-spacing:.4em;font-size:20px">
-      <button class="btn" id="otpGo" style="width:100%">Verify &amp; open my invite</button>
-      <div class="row" style="justify-content:center;gap:18px"><button class="linkbtn" id="otpBack">Change number</button><button class="linkbtn" id="otpResend">Resend code</button></div>
-    </div>
-    <div id="recap"></div>
+    <p class="muted">Enter the mobile number the family has for you, to see your room and your events.</p>
+    <input type="tel" id="loginQ" placeholder="Your mobile number" autocomplete="tel" inputmode="numeric" maxlength="14">
+    <button class="btn" id="loginGo" style="width:100%">Open my invite</button>
     <div class="stack" id="loginHits" style="width:100%"></div>
-    <p class="demo-note" id="loginDemo">Preview numbers: 9820012345 (Riya), 9820054321 (Kunal), 9820099999 (Neha) · OTP 123456</p>
+    <p class="demo-note" id="loginDemo">Preview numbers: 9820012345 (Riya), 9820054321 (Kunal), 9820099999 (Neha)</p>
   </div>
 </div>
 
@@ -854,51 +845,28 @@ $('#famGo').onclick=()=>{if($('#famPin').value==='1202'){famOpen=true;store.set(
 $$('.ftabs button').forEach(b=>b.onclick=()=>{famTab=b.dataset.ft;renderFamily()});
 
 /* ---------- guest login ---------- */
-function guestWelcome(g){ME=g;store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`)}
-let otpPhone=null;
-const loginMsg=t=>{$('#loginHits').innerHTML=t?`<p class="muted">${t}</p>`:'';renderLoginFoot()};
-const showOtp=on=>{$('#phoneBox').hidden=on;$('#otpBox').hidden=!on;if(!on)$('#otpCode').value=''};
-const otpErr=e=>({'auth/invalid-verification-code':'That code is wrong. Check the SMS and try again.','auth/code-expired':'The code has expired. Tap Resend code.',
-  'auth/too-many-requests':'Too many tries. Please wait a few minutes and try again.','auth/invalid-phone-number':'That number looks wrong. Please check it.',
-  'auth/quota-exceeded':'We can\'t send SMS right now. Please tell the family.','auth/captcha-check-failed':'Security check failed. Refresh the page and try again.'}[e&&e.code]
-  ||'Couldn\'t send the code. Check your internet and try again.');
-async function sendOtp(){
+function guestWelcome(g){ME=g;store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`);if(CLOUD_ON())CLOUD.onGuest(ME)}
+async function tryLogin(){
   const ph=normPhone($('#loginQ').value);
-  if(ph.length!==10)return loginMsg('Enter your 10-digit mobile number.');
-  $('#loginGo').disabled=$('#otpResend').disabled=true;loginMsg('Checking the guest list…');
+  if(ph.length!==10){$('#loginHits').innerHTML='<p class="muted">Enter your 10-digit mobile number.</p>';return}
+  $('#loginGo').disabled=true;$('#loginHits').innerHTML='<p class="muted">Looking for your invite…</p>';
   try{
-    const known=CLOUD_ON()?await CLOUD.isGuest(ph):GUESTS.some(x=>x.phone===ph);
-    if(!known)return loginMsg('We couldn\'t find this number on the guest list. Try the number the family messaged you on, or browse without signing in.');
-    loginMsg('Sending a code to +91 '+ph+'…');
-    if(CLOUD_ON())await CLOUD.sendOtp(ph,'recap');
-    otpPhone=ph;showOtp(true);loginMsg('');
-    $('#otpSent').textContent=`We sent a 6-digit code by SMS to +91 ${ph}.`;$('#otpCode').focus();
-  }catch(e){console.error(e);loginMsg(otpErr(e))}
-  finally{$('#loginGo').disabled=$('#otpResend').disabled=false}
-}
-async function verifyOtp(){
-  const code=$('#otpCode').value.replace(/\D/g,'');
-  if(code.length!==6)return loginMsg('Enter the 6-digit code from the SMS.');
-  $('#otpGo').disabled=true;loginMsg('Checking…');
-  try{
-    if(CLOUD_ON()){await CLOUD.verifyOtp(code);return}   // reloads the app signed in
-    if(code!=='123456')throw{code:'auth/invalid-verification-code'};
-    showOtp(false);guestWelcome(GUESTS.find(x=>x.phone===otpPhone));
-  }catch(e){console.error(e);loginMsg(otpErr(e))}
-  finally{$('#otpGo').disabled=false}
+    const g=CLOUD_ON()?await CLOUD.findGuest(ph):GUESTS.find(x=>x.phone===ph);
+    if(g)return guestWelcome(g);
+    $('#loginHits').innerHTML='<p class="muted">We couldn\'t find that number. Try the number the family messaged you on, or tap Need help after browsing.</p>';
+  }catch(e){$('#loginHits').innerHTML='<p class="muted">Couldn\'t connect. Check your internet and try again.</p>'}
+  finally{$('#loginGo').disabled=false;renderLoginFoot()}
 }
 function renderLoginFoot(){
   if(!$('#skipLogin'))$('#loginHits').insertAdjacentHTML('beforeend','<button class="linkbtn" id="skipLogin">Browse without signing in</button>');
   $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
   $('#loginDemo').hidden=CLOUD_ON();
 }
-function renderLogin(){showOtp(false);loginMsg('')}
+function renderLogin(){$('#loginHits').innerHTML='';renderLoginFoot()}
 function openLogin(){$('#login').hidden=false;$('#loginQ').value='';renderLogin()}
 function closeLogin(){$('#login').hidden=true;renderAll()}
-$('#loginGo').onclick=sendOtp;$('#loginQ').onkeydown=e=>{if(e.key==='Enter')sendOtp()};
-$('#otpGo').onclick=verifyOtp;$('#otpCode').onkeydown=e=>{if(e.key==='Enter')verifyOtp()};
-$('#otpBack').onclick=()=>{showOtp(false);loginMsg('')};$('#otpResend').onclick=sendOtp;
-$('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);store.set('skipLogin',false);if(CLOUD_ON())CLOUD.signOut();else openLogin()};
+$('#loginGo').onclick=tryLogin;$('#loginQ').onkeydown=e=>{if(e.key==='Enter')tryLogin()};
+$('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
 
 function renderContacts(){
   $('#contactList').innerHTML=CONTACTS.map(([n,ph,d])=>`<div class="card stack"><div class="row between"><b>${esc(n)}</b>${ph?`<a class="btn sm" href="tel:+91${esc(normPhone(ph))}">Call</a>`:''}</div><p class="muted small">${esc(d||'')}${ph?'':' · number coming soon'}</p></div>`).join('');

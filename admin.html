@@ -60,13 +60,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <img src="assets/postcard_jb_monogram.png" alt="JB monogram">
     <h1>Family panel</h1>
     <p class="muted" id="gateMsg">Loading…</p>
-    <div id="otpSignIn" class="stack" style="width:min(340px,100%)" hidden>
-      <div id="aPhoneBox" class="stack"><input type="tel" id="aPhone" placeholder="Your mobile number" inputmode="numeric" maxlength="14"><button class="btn" id="aSend">Send OTP</button></div>
-      <div id="aOtpBox" class="stack" hidden><p class="small" id="aSent"></p><input id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" style="text-align:center;letter-spacing:.4em;font-size:20px"><button class="btn" id="aVerify">Verify</button><button class="btn ghost sm" id="aBack">Change number</button></div>
-      <p class="err" id="aErr"></p>
-      <div id="aRecap"></div>
-    </div>
-    <button class="btn ghost sm" id="signIn" hidden>Sign in with Google instead</button>
+    <button class="btn" id="signIn" hidden>Sign in with Google</button>
     <a class="muted small" href="./">← Back to the guest app</a>
   </div>
 
@@ -159,8 +153,8 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <h3>Help contacts (shown to guests)</h3><div class="stack" id="contactList"></div>
       <div class="card">
         <h3>Family admins</h3>
-        <p class="muted small">People who can open this panel. Add their mobile number (they sign in with an SMS code).</p>
-        <div class="row"><input id="adminEmail" inputmode="tel" placeholder="Mobile number, e.g. 98200 12345" style="flex:1"><button class="btn" id="adminAdd">Add</button></div>
+        <p class="muted small">People who can open this panel. They sign in with this Gmail address.</p>
+        <div class="row"><input id="adminEmail" type="email" placeholder="family.member@gmail.com" style="flex:1"><button class="btn" id="adminAdd">Add</button></div>
         <div class="stack" id="adminList"></div>
       </div>
     </section>
@@ -193,54 +187,30 @@ async function start() {
   const list = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
   const byNew = (a, b) => ms(b.createdAt) - ms(a.createdAt);
 
-  // ---- mobile OTP sign-in (main) ----
-  let conf = null, ver = null;
-  const aErr = t => $('#aErr').textContent = t || '';
-  const otpMsg = e => ({ 'auth/invalid-verification-code': 'Wrong code. Check the SMS.', 'auth/code-expired': 'Code expired. Send a new one.',
-    'auth/too-many-requests': 'Too many tries. Wait a few minutes.', 'auth/invalid-phone-number': 'That number looks wrong.' }[e?.code] || 'Couldn\'t send the code. Try again.');
-  $('#aSend').onclick = async () => {
-    const ph = normPhone($('#aPhone').value); if (ph.length !== 10) return aErr('Enter your 10-digit mobile number.');
-    $('#aSend').disabled = true; aErr('');
-    try {
-      if (ver) { try { ver.clear(); } catch (e) {} }
-      $('#aRecap').innerHTML = '<div></div>'; ver = new A.RecaptchaVerifier(auth, $('#aRecap').firstChild, { size: 'invisible' });
-      conf = await A.signInWithPhoneNumber(auth, '+91' + ph, ver);
-      $('#aPhoneBox').hidden = true; $('#aOtpBox').hidden = false; $('#aSent').textContent = `Code sent by SMS to +91 ${ph}.`; $('#aCode').focus();
-    } catch (e) { console.error(e); aErr(otpMsg(e)); } finally { $('#aSend').disabled = false; }
-  };
-  $('#aVerify').onclick = async () => {
-    const c = $('#aCode').value.replace(/\D/g, ''); if (c.length !== 6) return aErr('Enter the 6-digit code.');
-    $('#aVerify').disabled = true; aErr('');
-    try { await conf.confirm(c); } catch (e) { console.error(e); aErr(otpMsg(e)); } finally { $('#aVerify').disabled = false; }
-  };
-  $('#aBack').onclick = () => { $('#aPhoneBox').hidden = false; $('#aOtpBox').hidden = true; aErr(''); };
   $('#signIn').onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch(e => { if (e.code !== 'auth/popup-closed-by-user') fail(e); });
   $('#signOut').onclick = () => A.signOut(auth).then(() => location.reload());
 
   A.onAuthStateChanged(auth, async u => {
-    if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the mobile number the family added.'; $('#otpSignIn').hidden = false; $('#signIn').hidden = false; return; }
-    const meId = u.phoneNumber || u.email;
-    $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true; $('#otpSignIn').hidden = true;
+    if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
+    $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true;
     try {
-      const a = await getDoc(doc(db, 'admins', meId));
+      const a = await getDoc(doc(db, 'admins', u.email));
       if (!a.exists()) {
         // First-ever sign-in claims the panel (allowed only until config/adminsLocked exists).
-        await setDoc(doc(db, 'admins', meId), { role: 'owner', addedAt: serverTimestamp() });
-        await setDoc(doc(db, 'config', 'adminsLocked'), { by: meId, at: serverTimestamp() });
+        await setDoc(doc(db, 'admins', u.email), { email: u.email, role: 'owner', addedAt: serverTimestamp() });
+        await setDoc(doc(db, 'config', 'adminsLocked'), { by: u.email, at: serverTimestamp() });
         toast('You are the owner of the family panel');
       }
     }
     catch (e) {
-      $('#gateMsg').innerHTML = `<b>${esc(meId)}</b> isn't on the family list yet. Ask Jeet to add it in Family panel → Team → Family admins.`;
-      $('#signIn').hidden = true; $('#otpSignIn').hidden = true;
-      $('#gate').insertAdjacentHTML('beforeend', '<button class="btn ghost sm" id="tryOther">Use a different number</button>');
-      $('#tryOther').onclick = () => A.signOut(auth).then(() => location.reload()); return;
+      $('#gateMsg').innerHTML = `<b>${esc(u.email)}</b> isn't on the family list yet. Ask Jeet to add this email in Firebase → Firestore → <code>admins</code>.`;
+      $('#signIn').hidden = false; $('#signIn').textContent = 'Use a different account'; return;
     }
-    $('#gate').hidden = true; $('#panel').hidden = false; $('#whoami').textContent = meId;
-    run(u, meId);
+    $('#gate').hidden = true; $('#panel').hidden = false; $('#whoami').textContent = u.email;
+    run(u);
   });
 
-  function run(u, meId) {
+  function run(u) {
     // ---------- tabs ----------
     const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']];
     let cur = location.hash.slice(1) || 'live';
@@ -260,10 +230,10 @@ async function start() {
       $('#nowPlace').value = n.place || '';
     });
     $('#nowSave').onclick = () => { const text = $('#nowText').value.trim(); if (!text) return toast('Write the message first');
-      setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, on: true, by: meId, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
+      setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, on: true, by: u.email, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
     $('#nowOff').onclick = () => setDoc(doc(db, 'config', 'now'), { on: false, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast('Banner hidden')).catch(fail);
     $('#postSend').onclick = () => { const title = $('#postTitle').value.trim(); if (!title) return toast('Add a title');
-      addDoc(collection(db, 'posts'), { title, body: $('#postBody').value.trim(), kind: $('#postKind').value, by: meId, createdAt: serverTimestamp() })
+      addDoc(collection(db, 'posts'), { title, body: $('#postBody').value.trim(), kind: $('#postKind').value, by: u.email, createdAt: serverTimestamp() })
         .then(() => { $('#postTitle').value = ''; $('#postBody').value = ''; toast('Posted to all guests'); }).catch(fail); };
     onSnapshot(collection(db, 'posts'), s => {
       const P = list(s).sort(byNew);
@@ -283,7 +253,7 @@ async function start() {
         <div class="row">${t.phone ? `<a class="btn sm" href="tel:+91${esc(t.phone)}">Call ${esc(t.phone)}</a>` : '<span class="muted small">Guest hasn\'t opened their pass, so there is no number.</span>'}
           ${t.status !== 'working' && t.status !== 'done' ? `<button class="btn ghost sm" data-st="working" data-id="${t.id}">On it</button>` : ''}
           ${t.status !== 'done' ? `<button class="btn sage sm" data-st="done" data-id="${t.id}">Resolved</button>` : `<button class="btn ghost sm" data-st="open" data-id="${t.id}">Reopen</button>`}</div></div>`).join('') : '<p class="muted">No help requests. 🎉</p>';
-      $$('#ticketList [data-st]').forEach(b => b.onclick = () => updateDoc(doc(db, 'tickets', b.dataset.id), { status: b.dataset.st, handledBy: meId }).catch(fail));
+      $$('#ticketList [data-st]').forEach(b => b.onclick = () => updateDoc(doc(db, 'tickets', b.dataset.id), { status: b.dataset.st, handledBy: u.email }).catch(fail));
     });
 
     // ---------- lost & found ----------
@@ -383,8 +353,8 @@ async function start() {
         $('#doImport').onclick = async () => {
           $('#doImport').disabled = true; $('#doImport').textContent = 'Importing…';
           const ops = [];
-          for (const [ph, g] of guests) { ops.push(b => b.set(doc(db, 'guests', ph), { ...g, updatedAt: serverTimestamp() })); ops.push(b => b.set(doc(db, 'guestPhones', ph), {})); }
-          for (const g of gone) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestPhones', g.id))); }
+          for (const [ph, g] of guests) ops.push(b => b.set(doc(db, 'guests', ph), { ...g, updatedAt: serverTimestamp() }));
+          for (const g of gone) ops.push(b => b.delete(doc(db, 'guests', g.id)));
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
             const old = await getDocs(collection(db, col));
@@ -437,14 +407,13 @@ async function start() {
     onSnapshot(doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
     onSnapshot(collection(db, 'admins'), s => {
       const L = list(s).sort((a, b) => (b.role === 'owner') - (a.role === 'owner') || a.id.localeCompare(b.id));
-      $('#adminList').innerHTML = L.map(a => `<div class="item"><div class="row between"><div><b>${esc(a.id)}</b>${a.role === 'owner' ? ' <span class="chip plum">Owner</span>' : ''}</div>${a.id !== meId && a.role !== 'owner' ? `<button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button>` : ''}</div></div>`).join('');
+      $('#adminList').innerHTML = L.map(a => `<div class="item"><div class="row between"><div><b>${esc(a.id)}</b>${a.role === 'owner' ? ' <span class="chip plum">Owner</span>' : ''}</div>${a.id !== u.email && a.role !== 'owner' ? `<button class="btn danger sm" data-adel="${esc(a.id)}">Remove</button>` : ''}</div></div>`).join('');
       $$('[data-adel]').forEach(b => b.onclick = () => confirm(`Remove ${b.dataset.adel} from the family panel?`) && deleteDoc(doc(db, 'admins', b.dataset.adel)).catch(fail));
     });
     $('#adminAdd').onclick = () => {
-      const raw = $('#adminEmail').value.trim().toLowerCase();
-      const e = raw.includes('@') ? raw : (normPhone(raw).length === 10 ? '+91' + normPhone(raw) : '');
-      if (!e || (raw.includes('@') && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) return toast('Enter a 10-digit mobile number');
-      setDoc(doc(db, 'admins', e), { role: 'family', addedBy: meId, addedAt: serverTimestamp() }).then(() => { $('#adminEmail').value = ''; toast('Added. They can sign in now'); }).catch(fail);
+      const e = $('#adminEmail').value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
+      setDoc(doc(db, 'admins', e), { email: e, role: 'family', addedBy: u.email, addedAt: serverTimestamp() }).then(() => { $('#adminEmail').value = ''; toast('Added. They can sign in now'); }).catch(fail);
     };
     const tel = p => p ? `<a class="btn ghost sm" href="tel:+91${esc(p)}">Call</a>` : '';
     function renderTeam() {

@@ -21,19 +21,16 @@ async function start() {
   const { doc, getDoc, setDoc, addDoc, updateDoc, collection, query, where, onSnapshot,
           serverTimestamp, increment, Timestamp } = F;
 
-  // Guests who verified their number by OTP stay signed in with that phone;
-  // everyone else browses as an anonymous user.
-  await auth.authStateReady();
-  if (!auth.currentUser) await A.signInAnonymously(auth);
-  const user = auth.currentUser;
+  const user = await new Promise((res, rej) => {
+    const off = A.onAuthStateChanged(auth, u => { if (u) { off(); res(u); } });
+    A.signInAnonymously(auth).catch(rej);
+  });
   const uid = user.uid;
-  const myPhone = user.phoneNumber ? user.phoneNumber.replace(/\D/g, '').slice(-10) : '';
   const W = window;
-  let confirmation = null, verifier = null;
   // The app's state lives in index.html's top-level `let` variables (ME, POSTS, travel...),
   // which modules can read and assign by name; they are not window properties.
   const me = () => ME || null;
-  const who = () => ({ uid, phone: myPhone, name: me()?.n || 'Guest', room: me()?.room || '' });
+  const who = () => ({ uid, phone: me()?.phone || '', name: me()?.n || 'Guest', room: me()?.room || '' });
   const ms = t => (t && t.toMillis ? t.toMillis() : Date.now());
   const ago = t => {
     const m = Math.round((Date.now() - ms(t)) / 60000);
@@ -66,22 +63,6 @@ async function start() {
 
   const CLOUD = {
     uid,
-    // Is this number on the guest list? (an empty marker doc per phone, no details)
-    async isGuest(phone) { return (await getDoc(doc(db, 'guestPhones', phone))).exists(); },
-    async sendOtp(phone, boxId) {
-      // A fresh invisible reCAPTCHA each time (they can't be re-rendered).
-      if (verifier) { try { verifier.clear(); } catch (e) {} }
-      const box = document.getElementById(boxId); box.innerHTML = '<div></div>';
-      verifier = new A.RecaptchaVerifier(auth, box.firstChild, { size: 'invisible' });
-      confirmation = await A.signInWithPhoneNumber(auth, '+91' + phone, verifier);
-    },
-    async verifyOtp(code) {
-      await confirmation.confirm(code);
-      store.set('guest', null); store.set('skipLogin', false);
-      location.reload();                 // restart the app as the signed-in guest
-      await new Promise(() => {});
-    },
-    async signOut() { await A.signOut(auth); store.set('guest', null); location.reload(); },
     async findGuest(phone) {
       const snap = await getDoc(doc(db, 'guests', phone));
       if (!snap.exists()) return null;
@@ -94,7 +75,10 @@ async function start() {
         lang: g.lang || 'EN',
       };
     },
-
+    onGuest(g) {
+      // Tag this device's arrival/rsvp with the guest's name and phone.
+      if (travel) this.saveArrival(travel).catch(() => {});
+    },
     addTicket: (cat, text) => addDoc(collection(db, 'tickets'), { ...who(), cat, text, status: 'open', createdAt: serverTimestamp() }),
     addLost: (item, where_) => addDoc(collection(db, 'lost'), { ...who(), item, where: where_, status: 'searching', createdAt: serverTimestamp() }),
     addWish: (name, text) => addDoc(collection(db, 'wishes'), { uid, name, text, hidden: false, createdAt: serverTimestamp() }),
@@ -162,15 +146,7 @@ async function start() {
   setInterval(() => refresh('photos'), 60000); // photos "develop" at 9 AM without a reload
 
   if (LIVE_URL) { STREAM_URL = LIVE_URL; }
-  // Who is this? Only an OTP-verified phone unlocks a guest pass.
-  if (myPhone) {
-    const g = await CLOUD.findGuest(myPhone).catch(() => null);
-    ME = g; store.set('guest', g);
-    if (g) { closeLogin(); if (!store.get('welcomed', false)) { toast(`Welcome, ${g.n.split(' ')[0]}!`); store.set('welcomed', true); } }
-    else { openLogin(); loginMsg('This number isn\'t on the guest list yet. Please check with the family.'); }
-  } else if (ME) {
-    // A pass saved before OTP existed: ask them to verify their number once.
-    ME = null; store.set('guest', null); openLogin();
-  }
+  // Re-check the saved guest against the live list (room changes etc.).
+  if (me()?.phone) CLOUD.findGuest(me().phone).then(g => { if (g) { ME = g; store.set('guest', g); refresh('guest'); } }).catch(() => {});
   refresh('all');
 }
