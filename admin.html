@@ -106,6 +106,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <input id="nowText" maxlength="140" placeholder="e.g. Varmala starts in 10 min. Please come to Lake Side.">
         <div class="row">
           <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Lobby &amp; help desk</option><option value="ballroom">Ballroom</option><option value="lawn">Lawn</option><option value="lake">Lake Side</option><option value="rooms">Guest rooms</option><option value="parking">Parking &amp; main gate</option></select>
+          <select id="nowSide" style="width:auto"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select>
           <button class="btn" id="nowSave">Show to guests</button><button class="btn ghost" id="nowOff">Hide banner</button>
         </div>
         <p class="small" id="nowState"></p>
@@ -114,6 +115,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <h3>Post a live update</h3>
         <input id="postTitle" maxlength="80" placeholder="Title, e.g. Dinner is open">
         <textarea id="postBody" rows="2" maxlength="300" placeholder="Details, e.g. Buffet is ready on the Lawn. Jain counter on the left."></textarea>
+        <label class="stack" style="gap:4px"><span class="small muted">Send to</span><select id="postSide"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select></label>
         <div class="row"><select id="postKind" style="flex:1"><option>Info</option><option>Ceremony</option><option>Food</option><option>Shuttle</option></select><button class="btn" id="postSend">Post</button></div>
       </div>
       <h3>Posted updates</h3>
@@ -251,8 +253,9 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <label class="stack" style="gap:4px"><span class="small muted">Key moments, one per line as <b>time | moment</b> (optional)</span><textarea id="evMoments" rows="2" placeholder="3:30 PM | Jaan Prastan&#10;5:41 PM | Hastamelap"></textarea></label>
         <label class="stack" style="gap:4px"><span class="small muted">What to bring, one per line (optional)</span><textarea id="evPack" rows="3" placeholder="Old clothes&#10;Towel"></textarea></label>
         <label class="stack" style="gap:4px"><span class="small muted">What happens here, one per line as <b>Name: description</b> (optional)</span><textarea id="evRites" rows="3" placeholder="Haldi: Turmeric paste is applied to bless the couple."></textarea></label>
+        <label class="stack" style="gap:4px"><span class="small muted">Who sees this event</span><select id="evSide"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select></label>
         <label class="row small"><input type="checkbox" id="evHidden" style="width:18px;height:18px"> Hide this event from guests for now</label>
-        <div class="row"><button class="btn" id="evSave">Save event</button><button class="btn ghost" id="evCancel">Cancel</button><button class="btn danger" id="evDelete" hidden>Delete event</button></div>
+        <div class="row"><button class="btn" id="evSave">Save event</button><button class="btn ghost" id="evCancel">Cancel</button><button class="btn ghost" id="evDup" hidden>Copy for the other side</button><button class="btn danger" id="evDelete" hidden>Delete event</button></div>
       </div>
       <div class="stack" id="evList"></div>
 
@@ -397,16 +400,18 @@ async function start() {
       $('#nowState').innerHTML = n.on && n.text ? `<span class="chip sage">Showing now</span> ${esc(n.text)}` : '<span class="chip">Banner is hidden</span>';
       if (document.activeElement !== $('#nowText')) $('#nowText').value = n.text || '';
       $('#nowPlace').value = n.place || '';
+      $('#nowSide').value = n.side || 'all';
     });
     $('#nowSave').onclick = () => { const text = $('#nowText').value.trim(); if (!text) return toast('Write the message first');
-      setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, on: true, by: u.email, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
+      setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, side: $('#nowSide').value, on: true, by: u.email, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
     $('#nowOff').onclick = () => setDoc(doc(db, 'config', 'now'), { on: false, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast('Banner hidden')).catch(fail);
     $('#postSend').onclick = () => { const title = $('#postTitle').value.trim(); if (!title) return toast('Add a title');
-      addDoc(collection(db, 'posts'), { title, body: $('#postBody').value.trim(), kind: $('#postKind').value, by: u.email, createdAt: serverTimestamp() })
-        .then(() => { $('#postTitle').value = ''; $('#postBody').value = ''; toast('Posted to all guests'); }).catch(fail); };
+      const side = $('#postSide').value;
+      addDoc(collection(db, 'posts'), { title, body: $('#postBody').value.trim(), kind: $('#postKind').value, side, by: u.email, createdAt: serverTimestamp() })
+        .then(() => { $('#postTitle').value = ''; $('#postBody').value = ''; toast(side === 'all' ? 'Posted to all guests' : `Posted to the ${side.toLowerCase()}'s side`); }).catch(fail); };
     onSnapshot(collection(db, 'posts'), s => {
       const P = list(s).sort(byNew);
-      $('#postList').innerHTML = P.length ? P.map(p => `<div class="item"><div class="row between"><b>${esc(p.title)}</b><span class="chip">${esc(p.kind || 'Info')}</span></div>${p.body ? `<p>${esc(p.body)}</p>` : ''}<div class="row between"><span class="muted small">${when(p.createdAt)} · ${esc(p.by || '')}</span><button class="btn danger sm" data-del="${p.id}">Delete</button></div></div>`).join('') : '<p class="muted">Nothing posted yet.</p>';
+      $('#postList').innerHTML = P.length ? P.map(p => `<div class="item"><div class="row between"><b>${esc(p.title)}</b><span class="chip">${esc(p.kind || 'Info')}${p.side === 'Groom' ? ' · Groom\'s side' : p.side === 'Bride' ? ' · Bride\'s side' : ''}</span></div>${p.body ? `<p>${esc(p.body)}</p>` : ''}<div class="row between"><span class="muted small">${when(p.createdAt)} · ${esc(p.by || '')}</span><button class="btn danger sm" data-del="${p.id}">Delete</button></div></div>`).join('') : '<p class="muted">Nothing posted yet.</p>';
       $$('#postList [data-del]').forEach(b => b.onclick = () => confirm('Delete this update for everyone?') && deleteDoc(doc(db, 'posts', b.dataset.del)).catch(fail));
     });
 
@@ -424,8 +429,9 @@ async function start() {
       const label = e => { const [d, t] = parts(e.start); const dt = new Date(d + 'T00:00:00Z');
         return `${dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${e.time || t}`; };
       function openForm(e) {
-        editing = e ? e.id : null; $('#evForm').hidden = false; $('#evDelete').hidden = !e;
-        $('#evFormTitle').textContent = e ? `Edit ${e.name}` : 'New event';
+        editing = e && e.id ? e.id : null; $('#evForm').hidden = false; $('#evDelete').hidden = !editing; $('#evDup').hidden = !editing;
+        $('#evFormTitle').textContent = editing ? `Edit ${e.name}` : e ? `New: ${e.name} (copy)` : 'New event';
+        $('#evSide').value = e?.side || 'all';
         const [d, t] = e ? parts(e.start) : ['2026-12-01', '10:00'];
         $('#evName').value = e?.name || ''; $('#evGu').value = e && e.gu !== e.name ? e.gu || '' : ''; $('#evTag').value = e?.tag || '';
         $('#evDate').value = d; $('#evTime').value = t; $('#evHrs').value = e?.hrs || 2; $('#evTimeText').value = e?.time || '';
@@ -441,6 +447,10 @@ async function start() {
       const closeForm = () => { editing = null; $('#evForm').hidden = true; };
       $('#evNew').onclick = () => openForm(null);
       $('#evCancel').onclick = closeForm;
+      // Same event for the other family, e.g. a different time for the bride's side.
+      $('#evDup').onclick = () => { const e = EVS.find(x => x.id === editing); if (!e) return;
+        openForm({ ...e, id: null, side: e.side === 'Groom' ? 'Bride' : e.side === 'Bride' ? 'Groom' : 'Bride' });
+        toast('Copied. Change the time or details, then Save'); };
       $('#evSave').onclick = () => {
         const name = $('#evName').value.trim(); if (!name) return toast('Give the event a name');
         const date = $('#evDate').value, time = $('#evTime').value; if (!date || !time) return toast('Choose a date and start time');
@@ -451,7 +461,7 @@ async function start() {
           moments: lines('#evMoments').map(l => l.split('|').map(x => x.trim())).filter(m => m[0] && m[1]).map(m => [m[0], m[1]]),
           pack: lines('#evPack'),
           rites: lines('#evRites').map(l => { const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, '']; }),
-          hidden: $('#evHidden').checked, updatedBy: u.email, updatedAt: serverTimestamp() };
+          side: $('#evSide').value, hidden: $('#evHidden').checked, updatedBy: u.email, updatedAt: serverTimestamp() };
         const id = editing || (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event') + '-' + Math.random().toString(36).slice(2, 6);
         setDoc(doc(db, 'events', id), data).then(() => { closeForm(); toast('Saved. Guests see it now'); }).catch(fail);
       };
@@ -469,7 +479,7 @@ async function start() {
         $('#evSeed').hidden = EVS.length > 0;
         $('#evList').innerHTML = EVS.length ? EVS.map(e => `<div class="item ${e.hidden ? 'done' : ''}"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
             <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><img src="${esc(e.img || 'assets/postcard_jb_monogram.png')}" alt="" style="width:48px;height:48px;object-fit:contain;flex:none">
-            <div><b>${esc(e.name)}</b>${e.hidden ? ' <span class="chip">Hidden</span>' : ''}<p class="small">${label(e)} · ${esc(e.venue || '')}</p>${e.tag ? `<p class="small muted">${esc(e.tag)}</p>` : ''}</div></div>
+            <div><b>${esc(e.name)}</b>${e.side === 'Groom' ? ' <span class="chip plum">Groom\'s side</span>' : e.side === 'Bride' ? ' <span class="chip sage">Bride\'s side</span>' : ''}${e.hidden ? ' <span class="chip">Hidden</span>' : ''}<p class="small">${label(e)} · ${esc(e.venue || '')}</p>${e.tag ? `<p class="small muted">${esc(e.tag)}</p>` : ''}</div></div>
             <button class="btn ghost sm" data-evedit="${esc(e.id)}">Edit</button></div></div>`).join('')
           : '<p class="muted">Guests currently see the 4 built-in events. Copy them above to edit, or add a new event (the built-in ones then stop showing until copied).</p>';
         $$('[data-evedit]').forEach(b => b.onclick = () => openForm(EVS.find(e => e.id === b.dataset.evedit)));

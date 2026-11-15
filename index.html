@@ -555,6 +555,7 @@ function buildDays(){DAYS=[...new Set(EVENTS.map(e=>e.day))].sort().map(id=>{con
 buildDays();
 const dayText=id=>{const d=DAYS.find(x=>x.id===id);return d?`${d.dow}, ${d.d} ${d.m}`:id};
 const HASTAMELAP=new Date('2026-12-02T17:41:00+05:30');
+let POSTS_ALL=null,NOWS_ALL=null;
 let POSTS=[
  {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
  {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
@@ -563,9 +564,9 @@ let POSTS=[
  {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
 ];
 const GUESTS=[
- {n:'Riya Shah',phone:'9820012345',side:"Groom's side",room:'214',party:3,events:EVENTS.map(e=>e.id)},
- {n:'Kunal Mehta',phone:'9820054321',side:"Bride's side",room:'118',party:2,events:['sangeet','mandap','wedding']},
- {n:'Neha Patel',phone:'',side:"Groom's friend",room:null,party:1,events:['sangeet','wedding']},
+ {n:'Riya Shah',phone:'9820012345',side:"Groom's side",sideKey:'Groom',room:'214',party:3,events:EVENTS.map(e=>e.id)},
+ {n:'Kunal Mehta',phone:'9820054321',side:"Bride's side",sideKey:'Bride',room:'118',party:2,events:['sangeet','mandap','wedding']},
+ {n:'Neha Patel',phone:'',side:"Groom's friend",sideKey:'Groom',room:null,party:1,events:['sangeet','wedding']},
 ];
 let CONTACTS=[['Hospitality desk','','Rooms, cabs, anything at the venue'],['Jabuani family','',"Groom's side"],['Nakrani family','',"Bride's side"]];
 /* When js/cloud.js connects to Firebase it sets window.CLOUD; until then the app runs on sample data. */
@@ -578,7 +579,10 @@ const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-01-cafe-window.jpg',ar:'2/3'},
 ];
 let ME=store.get('guest',null);
-const myEvents=()=>{const m=EVENTS.filter(e=>!ME||(ME.skip?!ME.skip.includes(e.id):(ME.events||[]).includes(e.id)));return m.length?m:EVENTS};
+/* Groom's side and bride's side: each guest sees only events, updates and banners for their side or for everyone. */
+const mySide=()=>ME?(ME.sideKey||(/bride/i.test(ME.side||'')?'Bride':/groom/i.test(ME.side||'')?'Groom':'')):'';
+const forMe=x=>!x.side||x.side==='all'||!mySide()||x.side===mySide();
+const myEvents=()=>{const m=EVENTS.filter(e=>forMe(e)&&(!ME||(ME.skip?!ME.skip.includes(e.id):(ME.events||[]).includes(e.id))));return m.length?m:EVENTS.filter(forMe).length?EVENTS.filter(forMe):EVENTS};
 const nextEvent=()=>myEvents().find(e=>new Date(e.start).getTime()+e.hrs*36e5>Date.now())||myEvents()[myEvents().length-1];
 let NOWS=[
  {t:'Varmala starts in 10 min. Please come to Lake Side.',place:'lake'},
@@ -626,6 +630,7 @@ function renderHome(){
   renderAlerts();renderLive();renderNow();renderPickup();
 }
 function renderNow(){
+  if(NOWS_ALL)NOWS=NOWS_ALL.filter(forMe);
   $('#nowbar').hidden=!NOWS.length;if(!NOWS.length)return;
   const n=NOWS[nowI%NOWS.length];
   $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now${CLOUD_ON()?'':' · sample'}</small><b>${esc(n.t)}</b></span><span class="go">›</span>`;
@@ -654,6 +659,7 @@ $('#qrBtn').onclick=()=>{
   o.hidden=false;$('#qrBtn').textContent='Hide QR';
 };
 function renderFeed(){
+  if(POSTS_ALL)POSTS=POSTS_ALL.filter(forMe);
   $('#feed').innerHTML=POSTS.length?POSTS.map(p=>`<div class="post"><span class="dot" style="background:${p.c}"></span><div><b>${esc(p.t)}</b><span>${esc(p.b)}</span><br><time>${esc(p.ago)}${p.k?` · ${esc(p.k)}`:''}</time></div></div>`).join(''):'<p class="muted">No updates yet. The family will post here during the wedding.</p>';
   $('#newCount').textContent=POSTS.length?POSTS.length+' new':'';$('#newCount').hidden=!POSTS.length;
 }
@@ -696,7 +702,7 @@ function renderSchedule(){
   $('#events').innerHTML=mine.filter(e=>e.day===curDay).map(e=>{const on=alerts.on&&alerts.ev[e.id]!==false;return `
    <article class="event"><div class="art"><img src="${e.img}" alt=""></div>
    <div class="body">
-     <div><h2>${esc(evName(e))}</h2>${e.tag?`<p class="tag">${esc(e.tag)}</p>`:''}</div>
+     <div><h2>${esc(evName(e))}</h2>${e.tag?`<p class="tag">${esc(e.tag)}</p>`:''}${!mySide()&&(e.side==='Groom'||e.side==='Bride')?`<span class="chip ${e.side==='Groom'?'plum':'sage'}" style="margin-top:6px">${e.side==='Groom'?'Groom\'s side':'Bride\'s side'}</span>`:''}</div>
      ${e.moments?`<div class="moments">${e.moments.map(([t,n])=>`<div><b>${esc(t)}</b><span>${esc(n)}</span></div>`).join('')}</div>`:''}
      <dl class="meta"><dt>When</dt><dd>${dayText(e.day)} · ${esc(e.time)}</dd><dt>Where</dt><dd>${esc(e.venue)}${/karjat/i.test(e.venue)?'':', Karjat'}</dd>${e.dress?`<dt>Wear</dt><dd>${esc(e.dress)} <span class="suggest">(suggested)</span></dd>`:''}</dl>
      ${e.note?`<p class="muted small">${esc(e.note)}</p>`:''}

@@ -99,6 +99,7 @@ async function start() {
         id, n: g.name, phone, room: g.room || null, party: g.people || 1,
         roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '',
         side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
+        sideKey: /bride/i.test(g.side || '') ? 'Bride' : /groom/i.test(g.side || '') ? 'Groom' : '',
         skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
         lang: g.lang || 'EN',
       };
@@ -128,7 +129,7 @@ async function start() {
 
   // ---- live data → app state ----
   onSnapshot(collection(db, 'posts'), s => {
-    POSTS = list(s).sort(byNew).map(p => ({ t: p.title, b: p.body || '', k: p.kind || '', ago: ago(p.createdAt), c: COLORS[p.kind] || 'var(--plum)' }));
+    POSTS_ALL = list(s).sort(byNew).map(p => ({ t: p.title, b: p.body || '', k: p.kind || '', side: p.side || 'all', ago: ago(p.createdAt), c: COLORS[p.kind] || 'var(--plum)' }));
     refresh('posts');
   });
   onSnapshot(collection(db, 'events'), s => {
@@ -137,7 +138,7 @@ async function start() {
   });
   onSnapshot(doc(db, 'config', 'now'), s => {
     const n = s.exists() ? s.data() : null;
-    NOWS = n && n.on && n.text ? [{ t: n.text, place: n.place || null }] : []; nowI = 0; refresh('now');
+    NOWS_ALL = n && n.on && n.text ? [{ t: n.text, place: n.place || null, side: n.side || 'all' }] : []; nowI = 0; refresh('now');
   });
   onSnapshot(doc(db, 'config', 'map'), s => {
     const L = s.exists() ? s.data().places : null;
