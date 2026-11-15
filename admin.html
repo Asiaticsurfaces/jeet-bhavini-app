@@ -448,7 +448,13 @@ async function start() {
       $('#evNew').onclick = () => openForm(null);
       $('#evCancel').onclick = closeForm;
       // Same event for the other family, e.g. a different time for the bride's side.
-      $('#evDup').onclick = () => { const e = EVS.find(x => x.id === editing); if (!e) return;
+      // Until something is saved, the list shows the built-in schedule (what guests see now).
+      const DEFS = () => (window.DEFAULT_EVENTS || []).map(({ day, ...e }) => ({ ...e, side: e.side || 'all', hidden: false }));
+      const SHOWN = () => EVS.length ? EVS : DEFS();
+      // The first save copies the whole built-in schedule too, so no event disappears for guests.
+      const withDefaults = (b, skipId) => { if (EVS.length) return;
+        DEFS().forEach(({ id, ...e }) => id !== skipId && b.set(doc(db, 'events', id), { ...e, updatedBy: u.email, updatedAt: serverTimestamp() })); };
+      $('#evDup').onclick = () => { const e = SHOWN().find(x => x.id === editing); if (!e) return;
         openForm({ ...e, id: null, side: e.side === 'Groom' ? 'Bride' : e.side === 'Bride' ? 'Groom' : 'Bride' });
         toast('Copied. Change the time or details, then Save'); };
       $('#evSave').onclick = () => {
@@ -463,10 +469,12 @@ async function start() {
           rites: lines('#evRites').map(l => { const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, '']; }),
           side: $('#evSide').value, hidden: $('#evHidden').checked, updatedBy: u.email, updatedAt: serverTimestamp() };
         const id = editing || (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event') + '-' + Math.random().toString(36).slice(2, 6);
-        setDoc(doc(db, 'events', id), data).then(() => { closeForm(); toast('Saved. Guests see it now'); }).catch(fail);
+        const b = writeBatch(db); withDefaults(b, id); b.set(doc(db, 'events', id), data);
+        b.commit().then(() => { closeForm(); toast('Saved. Guests see it now'); }).catch(fail);
       };
-      $('#evDelete').onclick = () => editing && confirm('Delete this event for everyone?')
-        && deleteDoc(doc(db, 'events', editing)).then(() => { closeForm(); toast('Event deleted'); }).catch(fail);
+      $('#evDelete').onclick = () => { if (!editing || !confirm('Delete this event for everyone?')) return;
+        const b = writeBatch(db); withDefaults(b, editing); if (EVS.length) b.delete(doc(db, 'events', editing));
+        b.commit().then(() => { closeForm(); toast('Event deleted'); }).catch(fail); };
       $('#evSeedBtn').onclick = async () => {
         $('#evSeedBtn').disabled = true;
         try { const b = writeBatch(db);
@@ -476,13 +484,14 @@ async function start() {
       };
       sub('events', collection(db, 'events'), s => {
         EVS = list(s).sort((a, b) => new Date(a.start) - new Date(b.start));
-        $('#evSeed').hidden = EVS.length > 0;
-        $('#evList').innerHTML = EVS.length ? EVS.map(e => `<div class="item ${e.hidden ? 'done' : ''}"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
+        $('#evSeed').hidden = true;
+        const L = SHOWN().sort((a, b) => new Date(a.start) - new Date(b.start));
+        $('#evList').innerHTML = L.length ? L.map(e => `<div class="item ${e.hidden ? 'done' : ''}"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
             <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><img src="${esc(e.img || 'assets/postcard_jb_monogram.png')}" alt="" style="width:48px;height:48px;object-fit:contain;flex:none">
             <div><b>${esc(e.name)}</b>${e.side === 'Groom' ? ' <span class="chip plum">Groom\'s side</span>' : e.side === 'Bride' ? ' <span class="chip sage">Bride\'s side</span>' : ''}${e.hidden ? ' <span class="chip">Hidden</span>' : ''}<p class="small">${label(e)} · ${esc(e.venue || '')}</p>${e.tag ? `<p class="small muted">${esc(e.tag)}</p>` : ''}</div></div>
-            <button class="btn ghost sm" data-evedit="${esc(e.id)}">Edit</button></div></div>`).join('')
-          : '<p class="muted">Guests currently see the 4 built-in events. Copy them above to edit, or add a new event (the built-in ones then stop showing until copied).</p>';
-        $$('[data-evedit]').forEach(b => b.onclick = () => openForm(EVS.find(e => e.id === b.dataset.evedit)));
+            <button class="btn sm" data-evedit="${esc(e.id)}">Edit</button></div></div>`).join('')
+          : '<p class="muted">No events yet. Tap + Add event.</p>';
+        $$('[data-evedit]').forEach(b => b.onclick = () => openForm(SHOWN().find(e => e.id === b.dataset.evedit)));
       });
     }
 
