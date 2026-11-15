@@ -71,7 +71,7 @@ async function start() {
       return {
         n: g.name, phone, room: g.room || null, party: g.people || 1,
         side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
-        events: ['mameru', 'sangeet', 'mandap', 'wedding'].filter(k => ev[k] !== false),
+        skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
         lang: g.lang || 'EN',
       };
     },
@@ -102,6 +102,10 @@ async function start() {
   onSnapshot(collection(db, 'posts'), s => {
     POSTS = list(s).sort(byNew).map(p => ({ t: p.title, b: p.body || '', k: p.kind || '', ago: ago(p.createdAt), c: COLORS[p.kind] || 'var(--plum)' }));
     refresh('posts');
+  });
+  onSnapshot(collection(db, 'events'), s => {
+    const L = list(s).filter(e => e.start && e.name && !e.hidden);
+    if (L.length) { EVENTS = normEvents(L); refresh('events'); }
   });
   onSnapshot(doc(db, 'config', 'now'), s => {
     const n = s.exists() ? s.data() : null;

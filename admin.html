@@ -151,11 +151,54 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <div class="photos" id="photoGrid"></div>
     </section>
 
+    <!-- EVENTS -->
+    <section data-sec="events" class="stack" hidden>
+      <div class="card" id="evSeed" hidden>
+        <h3>Start from the current schedule</h3>
+        <p class="muted small">Copies Mameru, Sangeet, Mandap Ropan and Wedding here so you can edit them and add more. Guests keep seeing the same schedule.</p>
+        <button class="btn" id="evSeedBtn" style="align-self:flex-start">Copy the 4 events</button>
+      </div>
+      <div class="row between"><p class="muted small">Changes show on every guest's Events screen within seconds.</p><button class="btn" id="evNew">+ Add event</button></div>
+      <div class="card" id="evForm" hidden>
+        <h3 id="evFormTitle">New event</h3>
+        <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Event name</span><input id="evName" maxlength="40" placeholder="e.g. Haldi"></label>
+          <label class="stack" style="gap:4px"><span class="small muted">Name in Gujarati (optional)</span><input id="evGu" maxlength="40" placeholder="e.g. પીઠી"></label></div>
+        <label class="stack" style="gap:4px"><span class="small muted">Tagline (optional)</span><input id="evTag" maxlength="60" placeholder="e.g. A Splash of Turmeric"></label>
+        <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Date</span><input type="date" id="evDate" value="2026-12-01"></label>
+          <div class="row" style="gap:8px"><label class="stack" style="gap:4px;flex:1"><span class="small muted">Start time</span><input type="time" id="evTime" value="10:00"></label>
+          <label class="stack" style="gap:4px;width:90px"><span class="small muted">Hours</span><input type="number" id="evHrs" min="0.5" max="12" step="0.5" value="2"></label></div></div>
+        <label class="stack" style="gap:4px"><span class="small muted">Time as shown to guests (optional)</span><input id="evTimeText" maxlength="30" placeholder="Leave empty to show the start time, or e.g. 3:30 PM onwards"></label>
+        <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Venue</span><select id="evVenue"><option>Oleander Ballroom</option><option>Oleander Lawn</option><option>Oleander Lake Side</option><option value="other">Other…</option></select></label>
+          <label class="stack" style="gap:4px"><span class="small muted">Other venue</span><input id="evVenueOther" placeholder="Only if you chose Other"></label></div>
+        <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Dress code (optional)</span><input id="evDress" maxlength="60" placeholder="e.g. Yellow"></label>
+          <label class="stack" style="gap:4px"><span class="small muted">Picture</span><select id="evImg"></select></label></div>
+        <label class="stack" style="gap:4px"><span class="small muted">Note for guests (optional)</span><textarea id="evNote" rows="2" maxlength="300" placeholder="e.g. Wear clothes you don't mind getting haldi on!"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="small muted">Key moments, one per line as <b>time | moment</b> (optional)</span><textarea id="evMoments" rows="2" placeholder="3:30 PM | Jaan Prastan&#10;5:41 PM | Hastamelap"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="small muted">What to bring, one per line (optional)</span><textarea id="evPack" rows="3" placeholder="Old clothes&#10;Towel"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="small muted">What happens here, one per line as <b>Name: description</b> (optional)</span><textarea id="evRites" rows="3" placeholder="Haldi: Turmeric paste is applied to bless the couple."></textarea></label>
+        <label class="row small"><input type="checkbox" id="evHidden" style="width:18px;height:18px"> Hide this event from guests for now</label>
+        <div class="row"><button class="btn" id="evSave">Save event</button><button class="btn ghost" id="evCancel">Cancel</button><button class="btn danger" id="evDelete" hidden>Delete event</button></div>
+      </div>
+      <div class="stack" id="evList"></div>
+    </section>
+
     <!-- TEAM -->
     <section data-sec="team" class="stack" hidden>
       <h3>Duties</h3><div class="stack" id="dutyList"></div>
-      <h3>Vendors</h3><div class="stack" id="vendorList"></div>
-      <h3>Drivers</h3><div class="stack" id="driverList"></div>
+      <div class="row between"><h3>Vendors</h3><button class="btn ghost sm" data-addform="vendor">+ Add vendor</button></div>
+      <div class="card" id="vendorForm" hidden>
+        <div class="grid2"><input id="vRole" placeholder="Service, e.g. Decorator, Caterer"><input id="vName" placeholder="Business / person name"></div>
+        <div class="grid2"><input id="vPhone" inputmode="tel" placeholder="Phone (10 digits)"><input id="vNote" placeholder="Note, e.g. Mandap and Lawn"></div>
+        <div class="row"><button class="btn sm" id="vSave">Save vendor</button><button class="btn ghost sm" data-closeform="vendor">Cancel</button></div>
+      </div>
+      <div class="stack" id="vendorList"></div>
+      <div class="row between"><h3>Drivers</h3><button class="btn ghost sm" data-addform="driver">+ Add driver</button></div>
+      <div class="card" id="driverForm" hidden>
+        <div class="grid2"><input id="dName" placeholder="Driver name"><input id="dPhone" inputmode="tel" placeholder="Phone (10 digits)"></div>
+        <div class="grid2"><input id="dCar" placeholder="Car, e.g. White Innova"><input id="dPlate" placeholder="Number plate, e.g. MH 46 AB 1234"></div>
+        <div class="row"><button class="btn sm" id="dSave">Save driver</button><button class="btn ghost sm" data-closeform="driver">Cancel</button></div>
+      </div>
+      <div class="stack" id="driverList"></div>
       <h3>Help contacts (shown to guests)</h3><div class="stack" id="contactList"></div>
       <div class="card" id="peopleCard">
         <h3>People &amp; access</h3>
@@ -175,6 +218,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/events-default.js"></script>
 <script type="module">
 import { FIREBASE_CONFIG } from './js/config.js';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -211,7 +255,8 @@ async function start() {
     ['pickups', 'Pickups', 'See arrivals and assign drivers'],
     ['guests', 'Guest list', 'See guests, rooms, RSVPs and headcounts'],
     ['photos', 'Photos', 'See all photos, hide them, add photographer photos'],
-    ['team', 'Team', 'Duties (tick done), vendors, drivers, contacts'],
+    ['team', 'Team', 'Duties, vendors and drivers (add / edit), contacts'],
+    ['events', 'Events', 'Add and edit the wedding events guests see'],
   ];
   const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team'], event: ['live'] };
   const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
@@ -245,7 +290,7 @@ async function start() {
     // Subscribe only to data this person is allowed to read.
     const sub = (perm, ref, fn) => { if (can[perm]) onSnapshot(ref, fn, e => console.warn(perm, e.code)); };
     // ---------- tabs ----------
-    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['team', 'Team']]
+    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['photos', 'Photos'], ['events', 'Events'], ['team', 'Team']]
       .filter(([k]) => can[k]);
     if (!TABS.length) { $('#tabs').innerHTML = ''; $$('[data-sec]').forEach(x => x.hidden = true);
       $('#panel').insertAdjacentHTML('beforeend', '<p class="muted">You don\'t have any permissions yet. Ask Jeet to tick what you need.</p>'); return; }
@@ -280,6 +325,70 @@ async function start() {
       $$('#postList [data-del]').forEach(b => b.onclick = () => confirm('Delete this update for everyone?') && deleteDoc(doc(db, 'posts', b.dataset.del)).catch(fail));
     });
 
+    }
+
+    // ---------- events ----------
+    if (can.events) {
+      const IMGS = [['assets/user_mameru_final.png', 'Mameru'], ['assets/user_sangeet_final.png', 'Sangeet'], ['assets/user_mandap_clean.png', 'Mandap'],
+        ['assets/user_lagna_scene_final.png', 'Wedding'], ['assets/ganesha_motif.png', 'Ganesha'], ['assets/postcard_jb_monogram.png', 'JB monogram']];
+      $('#evImg').innerHTML = IMGS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+      let EVS = [], editing = null;
+      const IST = 5.5 * 3600e3;
+      const parts = iso => { const d = new Date(new Date(iso).getTime() + IST).toISOString(); return [d.slice(0, 10), d.slice(11, 16)]; };
+      const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+      const label = e => { const [d, t] = parts(e.start); const dt = new Date(d + 'T00:00:00Z');
+        return `${dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${e.time || t}`; };
+      function openForm(e) {
+        editing = e ? e.id : null; $('#evForm').hidden = false; $('#evDelete').hidden = !e;
+        $('#evFormTitle').textContent = e ? `Edit ${e.name}` : 'New event';
+        const [d, t] = e ? parts(e.start) : ['2026-12-01', '10:00'];
+        $('#evName').value = e?.name || ''; $('#evGu').value = e && e.gu !== e.name ? e.gu || '' : ''; $('#evTag').value = e?.tag || '';
+        $('#evDate').value = d; $('#evTime').value = t; $('#evHrs').value = e?.hrs || 2; $('#evTimeText').value = e?.time || '';
+        const known = ['Oleander Ballroom', 'Oleander Lawn', 'Oleander Lake Side'].includes(e?.venue);
+        $('#evVenue').value = !e ? 'Oleander Ballroom' : known ? e.venue : 'other'; $('#evVenueOther').value = e && !known ? e.venue || '' : '';
+        $('#evDress').value = e?.dress || ''; $('#evImg').value = e?.img || 'assets/postcard_jb_monogram.png'; $('#evNote').value = e?.note || '';
+        $('#evMoments').value = (e?.moments || []).map(m => m.join(' | ')).join('\n');
+        $('#evPack').value = (e?.pack || []).join('\n');
+        $('#evRites').value = (e?.rites || []).map(([n, d2]) => d2 ? `${n}: ${d2}` : n).join('\n');
+        $('#evHidden').checked = !!e?.hidden;
+        $('#evForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#evName').focus();
+      }
+      const closeForm = () => { editing = null; $('#evForm').hidden = true; };
+      $('#evNew').onclick = () => openForm(null);
+      $('#evCancel').onclick = closeForm;
+      $('#evSave').onclick = () => {
+        const name = $('#evName').value.trim(); if (!name) return toast('Give the event a name');
+        const date = $('#evDate').value, time = $('#evTime').value; if (!date || !time) return toast('Choose a date and start time');
+        const venue = $('#evVenue').value === 'other' ? $('#evVenueOther').value.trim() : $('#evVenue').value; if (!venue) return toast('Type the venue');
+        const data = { name, gu: $('#evGu').value.trim() || name, tag: $('#evTag').value.trim(), start: `${date}T${time}:00+05:30`,
+          hrs: Math.max(0.5, +$('#evHrs').value || 2), time: $('#evTimeText').value.trim(), venue, dress: $('#evDress').value.trim(),
+          img: $('#evImg').value, note: $('#evNote').value.trim(),
+          moments: lines('#evMoments').map(l => l.split('|').map(x => x.trim())).filter(m => m[0] && m[1]).map(m => [m[0], m[1]]),
+          pack: lines('#evPack'),
+          rites: lines('#evRites').map(l => { const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, '']; }),
+          hidden: $('#evHidden').checked, updatedBy: u.email, updatedAt: serverTimestamp() };
+        const id = editing || (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event') + '-' + Math.random().toString(36).slice(2, 6);
+        setDoc(doc(db, 'events', id), data).then(() => { closeForm(); toast('Saved. Guests see it now'); }).catch(fail);
+      };
+      $('#evDelete').onclick = () => editing && confirm('Delete this event for everyone?')
+        && deleteDoc(doc(db, 'events', editing)).then(() => { closeForm(); toast('Event deleted'); }).catch(fail);
+      $('#evSeedBtn').onclick = async () => {
+        $('#evSeedBtn').disabled = true;
+        try { const b = writeBatch(db);
+          (window.DEFAULT_EVENTS || []).forEach(({ day, id, ...e }) => b.set(doc(db, 'events', id), { ...e, hidden: false, updatedBy: u.email, updatedAt: serverTimestamp() }));
+          await b.commit(); toast('Copied. You can edit them now');
+        } catch (e) { fail(e); } finally { $('#evSeedBtn').disabled = false; }
+      };
+      sub('events', collection(db, 'events'), s => {
+        EVS = list(s).sort((a, b) => new Date(a.start) - new Date(b.start));
+        $('#evSeed').hidden = EVS.length > 0;
+        $('#evList').innerHTML = EVS.length ? EVS.map(e => `<div class="item ${e.hidden ? 'done' : ''}"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
+            <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><img src="${esc(e.img || 'assets/postcard_jb_monogram.png')}" alt="" style="width:48px;height:48px;object-fit:contain;flex:none">
+            <div><b>${esc(e.name)}</b>${e.hidden ? ' <span class="chip">Hidden</span>' : ''}<p class="small">${label(e)} · ${esc(e.venue || '')}</p>${e.tag ? `<p class="small muted">${esc(e.tag)}</p>` : ''}</div></div>
+            <button class="btn ghost sm" data-evedit="${esc(e.id)}">Edit</button></div></div>`).join('')
+          : '<p class="muted">Guests currently see the 4 built-in events. Copy them above to edit, or add a new event (the built-in ones then stop showing until copied).</p>';
+        $$('[data-evedit]').forEach(b => b.onclick = () => openForm(EVS.find(e => e.id === b.dataset.evedit)));
+      });
     }
 
     // ---------- help ----------
@@ -388,6 +497,7 @@ async function start() {
         const gone = GUESTS.filter(g => !guests.has(g.id));
         const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
         out.innerHTML = `<p><b>${guests.size}</b> families (${people} people), <b>${duties.length}</b> duties, <b>${vendors.length}</b> vendors, <b>${drivers.length}</b> drivers, <b>${contacts.length}</b> help contacts.</p>
+          <p class="small muted">Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
           ${gone.length ? `<p class="err">${gone.length} guest(s) already in the app are not in this file and will be removed: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>` : ''}
           ${errors.length ? `<div class="err"><b>${errors.length} row(s) skipped:</b><br>${errors.map(esc).join('<br>')}</div>` : ''}
           <button class="btn" id="doImport" ${guests.size ? '' : 'disabled'}>Import into the app</button>`;
@@ -398,6 +508,7 @@ async function start() {
           for (const g of gone) ops.push(b => b.delete(doc(db, 'guests', g.id)));
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
+            if (!items.length) continue;   // empty tab in the Excel: keep what was added in the panel
             const old = await getDocs(collection(db, col));
             old.docs.forEach(d => ops.push(b => b.delete(d.ref)));
             items.forEach(x => ops.push(b => b.set(doc(collection(db, col)), x)));
@@ -489,13 +600,36 @@ async function start() {
       onSnapshot(collection(db, 'admins'), s => { PEOPLE = list(s); drawPeople(); });
     }
     const tel = p => p ? `<a class="btn ghost sm" href="tel:+91${esc(p)}">Call</a>` : '';
+    // Add / edit / delete vendors and drivers.
+    const forms = { vendor: { col: 'vendors', box: '#vendorForm', f: { role: '#vRole', name: '#vName', phone: '#vPhone', note: '#vNote' }, need: 'role', save: '#vSave' },
+                    driver: { col: 'drivers', box: '#driverForm', f: { name: '#dName', phone: '#dPhone', car: '#dCar', plate: '#dPlate' }, need: 'name', save: '#dSave' } };
+    const editingId = {};
+    const openTeamForm = (k, item) => { const F2 = forms[k]; editingId[k] = item?.id || null; $(F2.box).hidden = false;
+      Object.entries(F2.f).forEach(([key, sel]) => $(sel).value = item?.[key] || ''); $(F2.save).textContent = item ? 'Save changes' : `Save ${k}`; $(Object.values(F2.f)[0]).focus(); };
+    const closeTeamForm = k => { editingId[k] = null; $(forms[k].box).hidden = true; };
+    $$('[data-addform]').forEach(b => b.onclick = () => openTeamForm(b.dataset.addform, null));
+    $$('[data-closeform]').forEach(b => b.onclick = () => closeTeamForm(b.dataset.closeform));
+    Object.entries(forms).forEach(([k, F2]) => $(F2.save).onclick = () => {
+      const data = Object.fromEntries(Object.entries(F2.f).map(([key, sel]) => [key, key === 'phone' ? normPhone($(sel).value) : $(sel).value.trim()]));
+      if (!data[F2.need]) return toast(k === 'vendor' ? 'Type the service, e.g. Decorator' : 'Type the driver\'s name');
+      if ($(F2.f.phone).value.trim() && data.phone.length !== 10) return toast('Phone should be 10 digits');
+      const ref = editingId[k] ? doc(db, F2.col, editingId[k]) : doc(collection(db, F2.col));
+      setDoc(ref, data).then(() => { closeTeamForm(k); toast('Saved'); }).catch(fail);
+    });
+    const rowBtns = (k, id) => `<button class="btn ghost sm" data-tedit="${k}:${esc(id)}">Edit</button><button class="btn danger sm" data-tdel="${k}:${esc(id)}">Delete</button>`;
+    function wireTeamRows() {
+      $$('[data-tedit]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.tedit.split(':'); openTeamForm(k, (k === 'vendor' ? VEN : DRIVERS).find(x => x.id === id)); });
+      $$('[data-tdel]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.tdel.split(':');
+        confirm(`Delete this ${k}?`) && deleteDoc(doc(db, forms[k].col, id)).then(() => toast('Deleted')).catch(fail); });
+    }
     function renderTeam() {
       const done = DUT.filter(d => d.done).length;
       $('#dutyList').innerHTML = DUT.length ? `<p class="muted small">${done} of ${DUT.length} done</p>` + DUT.map(d => `<label class="item ${d.done ? 'done' : ''}" style="flex-direction:row;align-items:flex-start;gap:12px"><input type="checkbox" data-duty="${d.id}" ${d.done ? 'checked' : ''} style="width:20px;height:20px;margin-top:3px;flex:none"><div style="flex:1"><b>${esc(d.task)}</b><p class="small muted">${esc(d.who)} · ${esc([d.date, d.time, d.place].filter(Boolean).join(' · '))}</p></div>${tel(d.phone)}</label>`).join('') : '<p class="muted">Import the Excel to add duties.</p>';
       $$('[data-duty]').forEach(c => c.onchange = () => updateDoc(doc(db, 'duties', c.dataset.duty), { done: c.checked }).catch(fail));
-      $('#vendorList').innerHTML = VEN.length ? VEN.map(v => `<div class="item"><div class="row between"><div><b>${esc(v.role)}</b>${v.name ? ` · ${esc(v.name)}` : ''}<p class="small muted">${esc(v.note || '')}</p></div>${tel(v.phone)}</div></div>`).join('') : '<p class="muted">No vendors yet.</p>';
-      $('#driverList').innerHTML = DRIVERS.length ? DRIVERS.map(d => `<div class="item"><div class="row between"><div><b>${esc(d.name)}</b><p class="small muted">${esc([d.car, d.plate].filter(Boolean).join(' · '))}</p></div>${tel(d.phone)}</div></div>`).join('') : '<p class="muted">No drivers yet.</p>';
+      $('#vendorList').innerHTML = VEN.length ? VEN.map(v => `<div class="item"><div class="row between"><div><b>${esc(v.role)}</b>${v.name ? ` · ${esc(v.name)}` : ''}<p class="small muted">${esc([v.phone, v.note].filter(Boolean).join(' · '))}</p></div><div class="row">${tel(v.phone)}${rowBtns('vendor', v.id)}</div></div></div>`).join('') : '<p class="muted">No vendors yet. Tap + Add vendor.</p>';
+      $('#driverList').innerHTML = DRIVERS.length ? DRIVERS.map(d => `<div class="item"><div class="row between"><div><b>${esc(d.name)}</b><p class="small muted">${esc([d.phone, d.car, d.plate].filter(Boolean).join(' · '))}</p></div><div class="row">${tel(d.phone)}${rowBtns('driver', d.id)}</div></div></div>`).join('') : '<p class="muted">No drivers yet. Tap + Add driver.</p>';
       $('#contactList').innerHTML = CON.length ? CON.map(c => `<div class="item"><div class="row between"><div><b>${esc(c.label)}</b><p class="small muted">${esc(c.note || '')}</p></div>${tel(c.phone)}</div></div>`).join('') : '<p class="muted">No help contacts yet.</p>';
+      wireTeamRows();
     }
   }
 }

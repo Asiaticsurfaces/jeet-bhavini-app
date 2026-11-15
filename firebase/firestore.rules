@@ -11,7 +11,8 @@ rules_version = '2';
 //   pickups – arrivals and driver assignment
 //   guests  – guest list, RSVPs, private notes (read)
 //   photos  – see all photos, hide/show, add photographer photos
-//   team    – duties (tick done), vendors, drivers, contacts
+//   team    – duties (tick done), add/edit vendors and drivers, contacts
+//   events  – add and edit the wedding events (schedule)
 service cloud.firestore {
   match /databases/{db}/documents {
 
@@ -138,7 +139,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done']);
       allow create, delete: if isOwner();
     }
-    match /vendors/{id} { allow read: if can('team'); allow write: if isOwner(); }
-    match /drivers/{id} { allow read: if can('team') || can('pickups'); allow write: if isOwner(); }
+    match /vendors/{id} { allow read: if can('team'); allow write: if can('team'); }
+    match /drivers/{id} { allow read: if can('team') || can('pickups'); allow write: if can('team'); }
+
+    // Wedding schedule: everyone reads; the events permission edits.
+    match /events/{id} { allow read: if signedIn(); allow write: if can('events'); }
   }
 }

@@ -513,6 +513,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="js/events-default.js"></script>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{return JSON.parse(localStorage.getItem('jb_'+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem('jb_'+k,JSON.stringify(v))}catch(e){}}};
@@ -528,21 +529,22 @@ function applyLang(){$$('[data-t]').forEach(el=>el.textContent=(lang==='gu'?GU:E
 $$('.lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;store.set('lang',lang);applyLang()});
 
 /* ---------- wedding data (from the invite) ---------- */
-const EVENTS=[
- {id:'mameru',day:'1',name:'Mameru',gu:'મામેરું',tag:'Where Blessings Begin',start:'2026-12-01T09:00:00+05:30',hrs:3,time:'9:00 AM',venue:'Oleander Ballroom',img:'assets/user_mameru_final.png',dress:'Pastel traditional',note:'Hosted by Mr. Devendra Keshavlal Bhadani & family.',
-  pack:['Pastel traditional outfit','Light shawl, mornings are cool in December','Comfortable footwear'],
-  rites:[['Mameru','The maternal uncle (mama) and his family arrive with gifts of clothes, jewellery and sweets, and bless the family before the wedding.']]},
- {id:'sangeet',day:'1',name:'Sangeet',gu:'સંગીત',tag:'An Evening of Song & Dance',start:'2026-12-01T19:00:00+05:30',hrs:4,time:'7:00 PM',venue:'Oleander Lawn',img:'assets/user_sangeet_final.png',dress:'Glam Indo-western',note:'Performances, dhol and an open dance floor. Add your song requests in Guest Info.',
-  pack:['Glam Indo-western outfit','Flat shoes or block heels, it\'s on the lawn','Shawl or jacket, Karjat nights get cold','Phone charged for the wedding camera'],
-  rites:[['Sangeet','An evening of music and dance. Both families perform for the couple, then the dance floor opens for everyone.']]},
- {id:'mandap',day:'2',name:'Mandap Ropan',gu:'મંડપ રોપણ',tag:'Raising the Sacred Canopy',start:'2026-12-02T08:00:00+05:30',hrs:2,time:'8:00 AM',venue:'Oleander Ballroom',img:'assets/user_mandap_clean.png',dress:'Yellows & greens',note:'A morning puja to raise the mandap.',
-  pack:['Yellow or green outfit','Head covering for the puja (optional)','Water bottle'],
-  rites:[['Ganesh Sthapana','A prayer to Lord Ganesha so the wedding goes smoothly.'],['Mandap Ropan','The family plants the first pillar of the wedding canopy (mandap) with a small puja.']]},
- {id:'wedding',day:'2',name:'Wedding',gu:'લગ્ન',tag:'The Joining of Hands',start:'2026-12-02T15:30:00+05:30',hrs:5,time:'3:30 PM onwards',venue:'Oleander Lake Side',img:'assets/user_lagna_scene_final.png',dress:'Traditional, reds & golds',moments:[['3:30 PM','Jaan Prastan'],['5:41 PM','Hastamelap']],note:'Please be seated by 5:15 PM for the Hastamelap.',
-  pack:['Traditional outfit in reds or golds','Comfortable footwear for the Jaan (lots of dancing)','Sunglasses for the afternoon','Shawl for the evening by the lake'],
-  rites:[['Jaan Prastan','The groom\'s procession arrives with dhol and dancing. The bride\'s mother welcomes him at the entrance.'],['Varmala','The couple exchange flower garlands.'],['Hastamelap','The bride\'s hand is placed in the groom\'s. This is the moment they are joined, at 5:41 PM.'],['Mangal Fera','The couple walk around the sacred fire, taking their wedding vows.'],['Kansar','The couple feed each other a sweet, their first meal together.']]},
-];
-const DAYS=[{id:'1',dow:'Tue',d:'1',m:'Dec'},{id:'2',dow:'Wed',d:'2',m:'Dec'}];
+/* Events: from the family panel (Firestore 'events') once added there, else js/events-default.js. */
+const IST_MS=5.5*36e5;
+const istDate=iso=>new Date(new Date(iso).getTime()+IST_MS).toISOString().slice(0,10);
+const fmtClock=iso=>{const d=new Date(new Date(iso).getTime()+IST_MS);const h=d.getUTCHours(),m=d.getUTCMinutes();return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`};
+function normEvents(list){
+  return list.map(e=>({...e,day:istDate(e.start),time:e.time||fmtClock(e.start),hrs:+e.hrs||2,gu:e.gu||e.name,tag:e.tag||'',
+    venue:e.venue||'Oleander, Karjat',img:e.img||'assets/postcard_jb_monogram.png',dress:e.dress||'',note:e.note||'',
+    pack:e.pack||[],rites:e.rites||[],moments:e.moments&&e.moments.length?e.moments:null}))
+   .sort((a,b)=>new Date(a.start)-new Date(b.start));
+}
+let EVENTS=normEvents(window.DEFAULT_EVENTS||[]);
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],DOWS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let DAYS=[];
+function buildDays(){DAYS=[...new Set(EVENTS.map(e=>e.day))].sort().map(id=>{const d=new Date(id+'T00:00:00Z');return{id,dow:DOWS[d.getUTCDay()],d:String(d.getUTCDate()),m:MONTHS[d.getUTCMonth()]}})}
+buildDays();
+const dayText=id=>{const d=DAYS.find(x=>x.id===id);return d?`${d.dow}, ${d.d} ${d.m}`:id};
 const HASTAMELAP=new Date('2026-12-02T17:41:00+05:30');
 let POSTS=[
  {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
@@ -567,7 +569,7 @@ const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-01-cafe-window.jpg',ar:'2/3'},
 ];
 let ME=store.get('guest',null);
-const myEvents=()=>EVENTS.filter(e=>!ME||ME.events.includes(e.id));
+const myEvents=()=>{const m=EVENTS.filter(e=>!ME||(ME.skip?!ME.skip.includes(e.id):(ME.events||[]).includes(e.id)));return m.length?m:EVENTS};
 const nextEvent=()=>myEvents().find(e=>new Date(e.start).getTime()+e.hrs*36e5>Date.now())||myEvents()[myEvents().length-1];
 let NOWS=[
  {t:'Varmala starts in 10 min. Please come to Lake Side.',place:'lake'},
@@ -603,10 +605,10 @@ function renderHome(){
   const nx=nextEvent();
   $('#hello').textContent=ME?ME.n.split(' ')[0]:'Guest';
   $('#upnext').innerHTML=`<div class="thumb"><img src="${nx.img}" alt=""></div>
-   <div style="min-width:0;flex:1"><h3>${evName(nx)}</h3><div class="muted small">${DAYS.find(d=>d.id===nx.day).dow}, ${nx.day} Dec · ${nx.time}<br>${nx.venue}</div></div>
+   <div style="min-width:0;flex:1"><h3>${esc(evName(nx))}</h3><div class="muted small">${dayText(nx.day)} · ${nx.time}<br>${esc(nx.venue)}</div></div>
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
   $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>People</span><b>${ME.party||1}</b></div>
-     <div><span>Events</span><b>${ME.events.length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`
+     <div><span>Events</span><b>${myEvents().length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
   $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
@@ -683,12 +685,12 @@ function renderSchedule(){
   $('#events').innerHTML=mine.filter(e=>e.day===curDay).map(e=>{const on=alerts.on&&alerts.ev[e.id]!==false;return `
    <article class="event"><div class="art"><img src="${e.img}" alt=""></div>
    <div class="body">
-     <div><h2>${evName(e)}</h2><p class="tag">${e.tag}</p></div>
-     ${e.moments?`<div class="moments">${e.moments.map(([t,n])=>`<div><b>${t}</b><span>${n}</span></div>`).join('')}</div>`:''}
-     <dl class="meta"><dt>When</dt><dd>${DAYS.find(d=>d.id===e.day).dow}, ${e.day} Dec · ${e.time}</dd><dt>Where</dt><dd>${e.venue}, Karjat</dd><dt>Wear</dt><dd>${e.dress} <span class="suggest">(suggested)</span></dd></dl>
-     <p class="muted small">${e.note}</p>
-     <details><summary>What to bring</summary><div>${e.pack.map((x,i)=>{const k=e.id+i;return `<label class="pack ${packed[k]?'done':''}"><input type="checkbox" data-pk="${k}" ${packed[k]?'checked':''}><span>${x}</span></label>`}).join('')}</div></details>
-     <details><summary>What happens here</summary><div>${e.rites.map(([n,d])=>`<div class="rite"><b>${n}</b><p>${d}</p></div>`).join('')}</div></details>
+     <div><h2>${esc(evName(e))}</h2>${e.tag?`<p class="tag">${esc(e.tag)}</p>`:''}</div>
+     ${e.moments?`<div class="moments">${e.moments.map(([t,n])=>`<div><b>${esc(t)}</b><span>${esc(n)}</span></div>`).join('')}</div>`:''}
+     <dl class="meta"><dt>When</dt><dd>${dayText(e.day)} · ${esc(e.time)}</dd><dt>Where</dt><dd>${esc(e.venue)}${/karjat/i.test(e.venue)?'':', Karjat'}</dd>${e.dress?`<dt>Wear</dt><dd>${esc(e.dress)} <span class="suggest">(suggested)</span></dd>`:''}</dl>
+     ${e.note?`<p class="muted small">${esc(e.note)}</p>`:''}
+     ${e.pack.length?`<details><summary>What to bring</summary><div>${e.pack.map((x,i)=>{const k=e.id+i;return `<label class="pack ${packed[k]?'done':''}"><input type="checkbox" data-pk="${k}" ${packed[k]?'checked':''}><span>${esc(x)}</span></label>`}).join('')}</div></details>`:''}
+     ${e.rites.length?`<details><summary>What happens here</summary><div>${e.rites.map(([n,d])=>`<div class="rite"><b>${esc(n)}</b>${d?`<p>${esc(d)}</p>`:''}</div>`).join('')}</div></details>`:''}
      <div class="rsvp" role="group" aria-label="RSVP for ${e.name}">${['Going','Maybe','Can\'t'].map(o=>`<button data-ev="${e.id}" data-v="${o}" aria-pressed="${rsvp[e.id]===o}">${o}</button>`).join('')}</div>
      <div class="row"><a class="btn ghost sm" style="flex:1" href="https://maps.google.com/?q=${encodeURIComponent('Oleander Karjat')}" target="_blank" rel="noopener">Directions</a>
      <button class="bell" data-bell="${e.id}" aria-pressed="${on}">${on?'Reminder on':'Remind me'}</button></div>
@@ -884,6 +886,7 @@ function cloudRefresh(what){
   else if(what==='photos')renderPhotos();
   else if(what==='contacts')renderContacts();
   else if(what==='guest')renderAll();
+  else if(what==='events'){buildDays();renderAll()}
   else renderAll();
 }
 function renderAll(){
