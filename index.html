@@ -367,6 +367,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
         <button class="tile" data-go="contacts"><b>Contacts</b><small>Who to call</small></button>
         <button class="tile fam" data-go="family" style="grid-column:1/-1"><b>🔒 Family only</b><small>Duties, vendors and arrivals</small></button>
       </div>
+      <div class="card stack" id="account"></div>
     </div>
 
     <div id="m-help" class="screen" hidden>
@@ -628,7 +629,7 @@ function renderHome(){
      ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}
      ${ME.room&&(ME.roommates||[]).length?`<div style="grid-column:1/-1"><span>Sharing your room with</span><div class="mates">${ME.roommates.map(n=>`<span class="mate">${esc(n)}</span>`).join('')}</div></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
-  $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
+  $('#switchGuest').textContent=ME?'Log out':'Find my invite';
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
   renderAlerts();renderLive();renderNow();renderPickup();
 }
@@ -925,7 +926,22 @@ function openLogin(){$('#login').hidden=false;$('#loginQ').value='';renderLogin(
 function closeLogin(){$('#login').hidden=true;renderAll()}
 $('#loginGo').onclick=tryLogin;$('#loginQ').onkeydown=e=>{if(e.key==='Enter')tryLogin()};
 $('#nameQ').oninput=()=>{clearTimeout(nameTimer);nameTimer=setTimeout(searchNames,300)};$('#nameBack').onclick=backToPhone;
-$('#switchGuest').onclick=()=>{ME=null;store.set('guest',null);openLogin()};
+/* Log out: forget this phone's invite so another number can be used. Until then the app opens the pass by itself. */
+function logout(){
+  if(!ME)return openLogin();
+  if(!confirm(`Log out ${ME.n}? Next time, enter a mobile number to open an invite.`))return;
+  ME=null;store.set('guest',null);store.set('skipLogin',false);store.set('welcomed',false);
+  renderAll();show('home');location.hash='home';openLogin();toast('Logged out');
+}
+function renderAccount(){
+  const ph=ME&&ME.phone?`+91 ${ME.phone.slice(0,5)} ${ME.phone.slice(5)}`:'';
+  $('#account').innerHTML=ME
+    ?`<p class="eyebrow">Signed in</p><div class="row between" style="flex-wrap:wrap"><div><h3>${esc(ME.n)}</h3>${ph?`<p class="muted small">${ph}</p>`:''}</div>
+       <button class="btn ghost sm" id="logoutBtn">Log out · use another number</button></div>`
+    :`<p class="eyebrow">Not signed in</p><p class="muted small">Open your invite to see your room and your events.</p><button class="btn sm" id="loginBtn" style="align-self:flex-start">Find my invite</button>`;
+  if(ME)$('#logoutBtn').onclick=logout;else $('#loginBtn').onclick=openLogin;
+}
+$('#switchGuest').onclick=logout;
 
 function renderContacts(){
   $('#contactList').innerHTML=CONTACTS.map(([n,ph,d])=>`<div class="card stack"><div class="row between"><b>${esc(n)}</b>${ph?`<a class="btn sm" href="tel:+91${esc(normPhone(ph))}">Call</a>`:''}</div><p class="muted small">${esc(d||'')}${ph?'':' · number coming soon'}</p></div>`).join('');
@@ -948,6 +964,7 @@ function cloudRefresh(what){
   else renderAll();
 }
 function renderAll(){
+  renderAccount();
   $('#loginDemo').hidden=CLOUD_ON();
   renderContacts();renderFeed();renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
 }
