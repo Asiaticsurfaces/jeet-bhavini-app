@@ -625,8 +625,7 @@ function renderHome(){
   $('#upnext').innerHTML=`<div class="thumb"><img src="${nx.img}" alt=""></div>
    <div style="min-width:0;flex:1"><h3>${esc(evName(nx))}</h3><div class="muted small">${dayText(nx.day)} · ${nx.time}<br>${esc(nx.venue)}</div></div>
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
-  $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>People</span><b>${ME.party||1}</b></div>
-     ${ME.side?`<div style="grid-column:1/-1"><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`:''}
+  $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div>${ME.side?`<div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`:''}
      ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}
      ${ME.room&&(ME.roommates||[]).length?`<div style="grid-column:1/-1"><span>Sharing your room with</span><div class="mates">${ME.roommates.map(n=>`<span class="mate">${esc(n)}</span>`).join('')}</div></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
