@@ -263,7 +263,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="muted small">Copies Mameru, Sangeet, Mandap Ropan and Wedding here so you can edit them and add more. Guests keep seeing the same schedule.</p>
         <button class="btn" id="evSeedBtn" style="align-self:flex-start">Copy the 4 events</button>
       </div>
-      <div class="row between"><p class="muted small">Changes show on every guest's Events screen within seconds.</p><button class="btn" id="evNew">+ Add event</button></div>
+      <div class="row between"><p class="muted small">Changes show on every guest's Events screen within seconds.</p><div class="row"><button class="btn ghost" id="evBride">Copy all for Bride's side</button><button class="btn" id="evNew">+ Add event</button></div></div>
       <div class="card" id="evForm" hidden>
         <h3 id="evFormTitle">New event</h3>
         <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Event name</span><input id="evName" maxlength="40" placeholder="e.g. Haldi"></label>
@@ -450,14 +450,14 @@ async function start() {
       const IMGS = [['assets/user_mameru_final.png', 'Mameru'], ['assets/user_sangeet_final.png', 'Sangeet'], ['assets/user_mandap_clean.png', 'Mandap'],
         ['assets/user_lagna_scene_final.png', 'Wedding'], ['assets/ganesha_motif.png', 'Ganesha'], ['assets/postcard_jb_monogram.png', 'JB monogram']];
       $('#evImg').innerHTML = IMGS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
-      let EVS = [], editing = null;
+      let EVS = [], editing = null, formOf = '';   // formOf: id of the event this one is the other side's copy of
       const IST = 5.5 * 3600e3;
       const parts = iso => { const d = new Date(new Date(iso).getTime() + IST).toISOString(); return [d.slice(0, 10), d.slice(11, 16)]; };
       const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
       const label = e => { const [d, t] = parts(e.start); const dt = new Date(d + 'T00:00:00Z');
         return `${dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${e.time || t}`; };
       function openForm(e) {
-        editing = e && e.id ? e.id : null; $('#evForm').hidden = false; $('#evDelete').hidden = !editing; $('#evDup').hidden = !editing;
+        editing = e && e.id ? e.id : null; formOf = e?.of || ''; $('#evForm').hidden = false; $('#evDelete').hidden = !editing; $('#evDup').hidden = !editing;
         $('#evFormTitle').textContent = editing ? `Edit ${e.name}` : e ? `New: ${e.name} (copy)` : 'New event';
         $('#evSide').value = e?.side || 'all';
         const [d, t] = e ? parts(e.start) : ['2026-12-01', '10:00'];
@@ -483,7 +483,7 @@ async function start() {
       const withDefaults = (b, skipId) => { if (EVS.length) return;
         DEFS().forEach(({ id, ...e }) => id !== skipId && b.set(doc(db, 'events', id), { ...e, updatedBy: u.email, updatedAt: serverTimestamp() })); };
       $('#evDup').onclick = () => { const e = SHOWN().find(x => x.id === editing); if (!e) return;
-        openForm({ ...e, id: null, side: e.side === 'Groom' ? 'Bride' : e.side === 'Bride' ? 'Groom' : 'Bride' });
+        openForm({ ...e, id: null, of: e.of || e.id, side: e.side === 'Groom' ? 'Bride' : e.side === 'Bride' ? 'Groom' : 'Bride' });
         toast('Copied. Change the time or details, then Save'); };
       $('#evSave').onclick = () => {
         const name = $('#evName').value.trim(); if (!name) return toast('Give the event a name');
@@ -495,7 +495,7 @@ async function start() {
           moments: lines('#evMoments').map(l => l.split('|').map(x => x.trim())).filter(m => m[0] && m[1]).map(m => [m[0], m[1]]),
           pack: lines('#evPack'),
           rites: lines('#evRites').map(l => { const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, '']; }),
-          side: $('#evSide').value, hidden: $('#evHidden').checked, updatedBy: u.email, updatedAt: serverTimestamp() };
+          side: $('#evSide').value, hidden: $('#evHidden').checked, ...(formOf ? { of: formOf } : {}), updatedBy: u.email, updatedAt: serverTimestamp() };
         const id = editing || (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event') + '-' + Math.random().toString(36).slice(2, 6);
         const b = writeBatch(db); withDefaults(b, id); b.set(doc(db, 'events', id), data);
         b.commit().then(() => { closeForm(); toast('Saved. Guests see it now'); }).catch(fail);
@@ -503,6 +503,20 @@ async function start() {
       $('#evDelete').onclick = () => { if (!editing || !confirm('Delete this event for everyone?')) return;
         const b = writeBatch(db); withDefaults(b, editing); if (EVS.length) b.delete(doc(db, 'events', editing));
         b.commit().then(() => { closeForm(); toast('Event deleted'); }).catch(fail); };
+      // One tap: every event gets a Bride's-side copy (same details), the originals become Groom's side.
+      $('#evBride').onclick = async () => {
+        const L = SHOWN(), done = new Set(L.filter(e => e.side === 'Bride').map(e => e.of || e.id));
+        const todo = L.filter(e => e.side !== 'Bride' && !done.has(e.of || e.id));
+        if (!todo.length) return toast("Every event already has a Bride's side copy");
+        if (!confirm(`Make a Bride's-side copy of ${todo.length} event${todo.length === 1 ? '' : 's'} (${todo.map(e => e.name).join(', ')})?\n\nThe current ones become Groom's side only. Then tap Edit on each Bride's side event to change its time.`)) return;
+        $('#evBride').disabled = true;
+        try { const b = writeBatch(db), at = { updatedBy: u.email, updatedAt: serverTimestamp() };
+          todo.forEach(({ id, ...e }) => { const base = e.of || id;
+            b.set(doc(db, 'events', id), { ...e, side: 'Groom', ...at });
+            b.set(doc(db, 'events', `${base}-bride`), { ...e, of: base, side: 'Bride', ...at }); });
+          await b.commit(); toast("Done. Bride's side events are in the list, tap Edit to change their timings");
+        } catch (e) { fail(e); } finally { $('#evBride').disabled = false; }
+      };
       $('#evSeedBtn').onclick = async () => {
         $('#evSeedBtn').disabled = true;
         try { const b = writeBatch(db);

@@ -585,7 +585,7 @@ let ME=store.get('guest',null);
 /* Groom's side and bride's side: each guest sees only events, updates and banners for their side or for everyone. */
 const mySide=()=>ME?(ME.sideKey||(/bride/i.test(ME.side||'')?'Bride':/groom/i.test(ME.side||'')?'Groom':'')):'';
 const forMe=x=>!x.side||x.side==='all'||!mySide()||x.side===mySide();
-const myEvents=()=>{const m=EVENTS.filter(e=>forMe(e)&&(!ME||(ME.skip?!ME.skip.includes(e.id):(ME.events||[]).includes(e.id))));return m.length?m:EVENTS.filter(forMe).length?EVENTS.filter(forMe):EVENTS};
+const myEvents=()=>{const m=EVENTS.filter(e=>forMe(e)&&(!ME||(ME.skip?!ME.skip.includes(e.of||e.id):(ME.events||[]).includes(e.of||e.id))));return m.length?m:EVENTS.filter(forMe).length?EVENTS.filter(forMe):EVENTS};
 const nextEvent=()=>myEvents().find(e=>new Date(e.start).getTime()+e.hrs*36e5>Date.now())||myEvents()[myEvents().length-1];
 let NOWS=[
  {t:'Varmala starts in 10 min. Please come to Lake Side.',place:'lake'},
