@@ -452,7 +452,7 @@ async function start() {
       $('#evImg').innerHTML = IMGS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
       // Firestore can't hold a list inside a list, so moments and rites are stored as {t,m} / {n,d} records.
       const pair = (x, a, b) => Array.isArray(x) ? x : [x?.[a] || '', x?.[b] || ''];
-      const fromDb = e => ({ ...e, moments: (e.moments || []).map(x => pair(x, 't', 'm')), rites: (e.rites || []).map(x => pair(x, 'n', 'd')) });
+      const fromDb = e => ({ ...e, ...(/sufi/i.test(e.name || '') && (!e.img || /monogram/.test(e.img)) ? { img: 'assets/user_sufi_final.png' } : {}), moments: (e.moments || []).map(x => pair(x, 't', 'm')), rites: (e.rites || []).map(x => pair(x, 'n', 'd')) });
       const toDb = e => ({ ...e, moments: (e.moments || []).map(x => { const [t, m] = pair(x, 't', 'm'); return { t, m }; }),
         rites: (e.rites || []).map(x => { const [n, d] = pair(x, 'n', 'd'); return { n, d: d || '' }; }) });
       const putEv = (b, id, data) => b.set(doc(db, 'events', id), toDb(data));
