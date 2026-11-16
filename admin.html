@@ -161,15 +161,11 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       </div>
       <div class="card" id="guestAdd">
         <div class="row between"><h3 id="gfTitle">Add a guest</h3><button class="btn sm" id="gfToggle">+ Add guest</button></div>
-        <p class="muted small">Type guests one by one. Phone is optional: guests without one pick their own name the first time they open the app.</p>
+        <p class="muted small">Type guests one by one. No number needed: each guest picks their own name the first time they open the app, and their number is saved then.</p>
         <div class="stack" id="gfBody" hidden>
-          <div class="grid2">
-            <label class="fld"><span>Guest / family name</span><input id="gfName" maxlength="60" placeholder="e.g. Riya Shah"></label>
-            <label class="fld"><span>Mobile number (optional)</span><input id="gfPhone" inputmode="tel" maxlength="14" placeholder="10 digits"></label>
-          </div>
           <div class="grid3">
+            <label class="fld"><span>Guest / family name</span><input id="gfName" maxlength="60" placeholder="e.g. Riya Shah"></label>
             <label class="fld"><span>Side</span><select id="gfSide"><option value="Groom">Groom's side</option><option value="Bride">Bride's side</option><option value="">Both / not sure</option></select></label>
-            <label class="fld"><span>Relation (optional)</span><input id="gfRel" maxlength="40" placeholder="e.g. Cousin"></label>
             <label class="fld"><span>No. of people coming</span><input id="gfPeople" type="number" min="1" max="30" value="1"></label>
           </div>
           <div class="grid3" id="gfRoomRow">
@@ -682,20 +678,36 @@ async function start() {
     let LINKS = [];
     sub('guests', collection(db, 'phoneLinks'), s => { LINKS = list(s); renderGuests(); });
     $('#guestQ').oninput = () => renderGuests();
-    const EVK = [['mameru', 'Mameru'], ['sangeet', 'Sangeet'], ['mandap', 'Mandap Ropan'], ['wedding', 'Wedding']];
+    // Events a guest can be invited to: one entry per event (the Bride's/Groom's copies of one event count once).
+    // [key, name, side]: side 'all', 'Groom' or 'Bride' (an event only one side has).
+    let EVK = [['mameru', 'Mameru', 'all'], ['sangeet', 'Sangeet', 'all'], ['mandap', 'Mandap Ropan', 'all'], ['wedding', 'Wedding', 'all']];
+    onSnapshot(collection(db, 'events'), s => {
+      const L = list(s).filter(e => !e.hidden).sort((a, b) => new Date(a.start) - new Date(b.start)); if (!L.length) return;
+      const by = new Map();
+      L.forEach(e => { const k = e.of || e.id, x = by.get(k) || { name: (L.find(y => y.id === k) || e).name, sides: new Set() }; x.sides.add(e.side || 'all'); by.set(k, x); });
+      EVK = [...by].map(([k, x]) => [k, x.name, x.sides.has('all') || (x.sides.has('Groom') && x.sides.has('Bride')) ? 'all' : [...x.sides][0]]);
+      if (!$('#gfBody').hidden) drawGev(); renderGuests();
+    }, e => console.warn('events', e.code));
     // ---- add / edit / delete a guest by typing (owner) ----
     const nameTokens = name => { const w = name.toLowerCase().split(/[^a-z0-9઀-૿]+/).filter(x => x.length >= 2);
       return [...new Set(w.flatMap(x => Array.from({ length: Math.min(x.length, 12) - 1 }, (_, k) => x.slice(0, k + 2))))]; };
     const slugOf = name => name.toLowerCase().replace(/[^a-z0-9઀-૿]+/g, '-').replace(/^-|-$/g, '') || 'guest';
     let gfEditing = null;
-    $('#gfEvents').innerHTML = EVK.map(([k, n]) => `<label class="row small" style="flex-wrap:nowrap;gap:6px"><input type="checkbox" data-gev="${k}" checked style="width:18px;height:18px"> ${n}</label>`).join('');
+    // Tick boxes for the events this guest's side has; keeps ticks already made.
+    let gfEv = {};
+    function drawGev() {
+      $$('[data-gev]').forEach(c => { gfEv[c.dataset.gev] = c.checked; });
+      const side = $('#gfSide').value, mine = EVK.filter(([, , sd]) => sd === 'all' || !side || sd === side);
+      $('#gfEvents').innerHTML = mine.map(([k, n, sd]) => `<label class="row small" style="flex-wrap:nowrap;gap:6px"><input type="checkbox" data-gev="${k}" ${gfEv[k] !== false ? 'checked' : ''} style="width:18px;height:18px"> ${esc(n)}${sd !== 'all' && !side ? ` <span class="muted">(${sd}'s side)</span>` : ''}</label>`).join('') || '<span class="muted small">No events yet</span>';
+    }
+    $('#gfSide').addEventListener('change', drawGev);
     function openGF(g) {
       gfEditing = g ? g.id : null; $('#gfBody').hidden = false; $('#gfToggle').hidden = true; $('#gfDelete').hidden = !g; $('#gfMsg').textContent = '';
       $('#gfTitle').textContent = g ? `Edit ${g.name}` : 'Add a guest';
-      $('#gfName').value = g?.name || ''; $('#gfPhone').value = g?.phone || '';
+      $('#gfName').value = g?.name || '';
       $('#gfSide').value = /bride/i.test(g?.side || '') ? 'Bride' : /groom/i.test(g?.side || '') || !g ? 'Groom' : '';
-      $('#gfRel').value = g?.relation || ''; $('#gfPeople').value = g?.people || 1; $('#gfLang').value = g?.lang === 'GU' ? 'GU' : 'EN'; $('#gfNote').value = '';
-      $$('[data-gev]').forEach(c => c.checked = g ? g.events?.[c.dataset.gev] !== false : true);
+      $('#gfPeople').value = g?.people || 1; $('#gfLang').value = g?.lang === 'GU' ? 'GU' : 'EN'; $('#gfNote').value = '';
+      gfEv = { ...(g?.events || {}) }; $('#gfEvents').innerHTML = ''; drawGev();
       // Room: fill suggestions and this guest's current allotment.
       $('#gfRoomRow').hidden = !roomsApi;
       if (roomsApi) {
@@ -718,16 +730,14 @@ async function start() {
     ['#gfIn', '#gfOut', '#gfPeople'].forEach(x => $(x).addEventListener('change', () => $('#gfRoom').oninput()));
     $('#gfCancel').onclick = closeGF;
     $('#gfSave').onclick = async () => {
-      const name = $('#gfName').value.trim(), raw = $('#gfPhone').value.trim(), phone = normPhone(raw);
+      const name = $('#gfName').value.trim();
       const msg = t => { $('#gfMsg').textContent = t; };
       if (!name) return msg('Type the guest\'s name');
-      if (raw && phone.length !== 10) return msg('The mobile number should be 10 digits, or leave it empty');
-      const owner = phone && (GUESTS.find(x => x.id !== gfEditing && x.phone === phone) || GUESTS.find(x => x.id !== gfEditing && LINKS.some(l => l.id === phone && l.guestId === x.id)));
-      if (owner) return msg(`${phone} is already ${owner.name}'s number`);
       if (!gfEditing && GUESTS.some(x => x.name.trim().toLowerCase() === name.toLowerCase()) && !confirm(`There is already a guest called "${name}". Add another one with the same name?`)) return;
       let id = gfEditing;
-      if (!id) { id = phone || slugOf(name); for (let k = 2; GUESTS.some(x => x.id === id); k++) id = `${phone || slugOf(name)}-${k}`; }
-      const data = { name, phone, side: $('#gfSide').value, relation: $('#gfRel').value.trim(), people: Math.max(1, +$('#gfPeople').value || 1),
+      if (!id) { id = slugOf(name); for (let k = 2; GUESTS.some(x => x.id === id); k++) id = `${slugOf(name)}-${k}`; }
+      // Phone numbers are linked when the guest signs in, so the form never touches them.
+      const data = { name, side: $('#gfSide').value, people: Math.max(1, +$('#gfPeople').value || 1),
         lang: $('#gfLang').value, events: Object.fromEntries($$('[data-gev]').map(c => [c.dataset.gev, c.checked])), updatedAt: serverTimestamp() };
       const note = $('#gfNote').value.trim();
       // Check the typed room before saving anything.
@@ -738,11 +748,7 @@ async function start() {
       try {
         const b = writeBatch(db);
         b.set(doc(db, 'guests', id), data, { merge: true });                       // keeps room details set in the Rooms tab
-        b.set(doc(db, 'guestIndex', id), { name, side: data.side, people: data.people, tokens: nameTokens(name), ...(phone ? { phones: [phone] } : {}) }, { merge: true });
-        if (phone) {                                                                 // one name, one number
-          b.set(doc(db, 'phoneLinks', phone), { guestId: id, name, at: serverTimestamp() });
-          LINKS.filter(l => l.guestId === id && l.id !== phone).forEach(l => b.delete(doc(db, 'phoneLinks', l.id)));
-        }
+        b.set(doc(db, 'guestIndex', id), { name, side: data.side, people: data.people, tokens: nameTokens(name) }, { merge: true });
         if (note) b.set(doc(db, 'guestNotes', id), { notes: note }); else if (gfEditing) b.delete(doc(db, 'guestNotes', id));
         await b.commit();
         let roomNote = '';
