@@ -240,6 +240,13 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
           <p class="muted small" id="raHint">Use a dash for a range. Rooms already in this wing are skipped.</p>
           <div class="row"><button class="btn" id="raSave">Add rooms</button><button class="btn danger" id="raDelete" hidden>Delete room</button><button class="btn ghost" id="raCancel">Cancel</button></div>
         </div>
+        <div class="stack" id="rxBox" style="border-top:1px solid var(--line, #e6dfd2);padding-top:12px;margin-top:4px">
+          <h3>Or upload an Excel room list</h3>
+          <p class="muted small">One row per room (or a range like <b>101-110</b>) with columns <b>Wing</b>, <b>Area / floor</b>, <b>Room number</b>, <b>Beds</b>. Rooms already added are skipped, so you can upload the same file again after adding more.</p>
+          <div class="row"><button class="btn ghost sm" id="rxTpl">Download room list template</button>
+            <label class="btn sm" style="cursor:pointer">Choose Excel file<input type="file" id="rxFile" accept=".xlsx,.xls,.csv" hidden></label></div>
+          <div class="stack" id="rxOut"></div>
+        </div>
         <datalist id="areaList"></datalist>
       </div>
     </section>
@@ -1013,6 +1020,61 @@ async function start() {
             toast(`Added ${add.length} room${add.length === 1 ? '' : 's'} to ${wing}${nums.length > add.length ? ` (${nums.length - add.length} already there)` : ''}`);
           }
         } catch (e) { fail(e); } finally { $('#raSave').disabled = false; }
+      };
+      // ---- Excel room list ----
+      $('#rxTpl').onclick = () => {
+        const ws = XLSX.utils.aoa_to_sheet([['Wing / building', 'Area / floor (optional)', 'Room number (or range)', 'Beds (people) per room'],
+          ['Premium Lake View A', 'Ground floor', '101-110', 4], ['Premium Lake View A', 'First floor', '201', 3], ['Garden Cottages', '', 'C1, C2, C3', 2]]);
+        ws['!cols'] = [{ wch: 26 }, { wch: 22 }, { wch: 22 }, { wch: 22 }];
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rooms'); XLSX.writeFile(wb, 'Room list.xlsx');
+      };
+      $('#rxFile').onchange = async ev => {
+        const f = ev.target.files[0]; if (!f) return; ev.target.value = '';
+        const out = $('#rxOut'); out.innerHTML = '<p class="muted">Reading the file…</p>';
+        try {
+          const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+          const sh = wb.Sheets[wb.SheetNames.find(n => /room/i.test(n)) || wb.SheetNames[0]];
+          const aoa = XLSX.utils.sheet_to_json(sh, { header: 1, defval: '', raw: false });
+          // Find the header row and which column is which (any order, any wording close to the template).
+          const hi = aoa.findIndex(r => r.some(c => /room|no\.?$|number/i.test(String(c))) && r.some(c => /wing|building|block|tower/i.test(String(c))));
+          if (hi < 0) { out.innerHTML = '<p class="err">Couldn\'t find the header row. It needs columns named Wing and Room number. Download the template to see the layout.</p>'; return; }
+          const H = aoa[hi].map(c => String(c).trim().toLowerCase()), col = re => H.findIndex(h => re.test(h));
+          const cW = col(/wing|building|block|tower/), cA = col(/area|floor/), cB = col(/bed|people|capacity|pax/), cN = [/number|room\s*no|^room$|^no\.?$|#/, /room/].map(re => H.findIndex((h, i) => i !== cB && re.test(h))).find(i => i >= 0) ?? -1;
+          const want = new Map(), errors = [], key = (w, n) => w.toLowerCase() + '|' + n.toLowerCase();
+          aoa.slice(hi + 1).forEach((r, i) => {
+            const wing = String(r[cW] ?? '').trim(), nums = String(r[cN] ?? '').trim(), area = cA >= 0 ? String(r[cA] ?? '').trim() : '';
+            if (!wing && !nums) return;
+            const row = hi + i + 2;
+            if (!wing) return errors.push(`Row ${row}: wing is empty`);
+            if (!nums) return errors.push(`Row ${row}: room number is empty`);
+            const bRaw = cB >= 0 ? String(r[cB] ?? '').trim() : '', beds = bRaw ? Math.round(+bRaw) : 4;
+            if (!(beds >= 1 && beds <= 12)) return errors.push(`Row ${row}: beds "${bRaw}" should be a number from 1 to 12`);
+            parseNums(nums).forEach(n => want.set(key(wing, n), { wing, area, number: n, beds }));
+          });
+          // Use the existing spelling of a wing if it only differs in capitals.
+          const wingName = w => ROOMS.find(r => r.wing.toLowerCase() === w.toLowerCase())?.wing || w;
+          const all = [...want.values()].map(r => ({ ...r, wing: wingName(r.wing) }));
+          const add = all.filter(r => !ROOMS.some(x => key(x.wing, String(x.number)) === key(r.wing, r.number)));
+          const wingsN = new Set(add.map(r => r.wing)).size, bedsN = add.reduce((t, r) => t + r.beds, 0);
+          out.innerHTML = `${errors.length ? `<div class="item"><b class="err">Fix these rows, then upload again:</b><ul class="small">${errors.slice(0, 20).map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
+            <p>${add.length ? `<b>${add.length} new room${add.length === 1 ? '' : 's'}</b> in ${wingsN} wing${wingsN === 1 ? '' : 's'}, ${bedsN} beds` : 'No new rooms in this file'}${all.length > add.length ? ` · ${all.length - add.length} already added (skipped)` : ''}</p>
+            ${add.length ? `<div class="small muted">${[...new Set(add.map(r => r.wing))].map(w => `${esc(w)}: ${add.filter(r => r.wing === w).map(r => esc(r.number)).join(', ')}`).join('<br>')}</div>
+            <div class="row"><button class="btn" id="rxGo">Add ${add.length} room${add.length === 1 ? '' : 's'}</button><button class="btn ghost" id="rxNo">Cancel</button></div>` : ''}`;
+          if (!add.length) return;
+          $('#rxNo').onclick = () => { out.innerHTML = ''; };
+          $('#rxGo').onclick = async () => {
+            $('#rxGo').disabled = true; $('#rxGo').textContent = 'Adding…';
+            try {
+              for (let i = 0; i < add.length; i += 400) {   // Firestore batches hold up to 500 writes
+                const b = writeBatch(db);
+                add.slice(i, i + 400).forEach(r => b.set(doc(collection(db, 'rooms')), { ...r, createdAt: serverTimestamp() }));
+                await b.commit();
+              }
+              out.innerHTML = `<p><b>Added ${add.length} room${add.length === 1 ? '' : 's'}.</b> They're on the room board below.</p>`;
+              toast(`Added ${add.length} rooms`);
+            } catch (e) { fail(e); $('#rxGo').disabled = false; $('#rxGo').textContent = `Add ${add.length} rooms`; }
+          };
+        } catch (e) { console.error(e); out.innerHTML = '<p class="err">Couldn\'t read this file. Save it as .xlsx and try again.</p>'; }
       };
       $('#raDelete').onclick = () => {
         const r = ROOMS.find(x => x.id === editRoom); if (!r) return;
