@@ -350,7 +350,8 @@ async function start() {
   const G = 'https://www.gstatic.com/firebasejs/10.14.1';
   const [{ initializeApp }, A, F, S] = await Promise.all([
     import(`${G}/firebase-app.js`), import(`${G}/firebase-auth.js`), import(`${G}/firebase-firestore.js`), import(`${G}/firebase-storage.js`)]);
-  const app = initializeApp(FIREBASE_CONFIG);
+  // Own app name = own saved sign-in, so opening the guest app (anonymous) on this phone never signs the panel out.
+  const app = initializeApp(FIREBASE_CONFIG, 'family-panel');
   const auth = A.getAuth(app), db = F.getFirestore(app), st = S.getStorage(app);
   const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp, writeBatch, Timestamp } = F;
   const ms = t => (t && t.toMillis ? t.toMillis() : 0);
@@ -378,7 +379,7 @@ async function start() {
   const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
     : (d.perms || Object.fromEntries((PRESETS[d.role] || []).map(k => [k, true])));
   A.onAuthStateChanged(auth, async u => {
-    if (!u || u.isAnonymous) { $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
+    if (!u || u.isAnonymous) { $('#panel').hidden = true; $('#gate').hidden = false; $('#gateMsg').textContent = 'Sign in with the Google account the family added.'; $('#signIn').hidden = false; return; }
     $('#gateMsg').textContent = 'Checking the family list…'; $('#signIn').hidden = true;
     let role = 'owner', perms = permsOf({ role: 'owner' });
     try {

@@ -23,7 +23,8 @@ async function start() {
 
   const user = await new Promise((res, rej) => {
     const off = A.onAuthStateChanged(auth, u => { if (u) { off(); res(u); } });
-    A.signInAnonymously(auth).catch(rej);
+    // Only sign in as a guest if nobody is signed in yet (never replace a family member's Google sign-in).
+    auth.authStateReady().then(() => auth.currentUser || A.signInAnonymously(auth)).catch(rej);
   });
   const uid = user.uid;
   const W = window;
