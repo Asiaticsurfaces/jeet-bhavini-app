@@ -448,7 +448,7 @@ async function start() {
     // ---------- events ----------
     if (can.events) {
       const IMGS = [['assets/user_mameru_final.png', 'Mameru'], ['assets/user_sangeet_final.png', 'Sangeet'], ['assets/user_mandap_clean.png', 'Mandap'],
-        ['assets/user_lagna_scene_final.png', 'Wedding'], ['assets/ganesha_motif.png', 'Ganesha'], ['assets/postcard_jb_monogram.png', 'JB monogram']];
+        ['assets/user_lagna_scene_final.png', 'Wedding'], ['assets/user_sufi_final.png', 'Sufi Night'], ['assets/ganesha_motif.png', 'Ganesha'], ['assets/postcard_jb_monogram.png', 'JB monogram']];
       $('#evImg').innerHTML = IMGS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
       // Firestore can't hold a list inside a list, so moments and rites are stored as {t,m} / {n,d} records.
       const pair = (x, a, b) => Array.isArray(x) ? x : [x?.[a] || '', x?.[b] || ''];
@@ -482,7 +482,7 @@ async function start() {
       $('#evNew').onclick = () => openForm(null);
       // Ready-made Sufi Night for the groom's side: fills the form, family checks the date/time and saves.
       const SUFI = { name: 'Sufi Night', gu: 'સૂફી નાઇટ', tag: 'An Evening of Soulful Qawwali', start: '2026-11-30T20:30:00+05:30', hrs: 3,
-        time: '8:30 PM onwards', venue: 'Oleander Lawn', dress: 'Ivory, white & soft pastels', img: 'assets/postcard_jb_monogram.png', side: 'Groom',
+        time: '8:30 PM onwards', venue: 'Oleander Lawn', dress: 'Ivory, white & soft pastels', img: 'assets/user_sufi_final.png', side: 'Groom',
         note: 'Live Sufi music and qawwali under the stars, with dinner. A relaxed, soulful evening for the groom\'s family and friends before the celebrations begin.',
         moments: [['8:30 PM', 'Welcome & dinner'], ['9:30 PM', 'Qawwali begins']],
         pack: ['White, ivory or pastel outfit (kurta, anarkali or sharara)', 'Shawl or jacket, Karjat nights get cold', 'Comfortable footwear, it\'s on the lawn', 'A light dupatta or stole'],
