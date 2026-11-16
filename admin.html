@@ -170,6 +170,12 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
             <label class="fld"><span>Relation (optional)</span><input id="gfRel" maxlength="40" placeholder="e.g. Cousin"></label>
             <label class="fld"><span>No. of people coming</span><input id="gfPeople" type="number" min="1" max="30" value="1"></label>
           </div>
+          <div class="grid3" id="gfRoomRow">
+            <label class="fld"><span>Room (optional)</span><input id="gfRoom" list="gfRoomList" maxlength="40" placeholder="e.g. 101"><datalist id="gfRoomList"></datalist></label>
+            <label class="fld"><span>Check-in</span><select id="gfIn"></select></label>
+            <label class="fld"><span>Check-out</span><select id="gfOut"></select></label>
+          </div>
+          <p class="small muted" id="gfRoomHint" style="margin-top:-4px"></p>
           <div class="fld"><span>Invited to</span><div class="row" id="gfEvents"></div></div>
           <div class="grid2">
             <label class="fld"><span>App language</span><select id="gfLang"><option value="EN">English</option><option value="GU">Gujarati</option></select></label>
@@ -628,6 +634,7 @@ async function start() {
 
     // ---------- guests ----------
     let GUESTS = [], RSVP = [], ROOMS = [], STAYS = [], onGuests = () => {};
+    let roomsApi = null;   // set by the Rooms section, used by the guest form to allot a typed room
     // The Rooms tab needs the guest list too.
     if (can.guests || can.rooms) onSnapshot(collection(db, 'guests'), s => { GUESTS = list(s); renderGuests(); onGuests(); }, e => console.warn('guests', e.code));
     sub('guests', collection(db, 'rsvps'), s => { RSVP = list(s); renderGuests(); });
@@ -648,11 +655,26 @@ async function start() {
       $('#gfSide').value = /bride/i.test(g?.side || '') ? 'Bride' : /groom/i.test(g?.side || '') || !g ? 'Groom' : '';
       $('#gfRel').value = g?.relation || ''; $('#gfPeople').value = g?.people || 1; $('#gfLang').value = g?.lang === 'GU' ? 'GU' : 'EN'; $('#gfNote').value = '';
       $$('[data-gev]').forEach(c => c.checked = g ? g.events?.[c.dataset.gev] !== false : true);
+      // Room: fill suggestions and this guest's current allotment.
+      $('#gfRoomRow').hidden = !roomsApi;
+      if (roomsApi) {
+        $('#gfIn').innerHTML = roomsApi.nights.map(d => `<option value="${d}">${roomsApi.dLbl(d)}</option>`).join('');
+        $('#gfOut').innerHTML = roomsApi.days.slice(1).map(d => `<option value="${d}">${roomsApi.dLbl(d)}</option>`).join('');
+        $('#gfRoomList').innerHTML = roomsApi.rooms().map(r => `<option value="${esc(roomsApi.label(r))}"></option>`).join('');
+        const mine = g ? roomsApi.staysOf(g.id) : [];
+        $('#gfRoom').value = mine.length === 1 ? roomsApi.label(roomsApi.rooms().find(r => r.id === mine[0].roomId)) : '';
+        $('#gfRoom').disabled = mine.length > 1;
+        $('#gfIn').value = mine[0]?.in || '2026-12-01'; $('#gfOut').value = mine[0]?.out || '2026-12-03';
+        $('#gfRoomHint').textContent = mine.length > 1 ? `${g.name} has ${mine.length} room allotments. Change them in the Rooms tab.` : '';
+      }
       if (g) getDoc(doc(db, 'guestNotes', g.id)).then(n => { if (gfEditing === g.id && n.exists()) $('#gfNote').value = n.data().notes || ''; }).catch(() => {});
       $('#guestAdd').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#gfName').focus();
     }
     const closeGF = () => { gfEditing = null; $('#gfBody').hidden = true; $('#gfToggle').hidden = false; $('#gfTitle').textContent = 'Add a guest'; };
     $('#gfToggle').onclick = () => openGF(null);
+    $('#gfRoom').oninput = () => { if (!roomsApi) return; const t = $('#gfRoom').value.trim();
+      $('#gfRoomHint').textContent = t ? roomsApi.hint(t, gfEditing, +$('#gfPeople').value || 1, $('#gfIn').value, $('#gfOut').value) : ''; };
+    ['#gfIn', '#gfOut', '#gfPeople'].forEach(x => $(x).addEventListener('change', () => $('#gfRoom').oninput()));
     $('#gfCancel').onclick = closeGF;
     $('#gfSave').onclick = async () => {
       const name = $('#gfName').value.trim(), raw = $('#gfPhone').value.trim(), phone = normPhone(raw);
@@ -667,6 +689,10 @@ async function start() {
       const data = { name, phone, side: $('#gfSide').value, relation: $('#gfRel').value.trim(), people: Math.max(1, +$('#gfPeople').value || 1),
         lang: $('#gfLang').value, events: Object.fromEntries($$('[data-gev]').map(c => [c.dataset.gev, c.checked])), updatedAt: serverTimestamp() };
       const note = $('#gfNote').value.trim();
+      // Check the typed room before saving anything.
+      const roomText = roomsApi && !$('#gfRoom').disabled ? $('#gfRoom').value.trim() : null;
+      const inD = $('#gfIn').value, outD = $('#gfOut').value;
+      if (roomText) { const err = roomsApi.check(id, data.people, roomText, inD, outD); if (err) return msg(err); }
       $('#gfSave').disabled = true;
       try {
         const b = writeBatch(db);
@@ -677,7 +703,10 @@ async function start() {
           LINKS.filter(l => l.guestId === id && l.id !== phone).forEach(l => b.delete(doc(db, 'phoneLinks', l.id)));
         }
         if (note) b.set(doc(db, 'guestNotes', id), { notes: note }); else if (gfEditing) b.delete(doc(db, 'guestNotes', id));
-        await b.commit(); toast(gfEditing ? 'Guest updated' : `${name} added`);
+        await b.commit();
+        let roomNote = '';
+        if (roomText !== null) roomNote = await roomsApi.assign(id, name, data.people, roomText, inD, outD);
+        toast((gfEditing ? 'Guest updated' : `${name} added`) + (roomNote ? ` · ${roomNote}` : ''));
         if (gfEditing) closeGF(); else { openGF(null); }                             // ready for the next guest
       } catch (e) { fail(e); } finally { $('#gfSave').disabled = false; }
     };
@@ -839,6 +868,56 @@ async function start() {
       ['#sIn', '#sOut'].forEach(id => $(id).oninput = $(id).onchange = () => roomOpts());
       $('#sRoom').onchange = checkForm;
       $('#sCancel').onclick = resetForm;
+      // ---- used by the guest form: type a room number, it is allotted here ----
+      const roomLabel = r => r ? [String(r.number), r.wing, r.area].filter(Boolean).join(' · ') : '';
+      const matchRoom = text => {
+        const [num, ...rest] = text.split('·').map(x => x.trim()), wing = rest[0]?.toLowerCase(), area = rest[1]?.toLowerCase();
+        const hits = ROOMS.filter(r => String(r.number).toLowerCase() === num.toLowerCase()
+          && (!wing || (r.wing || '').toLowerCase() === wing) && (!area || (r.area || '').toLowerCase() === area));
+        return { num, wing: rest[0] || '', hits };
+      };
+      const fullNight = (roomId, beds, people, a, b, skip) => NIGHTS.filter(n => n >= a && n < b).find(n => used(roomId, n, skip) + people > beds);
+      roomsApi = {
+        days: DAYS, nights: NIGHTS, dLbl, label: roomLabel, rooms: () => ROOMS,
+        staysOf: gid => STAYS.filter(s => s.guestId === gid),
+        check(gid, people, text, a, b) {
+          if (b <= a) return 'Check-out has to be after check-in';
+          const { num, hits } = matchRoom(text), mine = STAYS.filter(s => s.guestId === gid);
+          if (!num) return 'Type a room number';
+          if (hits.length > 1) return `Room ${num} is in more than one wing. Pick it from the suggestions, e.g. "${roomLabel(hits[0])}"`;
+          if (hits.length === 1) { const short = fullNight(hits[0].id, hits[0].beds, people, a, b, mine[0]?.id);
+            if (short) return `Room ${num} doesn't have ${people} bed${people === 1 ? '' : 's'} free on ${dLbl(short)}`; }
+          return '';
+        },
+        hint(text, gid, people, a, b) {
+          const { num, hits } = matchRoom(text); if (!num) return '';
+          if (!hits.length) return `Room ${num} isn't in the Rooms list yet. It will be added (wing "${matchRoom(text).wing || 'Other'}", ${Math.max(4, people)} beds).`;
+          if (hits.length > 1) return `Room ${num} is in ${hits.length} wings. Pick one from the suggestions.`;
+          const r = hits[0], mine = STAYS.filter(s => s.guestId === gid), free = Math.min(...NIGHTS.filter(n => n >= a && n < b).map(n => r.beds - used(r.id, n, mine[0]?.id)));
+          return `${roomLabel(r)} · ${free} of ${r.beds} beds free on these nights`;
+        },
+        // Allot (or move, or clear) this guest's room; returns a short note for the toast.
+        async assign(gid, name, people, text, a, b) {
+          const mine = STAYS.filter(s => s.guestId === gid);
+          if (mine.length > 1) return '';
+          if (!text) { if (mine.length) { await commit([{ del: mine[0].id }], [gid]); return 'room removed'; } return ''; }
+          let { num, wing, hits } = matchRoom(text), r = hits[0], created = false;
+          if (!r) {   // not in the Rooms list yet: add it
+            const ref = doc(collection(db, 'rooms'));
+            r = { id: ref.id, wing: wing || 'Other', area: '', number: num, beds: Math.max(4, people) };
+            await setDoc(ref, { wing: r.wing, area: r.area, number: r.number, beds: r.beds });
+            if (!ROOMS.some(x => x.id === r.id)) ROOMS.push(r); created = true;
+          }
+          const old = mine[0], names = (old?.names?.length ? old.names : [name]).slice(0, people);
+          while (names.length < people) names.push('');
+          if (!names[0]) names[0] = name;
+          const data = { roomId: r.id, guestId: gid, name: names.filter(Boolean).join(', '), names, people,
+            in: a, out: b, note: old?.note || '', by: u.email, updatedAt: serverTimestamp() };
+          await commit([{ id: old?.id || doc(collection(db, 'stays')).id, data }], [gid]);
+          return `room ${roomLabel(r)}${created ? ' (new room added)' : ''}`;
+        },
+      };
+
       $('#sSave').onclick = async () => {
         const r = ROOMS.find(x => x.id === $('#sRoom').value); if (!r) return toast('Choose a room');
         const names = readNames().map(x => x.trim()); if (!names.some(Boolean)) return toast('Type at least one name');
