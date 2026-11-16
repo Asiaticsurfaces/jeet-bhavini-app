@@ -548,7 +548,8 @@ const fmtClock=iso=>{const d=new Date(new Date(iso).getTime()+IST_MS);const h=d.
 function normEvents(list){
   return list.map(e=>({...e,day:istDate(e.start),time:e.time||fmtClock(e.start),hrs:+e.hrs||2,gu:e.gu||e.name,tag:e.tag||'',
     venue:e.venue||'Oleander, Karjat',img:e.img||'assets/postcard_jb_monogram.png',dress:e.dress||'',note:e.note||'',
-    pack:e.pack||[],rites:e.rites||[],moments:e.moments&&e.moments.length?e.moments:null}))
+    pack:e.pack||[],rites:(e.rites||[]).map(x=>Array.isArray(x)?x:[x.n||'',x.d||'']),
+    moments:e.moments&&e.moments.length?e.moments.map(x=>Array.isArray(x)?x:[x.t||'',x.m||'']):null}))
    .sort((a,b)=>new Date(a.start)-new Date(b.start));
 }
 let EVENTS=normEvents(window.DEFAULT_EVENTS||[]);
