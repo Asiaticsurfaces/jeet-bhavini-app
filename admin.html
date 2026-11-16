@@ -263,7 +263,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="muted small">Copies Mameru, Sangeet, Mandap Ropan and Wedding here so you can edit them and add more. Guests keep seeing the same schedule.</p>
         <button class="btn" id="evSeedBtn" style="align-self:flex-start">Copy the 4 events</button>
       </div>
-      <div class="row between"><p class="muted small">Changes show on every guest's Events screen within seconds.</p><div class="row"><button class="btn ghost" id="evBride">Copy all for Bride's side</button><button class="btn" id="evNew">+ Add event</button></div></div>
+      <div class="row between"><p class="muted small">Changes show on every guest's Events screen within seconds.</p><div class="row"><button class="btn ghost" id="evSufi">+ Sufi Night (ready-made)</button><button class="btn ghost" id="evBride">Copy all for Bride's side</button><button class="btn" id="evNew">+ Add event</button></div></div>
       <div class="card" id="evForm" hidden>
         <h3 id="evFormTitle">New event</h3>
         <div class="grid2"><label class="stack" style="gap:4px"><span class="small muted">Event name</span><input id="evName" maxlength="40" placeholder="e.g. Haldi"></label>
@@ -480,6 +480,16 @@ async function start() {
       }
       const closeForm = () => { editing = null; $('#evForm').hidden = true; };
       $('#evNew').onclick = () => openForm(null);
+      // Ready-made Sufi Night for the groom's side: fills the form, family checks the date/time and saves.
+      const SUFI = { name: 'Sufi Night', gu: 'સૂફી નાઇટ', tag: 'An Evening of Soulful Qawwali', start: '2026-11-30T20:30:00+05:30', hrs: 3,
+        time: '8:30 PM onwards', venue: 'Oleander Lawn', dress: 'Ivory, white & soft pastels', img: 'assets/postcard_jb_monogram.png', side: 'Groom',
+        note: 'Live Sufi music and qawwali under the stars, with dinner. A relaxed, soulful evening for the groom\'s family and friends before the celebrations begin.',
+        moments: [['8:30 PM', 'Welcome & dinner'], ['9:30 PM', 'Qawwali begins']],
+        pack: ['White, ivory or pastel outfit (kurta, anarkali or sharara)', 'Shawl or jacket, Karjat nights get cold', 'Comfortable footwear, it\'s on the lawn', 'A light dupatta or stole'],
+        rites: [['Sufi music', 'Soulful songs of love and devotion from the Sufi tradition, sung live by the artists.'],
+          ['Qawwali', 'A group of singers with harmonium and tabla build the song slowly to a joyful, high-energy finish. Clap along!'],
+          ['Request a song', 'Have a favourite Sufi song? Add it under Song requests in Guest Info.']] };
+      $('#evSufi').onclick = () => { openForm({ ...SUFI, id: null }); $('#evFormTitle').textContent = 'New: Sufi Night (check the date and time, then Save)'; };
       $('#evCancel').onclick = closeForm;
       // Same event for the other family, e.g. a different time for the bride's side.
       // Until something is saved, the list shows the built-in schedule (what guests see now).
@@ -512,8 +522,8 @@ async function start() {
       // One tap: every event gets a Bride's-side copy (same details), the originals become Groom's side.
       $('#evBride').onclick = async () => {
         const L = SHOWN(), done = new Set(L.filter(e => e.side === 'Bride').map(e => e.of || e.id));
-        const todo = L.filter(e => e.side !== 'Bride' && !done.has(e.of || e.id));
-        if (!todo.length) return toast("Every event already has a Bride's side copy");
+        const todo = L.filter(e => (!e.side || e.side === 'all') && !done.has(e.of || e.id));
+        if (!todo.length) return toast("Nothing to copy: every shared event already has a Bride's side copy, and Groom-only events stay Groom-only");
         if (!confirm(`Make a Bride's-side copy of ${todo.length} event${todo.length === 1 ? '' : 's'} (${todo.map(e => e.name).join(', ')})?\n\nThe current ones become Groom's side only. Then tap Edit on each Bride's side event to change its time.`)) return;
         $('#evBride').disabled = true;
         try { const b = writeBatch(db), at = { updatedBy: u.email, updatedAt: serverTimestamp() };
@@ -533,6 +543,7 @@ async function start() {
       sub('events', collection(db, 'events'), s => {
         EVS = list(s).map(fromDb).sort((a, b) => new Date(a.start) - new Date(b.start));
         $('#evSeed').hidden = true;
+        $('#evSufi').hidden = SHOWN().some(e => /sufi/i.test(e.name || ''));
         const L = SHOWN().sort((a, b) => new Date(a.start) - new Date(b.start));
         $('#evList').innerHTML = L.length ? L.map(e => `<div class="item ${e.hidden ? 'done' : ''}"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
             <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><img src="${esc(e.img || 'assets/postcard_jb_monogram.png')}" alt="" style="width:48px;height:48px;object-fit:contain;flex:none">
