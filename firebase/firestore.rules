@@ -64,7 +64,7 @@ service cloud.firestore {
       allow write: if isOwner();
       // Rooms tab writes only the room shown on the guest's pass.
       allow update: if can('rooms')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'roomWhere', 'stayIn', 'stayOut']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'roomWhere', 'stayIn', 'stayOut', 'roommates']);
     }
     // Name search for first login: tokens of each name. A guest may search
     // (20 results at most per query, so the list can't be dumped). ONE NAME,

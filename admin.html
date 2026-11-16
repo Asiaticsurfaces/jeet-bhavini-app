@@ -695,8 +695,13 @@ async function start() {
       const guestPatch = (gid, stays, rooms = ROOMS) => {
         const mine = stays.filter(s => s.guestId === gid);
         const rs = [...new Set(mine.map(s => s.roomId))].map(id => rooms.find(r => r.id === id)).filter(Boolean);
+        // Everyone sleeping in the same room on any of the same nights (their own family included).
+        const own = (GUESTS.find(x => x.id === gid)?.name || '').trim().toLowerCase();
+        const mates = [];
+        for (const m of mine) for (const s of stays) if (s.roomId === m.roomId && s.in < m.out && m.in < s.out)
+          for (const n of namesOf(s)) { const t = (n || '').trim(); if (t && t.toLowerCase() !== own && !mates.includes(t)) mates.push(t); }
         return { room: rs.map(r => String(r.number)).join(', '), roomWhere: [...new Set(rs.map(whereOf).filter(Boolean))].join('; '),
-          stayIn: mine.map(s => s.in).sort()[0] || '', stayOut: mine.map(s => s.out).sort().at(-1) || '' };
+          stayIn: mine.map(s => s.in).sort()[0] || '', stayOut: mine.map(s => s.out).sort().at(-1) || '', roommates: mates.slice(0, 12) };
       };
       const commit = async (changes, gids) => {
         let next = STAYS.slice(); const b = writeBatch(db);
@@ -705,7 +710,10 @@ async function start() {
           if (c.del) b.delete(doc(db, 'stays', c.del));
           else { next.push({ id: c.id, ...c.data }); b.set(doc(db, 'stays', c.id), c.data); }
         }
-        for (const g of new Set(gids.filter(Boolean))) if (GUESTS.some(x => x.id === g)) b.update(doc(db, 'guests', g), guestPatch(g, next));
+        // Update every family in the rooms this change touches, so all roommates' passes stay right.
+        const roomsHit = new Set(changes.flatMap(c => [c.data?.roomId, STAYS.find(s => s.id === (c.del || c.id))?.roomId]).filter(Boolean));
+        const all = [...gids, ...[...STAYS, ...next].filter(s => roomsHit.has(s.roomId)).map(s => s.guestId)];
+        for (const g of new Set(all.filter(Boolean))) if (GUESTS.some(x => x.id === g)) b.update(doc(db, 'guests', g), guestPatch(g, next));
         await b.commit();
       };
 

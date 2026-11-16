@@ -87,6 +87,8 @@ input[type=text],textarea{width:100%;font:15px var(--body);padding:12px 16px;bor
 .pass{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pass div{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
 .pass span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.pass .mates{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;background:none;border:0;padding:0}
+.pass .mate{font:500 13px var(--body);padding:4px 10px;border-radius:999px;background:var(--plum-soft);color:var(--plum-deep);letter-spacing:0;text-transform:none}
 .pass b{display:block;font:600 26px/1.1 var(--display);color:var(--plum-deep);font-variant-numeric:tabular-nums}
 
 /* Switch */
@@ -564,7 +566,7 @@ let POSTS=[
  {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
 ];
 const GUESTS=[
- {n:'Riya Shah',phone:'9820012345',side:"Groom's side",sideKey:'Groom',room:'214',party:3,events:EVENTS.map(e=>e.id)},
+ {n:'Riya Shah',phone:'9820012345',side:"Groom's side",sideKey:'Groom',room:'214',roomWhere:'Wing A · Ground floor',stayIn:'2026-12-01',stayOut:'2026-12-03',roommates:['Amit Shah','Pooja Shah','Meera Patel'],party:3,events:EVENTS.map(e=>e.id)},
  {n:'Kunal Mehta',phone:'9820054321',side:"Bride's side",sideKey:'Bride',room:'118',party:2,events:['sangeet','mandap','wedding']},
  {n:'Neha Patel',phone:'',side:"Groom's friend",sideKey:'Groom',room:null,party:1,events:['sangeet','wedding']},
 ];
@@ -623,7 +625,8 @@ function renderHome(){
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
   $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div><div><span>People</span><b>${ME.party||1}</b></div>
      <div><span>Events</span><b>${myEvents().length} of ${EVENTS.length}</b></div><div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>
-     ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}`
+     ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}
+     ${ME.room&&(ME.roommates||[]).length?`<div style="grid-column:1/-1"><span>Sharing your room with</span><div class="mates">${ME.roommates.map(n=>`<span class="mate">${esc(n)}</span>`).join('')}</div></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
   $('#switchGuest').textContent=ME?'Not you?':'Find my invite';
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;

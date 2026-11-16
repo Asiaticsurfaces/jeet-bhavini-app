@@ -97,7 +97,7 @@ async function start() {
       const ev = g.events || {};
       return {
         id, n: g.name, phone, room: g.room || null, party: g.people || 1,
-        roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '',
+        roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '', roommates: Array.isArray(g.roommates) ? g.roommates : [],
         side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
         sideKey: /bride/i.test(g.side || '') ? 'Bride' : /groom/i.test(g.side || '') ? 'Groom' : '',
         skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
