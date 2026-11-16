@@ -31,7 +31,7 @@ service cloud.firestore {
     function isStaff() { return role() != 'none'; }
     // Older entries without `perms` fall back to their preset.
     function preset(r) {
-      return r == 'event' ? {'live': true}
+      return r == 'event' ? {'live': true, 'checkin': true}
         : r == 'family' ? {'help': true, 'lost': true, 'pickups': true, 'guests': true, 'photos': true, 'team': true, 'rooms': true}
         : {};
     }
@@ -60,7 +60,7 @@ service cloud.firestore {
     // the family can list them.
     match /guests/{phone} {
       allow get: if signedIn();
-      allow list: if can('guests') || can('rooms');
+      allow list: if can('guests') || can('rooms') || can('checkin');
       allow write: if isOwner();
       // Rooms tab writes only the room shown on the guest's pass.
       allow update: if can('rooms')
@@ -179,6 +179,12 @@ service cloud.firestore {
     match /events/{id} { allow read: if signedIn(); allow write: if can('events'); }
 
     // Room allotment (family panel → Rooms).
+    // Check-in desk (family panel → Check-in): one doc per guest family. Guests read their own (pass shows it).
+    match /checkins/{id} {
+      allow get: if signedIn();
+      allow list: if can('checkin') || can('guests') || can('rooms');
+      allow write: if can('checkin');
+    }
     match /rooms/{id} { allow read, write: if can('rooms'); }
     match /stays/{id} { allow read, write: if can('rooms'); }
   }

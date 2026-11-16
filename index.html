@@ -583,6 +583,7 @@ const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-01-cafe-window.jpg',ar:'2/3'},
 ];
 let ME=store.get('guest',null);
+let CHECKIN=null;   // set by js/cloud.js from checkins/{guest id}
 /* Groom's side and bride's side: each guest sees only events, updates and banners for their side or for everyone. */
 const mySide=()=>ME?(ME.sideKey||(/bride/i.test(ME.side||'')?'Bride':/groom/i.test(ME.side||'')?'Groom':'')):'';
 const forMe=x=>!x.side||x.side==='all'||!mySide()||x.side===mySide();
@@ -627,9 +628,11 @@ function renderHome(){
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
   $('#pass').innerHTML=ME?`<div><span>Room</span><b>${ME.room||'—'}</b></div>${ME.side?`<div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`:''}
      ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}
+     ${CHECKIN&&CHECKIN.in?`<div style="grid-column:1/-1"><span>Check-in</span><b style="font-size:17px">✓ Checked in · ${new Date(CHECKIN.at?.toMillis?CHECKIN.at.toMillis():Date.now()).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</b></div>`:''}
      ${ME.room&&(ME.roommates||[]).length?`<div style="grid-column:1/-1"><span>Sharing your room with</span><div class="mates">${ME.roommates.map(n=>`<span class="mate">${esc(n)}</span>`).join('')}</div></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
   $('#switchGuest').textContent=ME?'Log out':'Find my invite';
+  window.CLOUD?.watchCheckin?.();
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
   renderAlerts();renderLive();renderNow();renderPickup();
 }
@@ -657,9 +660,10 @@ const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec'})[d]
 const fmtT=t=>{const[h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`};
 $('#qrBtn').onclick=()=>{
   if(!ME)return;const o=$('#qrOut');if(!o.hidden){o.hidden=true;$('#qrBtn').textContent='Show check-in QR';return}
-  const data=`JB2026|${ME.n}|ROOM ${ME.room||'-'}|PEOPLE ${ME.party||1}`;let img='';
+  // Opens the family panel's check-in page for this guest (any phone camera can scan it).
+  const data=`${location.origin}/admin.html#checkin/${encodeURIComponent(ME.id||ME.phone||'')}`;let img='';
   try{const q=qrcode(0,'M');q.addData(data);q.make();img=q.createSvgTag({cellSize:5,margin:2,scalable:true})}catch(e){img='<p class="muted small" style="line-height:1.4;width:200px">QR loads when online</p>'}
-  o.innerHTML=`<div class="qrwrap"><div class="qrbox">${img}</div><b>${esc(ME.n)}</b><p class="muted small">Show this at the hotel desk to check in${ME.room?` to room ${ME.room}`:''}. Volunteers scan it to find your details.</p></div>`;
+  o.innerHTML=`<div class="qrwrap"><div class="qrbox">${img}</div><b>${esc(ME.n)}</b><p class="muted small">Show this at the check-in desk${ME.room?` to collect the keys for room ${ME.room}`:''}.</p></div>`;
   o.hidden=false;$('#qrBtn').textContent='Hide QR';
 };
 function renderFeed(){

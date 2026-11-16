@@ -126,6 +126,13 @@ async function start() {
         source: 'guest', revealAt: revealTime(), createdAt: serverTimestamp() });
     },
   };
+  // Desk check-in status for the pass (re-subscribes when the guest changes).
+  let ciId = null, ciOff = null;
+  CLOUD.watchCheckin = () => {
+    const id = me()?.id || null; if (id === ciId) return;
+    ciOff?.(); ciOff = null; ciId = id; CHECKIN = null;
+    if (id) ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
+  };
   W.CLOUD = CLOUD;
 
   // ---- live data → app state ----

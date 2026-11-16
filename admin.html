@@ -99,6 +99,25 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <nav class="tabs" id="tabs"></nav>
 
     <!-- LIVE -->
+    <!-- CHECK-IN -->
+    <section data-sec="checkin" class="stack" hidden>
+      <div class="card stack">
+        <div class="row between"><h3>Check-in desk</h3><button class="btn" id="ciScan">Scan guest QR</button></div>
+        <div id="ciCam" hidden style="position:relative;border-radius:16px;overflow:hidden;background:#000;max-width:420px">
+          <video id="ciVideo" playsinline muted style="width:100%;display:block"></video>
+          <div style="position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:18px"></div>
+          <button class="btn sm" id="ciStop" style="position:absolute;right:10px;bottom:10px">Close camera</button>
+        </div>
+        <p class="muted small" id="ciCamMsg"></p>
+        <input id="ciQ" placeholder="Or search a name or room number" autocomplete="off">
+        <div class="stack" id="ciHits"></div>
+      </div>
+      <div class="card stack" id="ciCard" hidden></div>
+      <div class="stats" id="ciStats"></div>
+      <div class="card"><div class="row between"><h3>Pending</h3><label class="row small"><input type="checkbox" id="ciRoomOnly" checked style="width:18px;height:18px"> Only guests with a room</label></div><div class="stack" id="ciPending"></div></div>
+      <div class="card"><h3>Checked in</h3><div class="stack" id="ciDone"></div></div>
+    </section>
+
     <section data-sec="live" class="stack">
       <div class="card">
         <h3>Happening now banner</h3>
@@ -379,8 +398,9 @@ async function start() {
     ['team', 'Team', 'Duties, vendors and drivers (add / edit), contacts'],
     ['events', 'Events & map', 'Add and edit the wedding events and the venue map'],
     ['rooms', 'Rooms', 'Add rooms and allot them to guests by day'],
+    ['checkin', 'Check-in desk', 'Scan guest QR codes, hand over keys and mark guests checked in'],
   ];
-  const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team', 'rooms'], event: ['live'] };
+  const PRESETS = { family: ['help', 'lost', 'pickups', 'guests', 'photos', 'team', 'rooms'], event: ['live', 'checkin'] };
   const permsOf = d => d.role === 'owner' ? Object.fromEntries(PERMS.map(([k]) => [k, true]))
     : (d.perms || Object.fromEntries((PRESETS[d.role] || []).map(k => [k, true])));
   A.onAuthStateChanged(auth, async u => {
@@ -412,11 +432,12 @@ async function start() {
     // Subscribe only to data this person is allowed to read.
     const sub = (perm, ref, fn) => { if (can[perm]) onSnapshot(ref, fn, e => console.warn(perm, e.code)); };
     // ---------- tabs ----------
-    const TABS = [['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['rooms', 'Rooms'], ['photos', 'Photos'], ['events', 'Events'], ['team', 'Team']]
+    const TABS = [['checkin', 'Check-in'], ['live', 'Live'], ['help', 'Help'], ['lost', 'Lost & found'], ['pickups', 'Pickups'], ['guests', 'Guests'], ['rooms', 'Rooms'], ['photos', 'Photos'], ['events', 'Events'], ['team', 'Team']]
       .filter(([k]) => can[k]);
     if (!TABS.length) { $('#tabs').innerHTML = ''; $$('[data-sec]').forEach(x => x.hidden = true);
       $('#panel').insertAdjacentHTML('beforeend', '<p class="muted">You don\'t have any permissions yet. Ask Jeet to tick what you need.</p>'); return; }
-    let cur = location.hash.slice(1);
+    let cur = location.hash.slice(1).split('/')[0];
+    if (cur === 'checkin' && !can.checkin) toast('This account can\'t check guests in. Ask Jeet to tick "Check-in desk" for you.');
     if (!TABS.some(([k]) => k === cur)) cur = TABS[0][0];
     $('#importCard').hidden = !can.owner; $('#peopleCard').hidden = !can.owner; $('#guestAdd').hidden = !can.owner;
     const badges = {};
@@ -449,6 +470,82 @@ async function start() {
       $$('#postList [data-del]').forEach(b => b.onclick = () => confirm('Delete this update for everyone?') && deleteDoc(doc(db, 'posts', b.dataset.del)).catch(fail));
     });
 
+    }
+
+    // ---------- check-in desk ----------
+    if (can.checkin) {
+      let CG = [], CI = {}, ciOpen = null, stream = null, scanning = false;
+      const clock = t => t ? new Date(ms(t)).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+      const roomTxt = g => g.room ? `Room ${g.room}${g.roomWhere ? ' · ' + g.roomWhere : ''}` : 'No room yet';
+      const sideTxt = g => /bride/i.test(g.side || '') ? "Bride's side" : /groom/i.test(g.side || '') ? "Groom's side" : '';
+      onSnapshot(collection(db, 'guests'), s => { CG = list(s); drawCi(); }, e => console.warn('checkin guests', e.code));
+      onSnapshot(collection(db, 'checkins'), s => { CI = Object.fromEntries(s.docs.map(d => [d.id, { id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }])); drawCi(); }, e => console.warn('checkins', e.code));
+      function drawCi() {
+        const done = CG.filter(g => CI[g.id]?.in).sort((a, b) => ms(CI[b.id].at) - ms(CI[a.id].at));
+        const pend = CG.filter(g => !CI[g.id]?.in && (!$('#ciRoomOnly').checked || g.room)).sort((a, b) => String(a.room || '~').localeCompare(String(b.room || '~'), undefined, { numeric: true }) || a.name.localeCompare(b.name));
+        const ppl = L => L.reduce((n, g) => n + (+g.people || 1), 0), allPend = CG.filter(g => !CI[g.id]?.in);
+        $('#ciStats').innerHTML = `<div><b>${done.length}</b><span>Families checked in · ${ppl(done)} people</span></div><div><b>${allPend.length}</b><span>Families pending · ${ppl(allPend)} people</span></div><div><b>${done.reduce((n, g) => n + (+CI[g.id].keys || 0), 0)}</b><span>Keys handed out</span></div>`;
+        const row = (g, btn) => `<div class="item"><div class="row between" style="flex-wrap:nowrap"><div><b>${esc(g.name)}</b><p class="small">${esc(roomTxt(g))} · ${+g.people || 1} ${(+g.people || 1) === 1 ? 'person' : 'people'}${sideTxt(g) ? ' · ' + sideTxt(g) : ''}</p>${btn ? '' : `<p class="small muted">✓ ${clock(CI[g.id].at)} · ${CI[g.id].keys || 0} key${CI[g.id].keys === 1 ? '' : 's'} · ${esc(CI[g.id].byName || CI[g.id].by || '')}</p>`}</div>
+          <button class="btn ${btn ? '' : 'ghost'} sm" data-ciopen="${esc(g.id)}">${btn ? 'Check in' : 'Open'}</button></div></div>`;
+        $('#ciPending').innerHTML = pend.length ? pend.map(g => row(g, true)).join('') : '<p class="muted">Everyone is checked in 🎉</p>';
+        $('#ciDone').innerHTML = done.length ? done.map(g => row(g, false)).join('') : '<p class="muted">No one checked in yet.</p>';
+        $$('[data-ciopen]').forEach(b => b.onclick = () => openCi(b.dataset.ciopen));
+        if (ciOpen) openCi(ciOpen, true);
+      }
+      $('#ciRoomOnly').onchange = drawCi;
+      function openCi(id, quiet) {
+        const g = CG.find(x => x.id === id), box = $('#ciCard');
+        if (!CG.length) { ciOpen = id; box.hidden = false; box.innerHTML = '<p class="muted">Loading the guest…</p>'; return; }   // opens once the list arrives
+        if (!g) { ciOpen = null; box.hidden = false; box.innerHTML = `<p class="err">This QR isn't on the guest list (${esc(id)}). Search the name instead.</p>`; return; }
+        ciOpen = id; const c = CI[id], mates = (g.roommates || []).filter(Boolean);
+        box.hidden = false;
+        box.innerHTML = `<div class="row between"><h3 style="margin:0">${esc(g.name)}</h3><span class="chip ${c?.in ? 'sage' : 'plum'}">${c?.in ? 'Checked in' : 'Not checked in'}</span></div>
+          <div class="stats" style="margin:0"><div><b style="font-size:20px">${esc(g.room || '—')}</b><span>${esc(g.roomWhere || 'Room')}</span></div><div><b>${+g.people || 1}</b><span>People</span></div><div><b style="font-size:16px">${esc(sideTxt(g) || '—')}</b><span>Side</span></div></div>
+          ${g.stayIn ? `<p class="small">Stay: ${esc(g.stayIn)} → ${esc(g.stayOut || '')}</p>` : ''}
+          ${mates.length ? `<p class="small">Sharing the room with: <b>${mates.map(esc).join(', ')}</b></p>` : ''}
+          ${c?.in ? `<p>✓ Checked in <b>${clock(c.at)}</b> by ${esc(c.byName || c.by || '')} · ${c.keys || 0} key${c.keys === 1 ? '' : 's'} given</p>
+              <div class="row"><button class="btn ghost sm" id="ciUndo">Undo check-in</button><button class="btn ghost sm" id="ciClose">Close</button></div>`
+            : `<div class="row" style="align-items:flex-end"><label class="fld" style="width:120px"><span>Keys given</span><input id="ciKeys" type="number" min="0" max="10" value="${g.room ? 1 : 0}"></label>
+              <button class="btn" id="ciGo">Give keys &amp; check in</button><button class="btn ghost" id="ciClose">Close</button></div>
+              ${g.room ? '' : '<p class="small err">No room allotted yet. You can still check them in.</p>'}`}`;
+        $('#ciClose').onclick = () => { ciOpen = null; box.hidden = true; };
+        if ($('#ciGo')) $('#ciGo').onclick = async () => {
+          $('#ciGo').disabled = true;
+          try { await setDoc(doc(db, 'checkins', id), { in: true, at: serverTimestamp(), by: u.email, byName: u.displayName || u.email, keys: Math.max(0, +$('#ciKeys').value || 0), room: g.room || '', name: g.name, people: +g.people || 1 });
+            toast(`${g.name} checked in`); } catch (e) { fail(e); $('#ciGo').disabled = false; }
+        };
+        if ($('#ciUndo')) $('#ciUndo').onclick = () => confirm(`Undo ${g.name}'s check-in?`) && deleteDoc(doc(db, 'checkins', id)).then(() => toast('Check-in undone')).catch(fail);
+        if (!quiet) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      // Search by name or room (guests without a phone, or a QR that won't scan).
+      $('#ciQ').oninput = () => { const q = $('#ciQ').value.trim().toLowerCase();
+        const hits = q ? CG.filter(g => g.name.toLowerCase().includes(q) || String(g.room || '').toLowerCase() === q).slice(0, 8) : [];
+        $('#ciHits').innerHTML = hits.map(g => `<button class="btn ghost sm" style="justify-content:flex-start" data-cihit="${esc(g.id)}">${esc(g.name)} · ${esc(roomTxt(g))}${CI[g.id]?.in ? ' · ✓' : ''}</button>`).join('');
+        $$('[data-cihit]').forEach(b => b.onclick = () => { $('#ciQ').value = ''; $('#ciHits').innerHTML = ''; openCi(b.dataset.cihit); }); };
+      // A QR holds https://…/admin.html#checkin/<guestId>
+      const idFromQr = t => { const m = String(t).match(/#checkin\/([^\s?#]+)/); return m ? decodeURIComponent(m[1]) : null; };
+      const fromHash = () => { const id = idFromQr(location.href); if (id) openCi(id); };
+      window.addEventListener('hashchange', fromHash); fromHash();
+      // In-panel camera scanner (stays signed in, no app switching).
+      const stopCam = () => { scanning = false; stream?.getTracks().forEach(t => t.stop()); stream = null; $('#ciCam').hidden = true; $('#ciScan').hidden = false; };
+      $('#ciStop').onclick = stopCam;
+      $('#ciScan').onclick = async () => {
+        $('#ciCamMsg').textContent = '';
+        try {
+          if (!window.jsQR) await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        } catch (e) { $('#ciCamMsg').textContent = 'Camera not available. Allow camera access, or search the name below.'; return; }
+        const v = $('#ciVideo'); v.srcObject = stream; await v.play(); $('#ciCam').hidden = false; $('#ciScan').hidden = true; scanning = true;
+        const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+        const tick = () => { if (!scanning) return;
+          if (v.readyState >= 2) { cv.width = v.videoWidth; cv.height = v.videoHeight; cx.drawImage(v, 0, 0);
+            const r = window.jsQR(cx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'dontInvert' });
+            if (r?.data) { const id = idFromQr(r.data);
+              if (id) { stopCam(); navigator.vibrate?.(80); openCi(id); return; }
+              $('#ciCamMsg').textContent = 'That QR is not a guest pass. Ask the guest to open their pass in the app (Home → Show check-in QR).'; } }
+          requestAnimationFrame(tick); };
+        tick();
+      };
     }
 
     // ---------- events ----------
