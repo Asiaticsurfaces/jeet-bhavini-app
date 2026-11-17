@@ -15,14 +15,3 @@ window.DEFAULT_EVENTS=[
   rites:[['Jaan Prastan','The groom\'s procession arrives with dhol and dancing. The bride\'s mother welcomes him at the entrance.'],['Varmala','The couple exchange flower garlands.'],['Hastamelap','The bride\'s hand is placed in the groom\'s. This is the moment they are joined, at 5:41 PM.'],['Mangal Fera','The couple walk around the sacred fire, taking their wedding vows.'],['Kansar','The couple feed each other a sweet, their first meal together.']]},
 ];
 
-// "What to wear" card for each event (the family panel can change any of it per event).
-// t = dress code, s = style, her / him = ideas, c = colour palette, bg / ink = card colours, outfit = couple illustration.
-window.DRESS_DEFAULTS={
- sufi:{t:'Ivory Nights',s:'Elegant ethnic',her:'Ivory or white anarkali, sharara or saree',him:'White kurta with a Nehru jacket',c:['#fffaf0','#efe6d2','#d8c3a5','#e8c4c4'],bg:'#f4efe4',ink:'#6b5530'},
- mameru:{t:'Pastel Perfection',s:'Traditional',her:'Pastel saree or lehenga',him:'Pastel kurta or Nehru jacket',c:['#f4c6d0','#bfe3d0','#c8d8f0','#e0cdee'],bg:'#f8e6ea',ink:'#7a2f4a'},
- sangeet:{t:'Glitz & Glam',s:'Indo-western',her:'Sequinned lehenga, gown or drape saree',him:'Bandhgala, Indo-western or tuxedo kurta',c:['#2d1b4e','#7a2848','#c0c0c8','#c9a54a'],bg:'#e9e3f2',ink:'#4b2a6b'},
- mandap:{t:'Sunshine & Marigold',s:'Traditional',her:'Yellow or green saree, or a kurta set',him:'Yellow kurta with white pajama',c:['#f2c230','#f08a24','#6a9a3a','#fff4d6'],bg:'#fbf0cf',ink:'#7a5410'},
- wedding:{t:'Royal Indian Splendour',s:'Traditional, reds & golds',her:'Lehenga or Gujarati saree in red, maroon or gold',him:'Sherwani or bandhgala, safa for the Jaan',c:['#9b1b2a','#5e1f3a','#c9a54a','#f4e3c1'],bg:'#f6e3e6',ink:'#7a1f2b'},
-};
-window.dressOf=e=>e.dc&&e.dc.t?e.dc:window.DRESS_DEFAULTS[e.of||e.id]||(/sufi/i.test(e.name||'')?window.DRESS_DEFAULTS.sufi:null)
-  ||(e.dress?{t:e.dress,s:'',her:'',him:'',c:[],bg:'#f3ead6',ink:'#5e1f3a'}:null);

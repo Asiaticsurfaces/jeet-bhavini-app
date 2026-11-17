@@ -263,29 +263,13 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
 .stat b{display:block;font:600 26px var(--display);color:var(--plum-deep)} .stat span{font-size:11px;color:var(--muted)}
 .demo-note{font-size:12px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-/* What to wear + Before you pack */
-.dc{border-radius:22px;padding:18px 14px 16px;text-align:center;border:1px solid rgba(0,0,0,.05)}
-.dc p{color:inherit}
-.dc .scr{font:400 40px/1 "Alex Brush",cursive;margin:0 0 4px}
-.dc .when{font:600 13px var(--display);letter-spacing:.06em;text-transform:uppercase;margin:0}
-.dc .ewx{font:italic 500 16px var(--display);margin:2px 0 10px;opacity:.8}
-.dc .outfit{width:100%;max-height:300px;object-fit:contain;display:block;margin:0 auto}
-.dc .code{margin-top:10px}.dc .code b{display:block;font:600 11px var(--body);letter-spacing:.18em;text-transform:uppercase}
-.dc .code .t{font:700 19px/1.15 var(--display);letter-spacing:.05em;text-transform:uppercase;margin:2px 0}
-.dc .code i{font:italic 500 16px var(--display);opacity:.8}
-.dc .who{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;text-align:left}
-.dc .who div{background:rgba(255,255,255,.62);border-radius:14px;padding:8px 10px;font-size:13px;line-height:1.35;color:var(--ink)}
-.dc .who span{display:block;font:600 10px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold-deep);margin-bottom:2px}
-.dc .sw{display:flex;justify-content:center;gap:7px;margin-top:10px;align-items:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
-.dc .sw i{width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.1);display:inline-block}
+/* Before you pack */
 .bp{text-align:center}.bp .scr{font:400 44px/1 "Alex Brush",cursive;color:var(--plum-deep);margin:4px 0}
 .bp .temps{display:flex;justify-content:center;gap:24px;margin:10px 0 2px}.bp .temps>div{display:flex;align-items:center;gap:8px;font:600 21px var(--display);text-align:left}
 .bp .temps small{display:block;font:500 11px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .bp .note{font:500 17px/1.4 var(--display);margin:8px 2px}
 .bp .icons{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 6px}.bp .icons div{display:flex;flex-direction:column;align-items:center;gap:5px;font:600 15px/1.15 var(--display)}
 .bp .icons svg{width:60px;height:60px}.bp .icons small{font:500 12px var(--body);color:var(--muted)}
-.bp .codes{display:grid;gap:8px;text-align:left}.bp .codes div{border-radius:14px;padding:9px 12px;display:flex;justify-content:space-between;gap:8px;align-items:center}
-.bp .codes b{font:700 15px var(--display);letter-spacing:.04em;text-transform:uppercase;text-align:right}.bp .codes span{font-size:12px}
 .bp .sign b{display:block;font:400 32px "Alex Brush",cursive;color:var(--gold-deep)}.bp .sign span{font:600 18px var(--display)}
 </style>
 
@@ -393,7 +377,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div><p class="eyebrow">Everything you need</p><h1 data-t="info">Guest Info</h1></div>
       <div class="tiles">
         <button class="tile urgent" data-go="help" style="grid-column:1/-1"><b data-t="needHelp">Need help?</b><small>Cab, room, medical</small></button>
-        <button class="tile" data-go="pack" style="grid-column:1/-1;background:var(--gold-soft)"><b>Before you pack</b><small>Dress codes, weather and what to carry</small></button>
+        <button class="tile" data-go="pack" style="grid-column:1/-1;background:var(--gold-soft)"><b>Before you pack</b><small>Weather and what to carry</small></button>
         <button class="tile" data-go="lost"><b data-t="lost">Lost &amp; found</b><small>Report or claim items</small></button>
         <button class="tile" data-go="wishes"><b data-t="wishes">Blessings</b><small>Leave a message</small></button>
         <button class="tile" data-go="travel"><b data-t="arrival">My arrival</b><small>Travel &amp; pickup</small></button>
@@ -763,8 +747,7 @@ function renderSchedule(){
    <div class="body">
      <div><h2>${esc(evName(e))}</h2>${e.tag?`<p class="tag">${esc(e.tag)}</p>`:''}${!mySide()&&(e.side==='Groom'||e.side==='Bride')?`<span class="chip ${e.side==='Groom'?'plum':'sage'}" style="margin-top:6px">${e.side==='Groom'?'Groom\'s side':'Bride\'s side'}</span>`:''}</div>
      ${e.moments?`<div class="moments">${e.moments.map(([t,n])=>`<div><b>${esc(t)}</b><span>${esc(n)}</span></div>`).join('')}</div>`:''}
-     <dl class="meta"><dt>When</dt><dd>${dayText(e.day)} · ${esc(e.time)}</dd><dt>Where</dt><dd>${esc(e.venue)}${/karjat/i.test(e.venue)?'':', Karjat'}</dd></dl>
-     ${dressCard(e)}
+     <dl class="meta"><dt>When</dt><dd>${dayText(e.day)} · ${esc(e.time)}</dd><dt>Where</dt><dd>${esc(e.venue)}${/karjat/i.test(e.venue)?'':', Karjat'}</dd>${e.dress?`<dt>Wear</dt><dd>${esc(e.dress)} <span class="suggest">(suggested)</span></dd>`:''}</dl>
      ${e.note?`<p class="muted small">${esc(e.note)}</p>`:''}
      ${e.pack.length?`<details><summary>What to bring</summary><div>${e.pack.map((x,i)=>{const k=e.id+i;return `<label class="pack ${packed[k]?'done':''}"><input type="checkbox" data-pk="${k}" ${packed[k]?'checked':''}><span>${esc(x)}</span></label>`}).join('')}</div></details>`:''}
      ${e.rites.length?`<details><summary>What happens here</summary><div>${e.rites.map(([n,d])=>`<div class="rite"><b>${esc(n)}</b>${d?`<p>${esc(d)}</p>`:''}</div>`).join('')}</div></details>`:''}
@@ -779,31 +762,6 @@ function renderSchedule(){
     alerts.ev[id]=alerts.ev[id]===false;
     store.set('alerts',alerts);renderSchedule();renderAlerts();toast(alerts.ev[id]!==false?'We\'ll remind you 30 min before':'Reminder off')});
   $('#rsvpCount').textContent=`${mine.filter(e=>rsvp[e.id]==='Going').length}/${mine.length} going`;
-  fillEventWx();
-}
-/* ---------- what to wear (per event) ---------- */
-function dressCard(e){
-  const d=window.dressOf?dressOf(e):null;if(!d)return'';
-  const ink=d.ink||'#5e1f3a',pic=(e.dc&&e.dc.outfit)||d.outfit||e.img;
-  return`<details class="wear" open><summary>What to wear</summary><div class="dc" style="background:${esc(d.bg||'#f3ead6')};color:${esc(ink)}">
-    <p class="scr">${esc(evName(e))}</p><p class="when">${dayText(e.day)} · ${esc(e.time)}</p>
-    <p class="ewx" data-ewx="${esc(e.id)}">Expected weather · loading…</p>
-    <img class="outfit" src="${esc(pic)}" alt="Outfit idea for ${esc(e.name)}" loading="lazy">
-    <div class="code"><b>Dress code</b><div class="t">${esc(d.t)}</div>${d.s?`<i>(${esc(d.s)})</i>`:''}</div>
-    ${d.her||d.him?`<div class="who">${d.her?`<div><span>Her</span>${esc(d.her)}</div>`:''}${d.him?`<div><span>Him</span>${esc(d.him)}</div>`:''}</div>`:''}
-    ${(d.c||[]).length?`<div class="sw">Colours ${d.c.map(c=>`<i style="background:${esc(c)}"></i>`).join('')}</div>`:''}
-  </div></details>`;
-}
-const wxAt=(d,t)=>{const h=new Date(t+5.5*36e5).toISOString().slice(0,13)+':00';const i=d?.hourly?d.hourly.time.indexOf(h):-1;return i>=0?d.hourly.temperature_2m[i]:null};
-function eventWxText(d,e){
-  const a=new Date(e.start).getTime(),L=[];for(let t=a;t<=a+(e.hrs||2)*36e5;t+=36e5){const v=wxAt(d,t);if(v!==null)L.push(v)}
-  if(!L.length)return'Usually about 30°C by day, 15°C at night';
-  const h=+new Date(a+5.5*36e5).toISOString().slice(11,13),lo=Math.round(Math.min(...L)),hi=Math.round(Math.max(...L));
-  return h>=17?`${lo}°C, ${lo<=20?'cool':'pleasant'} night`:h<11?`${hi}°C, ${hi>=30?'warm':'pleasant'} morning`:`${hi}°C, ${hi>=31?'sunny':'warm'} afternoon`;
-}
-async function fillEventWx(){
-  let d=null;try{d=await wxData()}catch(e){}
-  $$('[data-ewx]').forEach(el=>{const e=EVENTS.find(x=>x.id===el.dataset.ewx);if(e)el.textContent='Expected weather · '+eventWxText(d,e)});
 }
 /* ---------- before you pack ---------- */
 const PACK_ICONS=[
@@ -821,14 +779,12 @@ async function renderPack(){
   const hi=idx.length?Math.round(Math.max(...idx.map(i=>d.daily.temperature_2m_max[i]))):30,lo=idx.length?Math.round(Math.min(...idx.map(i=>d.daily.temperature_2m_min[i]))):15;
   const outside=[...new Set(mine.filter(e=>/lawn|lake/i.test(e.venue)).map(e=>`the ${esc(evName(e))} is ${/lake/i.test(e.venue)?'by the <b>Lake Side</b>':'on the <b>Lawn</b>'}`))];
   const range=days.length?`${dayText(days[0]).split(', ')[1]}${days.length>1?' – '+dayText(days[days.length-1]).split(', ')[1]:''}`:'';
-  const codes=[...new Map(mine.map(e=>[e.of||e.id,e])).values()].map(e=>[e,dressOf(e)]).filter(([,c])=>c);
   $('#packPage').innerHTML=`<p class="eyebrow">Karjat${range?' · '+range:''}</p><p class="scr">Before you pack</p>
     <div class="temps"><div><svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="6.5" fill="#f2b33d"/><g stroke="#f2b33d" stroke-width="2.4" stroke-linecap="round"><path d="M15 2.5v4M15 23.5v4M2.5 15h4M23.5 15h4M6 6l2.8 2.8M21.2 21.2L24 24M6 24l2.8-2.8M21.2 8.8L24 6"/></g></svg><span><small>Day</small>${hi}°C</span></div>
       <div><svg width="30" height="30" viewBox="0 0 30 30"><path d="M19 4a11 11 0 1 0 7 19A12 12 0 0 1 19 4z" fill="#3b4a7a"/><circle cx="23" cy="7" r="1.3" fill="#c9a54a"/><circle cx="26" cy="12" r="1" fill="#c9a54a"/></svg><span><small>Night</small>${lo}°C</span></div></div>
     <p class="muted small">${idx.length?'Forecast for your days':'Usual early-December weather'}</p>
     <p class="note">${hi>=30?'Sunny afternoons':'Pleasant days'} and ${lo<=18?'cool':'mild'} evenings.</p>
     ${outside.length?`<p class="note">${outside.join(' and ').replace(/^t/,'T')}: choose block heels or flats.</p>`:''}
-    ${codes.length?`<div class="ornament"><span>Dress codes</span></div><div class="codes">${codes.map(([e,c])=>`<div style="background:${esc(c.bg||'#f3ead6')};color:${esc(c.ink||'#5e1f3a')}"><span>${esc(evName(e))}</span><b>${esc(c.t)}</b></div>`).join('')}</div>`:''}
     <div class="ornament"><span>Don't forget to carry</span></div>
     <div class="icons">${PACK_ICONS.map(([n,s,svg])=>`<div><svg viewBox="0 0 64 64" aria-hidden="true">${svg}</svg>${n}<small>${s}</small></div>`).join('')}</div>
     <div class="sign"><b>With love</b><span>Jabuani &amp; Nakrani families</span></div>`;
