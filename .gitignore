@@ -6,3 +6,4 @@ assets/brass_elephant.png
 *.csv
 serviceAccount*.json
 _*.html
+node_modules/

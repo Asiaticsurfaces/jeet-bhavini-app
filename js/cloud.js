@@ -1,6 +1,6 @@
 // Connects the guest app (index.html) to Firebase. Does nothing while
 // FIREBASE_CONFIG is null, so the site keeps working as a preview.
-import { FIREBASE_CONFIG, STREAM_URL as LIVE_URL } from './config.js';
+import { FIREBASE_CONFIG } from './config.js';
 
 const V = '10.14.1';
 const G = `https://www.gstatic.com/firebasejs/${V}`;
@@ -18,7 +18,7 @@ async function start() {
   const auth = A.getAuth(app);
   const db = F.getFirestore(app);
   const st = S.getStorage(app);
-  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, collection, query, where, limit, onSnapshot,
+  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, limit, onSnapshot,
           serverTimestamp, increment, arrayUnion, writeBatch, Timestamp } = F;
 
   const user = await new Promise((res, rej) => {
@@ -135,6 +135,42 @@ async function start() {
   };
   // Face index of photographer photos, for "Find my photos" (read on demand, not live).
   CLOUD.faceIndex = async () => (await getDocs(collection(db, 'faces'))).docs.map(d => ({ id: d.id, f: d.data().f || [] }));
+  // ---- phone notifications (Firebase Cloud Messaging) ----
+  // pushTokens/{uid} = this phone's token + who the guest is, so the server sends only their side's updates.
+  let M = null, messaging = null, lastPush = '';
+  const pushInfo = off => { const g = me() || {};
+    return { guestId: g.id || '', name: g.n || '', side: g.sideKey || '', skip: g.skip || [], off: off || [], lang: g.lang || 'EN' }; };
+  async function pushToken(ask) {
+    M ||= await import(`${G}/firebase-messaging.js`);
+    if (!('Notification' in W) || !('serviceWorker' in navigator) || !(await M.isSupported())) throw new Error('unsupported');
+    if (Notification.permission !== 'granted') {
+      if (!ask) throw new Error(Notification.permission);
+      const p = await Notification.requestPermission(); if (p !== 'granted') throw new Error(p);
+    }
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    if (!messaging) { messaging = M.getMessaging(app);
+      // App open: show it as the in-app banner (the feed updates by itself).
+      M.onMessage(messaging, m => W.notify?.(m.notification?.title || 'Update', m.notification?.body || '')); }
+    return M.getToken(messaging, { serviceWorkerRegistration: reg });
+  }
+  // Ask permission (from a tap) and register this phone.
+  CLOUD.pushEnable = async off => {
+    const token = await pushToken(true), info = pushInfo(off);
+    await setDoc(doc(db, 'pushTokens', uid), { token, ...info, at: serverTimestamp() });
+    lastPush = JSON.stringify([token, info]);
+  };
+  // Keep the registration current (new token, other guest on this phone, reminders changed). Never asks.
+  CLOUD.pushSync = async off => {
+    try { const token = await pushToken(false), info = pushInfo(off), key = JSON.stringify([token, info]);
+      if (key === lastPush) return; lastPush = key;
+      await setDoc(doc(db, 'pushTokens', uid), { token, ...info, at: serverTimestamp() });
+    } catch (e) { /* not allowed / not supported: nothing to keep in sync */ }
+  };
+  CLOUD.pushOff = async () => {
+    lastPush = '';
+    await deleteDoc(doc(db, 'pushTokens', uid)).catch(() => {});
+    try { if (messaging) await M.deleteToken(messaging); } catch (e) {}
+  };
   W.CLOUD = CLOUD;
 
   // ---- live data → app state ----
@@ -192,7 +228,6 @@ async function start() {
   });
   setInterval(() => refresh('photos'), 60000); // photos "develop" at 9 AM without a reload
 
-  if (LIVE_URL) { STREAM_URL = LIVE_URL; }
   // Re-check the saved guest against the live list (room changes etc.).
   if (me()?.phone) CLOUD.findGuest(me().phone).then(g => { if (g) { ME = g; store.set('guest', g); refresh('guest'); } }).catch(() => {});
   refresh('all');

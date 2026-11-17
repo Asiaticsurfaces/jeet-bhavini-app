@@ -305,14 +305,12 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
 
     <div class="card stack" id="pickup"></div>
 
-    <div class="live" id="live"></div>
-
     <div class="card stack">
       <div class="row between">
-        <div><h3 data-t="alerts">Event alerts</h3><p class="muted small" id="alertSub"></p></div>
-        <button class="switch" id="alertSw" role="switch" aria-checked="false" aria-label="Event alerts"></button>
+        <div><h3 data-t="alerts">Notifications</h3><p class="muted small" id="alertSub"></p></div>
+        <button class="switch" id="alertSw" role="switch" aria-checked="false" aria-label="Notifications"></button>
       </div>
-      <button class="btn ghost sm" id="testAlert" style="align-self:flex-start">Preview an alert</button>
+      <div id="alertHelp" class="small" hidden></div>
     </div>
 
     <div class="ornament"><span>✦</span></div>
@@ -476,7 +474,6 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div>
         <details><summary>What should I wear?</summary><p>Each event in the Schedule tab has a dress code.</p></details>
         <details><summary>What time is the Hastamelap?</summary><p>5:41 PM on Wednesday, 2 December, at Oleander Lake Side. Jaan Prastan is at 3:30 PM.</p></details>
-        <details><summary>Can family abroad watch?</summary><p>Yes. The Hastamelap streams live from the Home screen. Copy the link and send it to them.</p></details>
         <details><summary>Gifts?</summary><p>Your blessings are what matter most to us.</p></details>
       </div>
     </div>
@@ -578,7 +575,6 @@ let POSTS=[
  {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
  {t:'Welcome to Oleander, Karjat!',b:'Check in at the hospitality desk in the lobby. Your welcome kit is in your room.',ago:'Just now',c:'var(--plum)'},
  {t:'Song requests are open',b:'Tell the Sangeet DJ what to play. Guest Info → Song requests.',ago:'2 h ago',c:'var(--gold)'},
- {t:'Save the link for family abroad',b:'The Hastamelap streams live at 5:41 PM on 2 December.',ago:'Yesterday',c:'var(--sage)'},
 ];
 const GUESTS=[
  {n:'Riya Shah',phone:'9820012345',side:"Groom's side",sideKey:'Groom',room:'214',roomWhere:'Wing A · Ground floor',stayIn:'2026-12-01',stayOut:'2026-12-03',roommates:['Amit Shah','Pooja Shah','Meera Patel'],party:3,events:EVENTS.map(e=>e.id)},
@@ -610,7 +606,6 @@ let NOWS=[
 let nowI=0;
 let DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
 let travel=store.get('travel',null);
-let STREAM_URL='https://www.youtube.com/';  // replace with the real live-stream link
 const evName=e=>lang==='gu'?e.gu:e.name;
 
 /* ---------- navigation ---------- */
@@ -648,7 +643,7 @@ function renderHome(){
   $('#switchGuest').textContent=ME?'Log out':'Find my invite';
   window.CLOUD?.watchCheckin?.();
   $('#qrBtn').hidden=!ME;if(!ME)$('#qrOut').hidden=true;
-  renderAlerts();renderLive();renderNow();renderPickup();
+  renderAlerts();renderNow();renderPickup();
 }
 function renderNow(){
   if(NOWS_ALL)NOWS=NOWS_ALL.filter(forMe);
@@ -688,30 +683,34 @@ function renderFeed(){
 renderFeed();
 
 let alerts=store.get('alerts',{on:false,ev:{}});
+// Reminders the guest switched off (by base event id, so both sides' copies count once).
+const remindOff=()=>Object.keys(alerts.ev).filter(id=>alerts.ev[id]===false).map(id=>{const e=EVENTS.find(x=>x.id===id);return e?(e.of||e.id):id});
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent),installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const pushState=()=>!('Notification' in window)?'none':Notification.permission;
 function renderAlerts(){
-  $('#alertSw').setAttribute('aria-checked',alerts.on);
+  const st=pushState(),on=alerts.on&&st==='granted';
+  $('#alertSw').setAttribute('aria-checked',on);
   const n=myEvents().filter(e=>alerts.ev[e.id]!==false).length;
-  $('#alertSub').textContent=alerts.on?`On for ${n} event${n===1?'':'s'}: 30 min before, plus live updates`:'Turn on so you never miss a ceremony';
-  $('#testAlert').hidden=!alerts.on;
+  $('#alertSub').textContent=on?`On: live updates, plus a reminder 30 min before ${n} event${n===1?'':'s'}. Even when the app is closed.`:'Get live updates and event reminders on your phone, even when the app is closed.';
+  const help=$('#alertHelp');help.hidden=true;
+  if(!on&&isIOS&&!installed){help.hidden=false;help.innerHTML='<b>On iPhone:</b> tap the Share button <b>⬆︎</b> in Safari → <b>Add to Home Screen</b>. Open the app from your home screen, then turn this on.'}
+  else if(!on&&st==='denied'){help.hidden=false;help.innerHTML='Notifications are blocked for this app. Allow them in your phone\'s settings (Settings → Notifications, or the site settings in Chrome), then turn this on.'}
+  if(on&&CLOUD_ON())CLOUD.pushSync(remindOff());
 }
-$('#alertSw').onclick=()=>{alerts.on=!alerts.on;store.set('alerts',alerts);renderAlerts();renderSchedule();toast(alerts.on?'Alerts on':'Alerts off')};
+$('#alertSw').onclick=async()=>{
+  if(!CLOUD_ON())return toast('Notifications work in the live app');
+  if(alerts.on&&pushState()==='granted'){alerts.on=false;store.set('alerts',alerts);CLOUD.pushOff();renderAlerts();renderSchedule();return toast('Notifications off')}
+  if(isIOS&&!installed){renderAlerts();return toast('First add the app to your Home Screen')}
+  try{await CLOUD.pushEnable(remindOff());alerts.on=true;store.set('alerts',alerts);toast('Notifications on 🔔')}
+  catch(e){const m=String(e?.message||e);toast(m==='denied'?'Notifications are blocked. Allow them in settings':m==='unsupported'?'This browser can\'t show notifications. Use Chrome, or add to Home Screen on iPhone':'Couldn\'t turn on notifications. Try again')}
+  renderAlerts();renderSchedule();
+};
 function notify(title,body){
   const el=$('#notif');el.innerHTML=`<img src="assets/postcard_jb_monogram.png" alt=""><div style="min-width:0"><b>${esc(title)}</b><br><span class="small">${esc(body)}</span><br><small>Jeet &amp; Bhavini · now</small></div>`;
   el.hidden=false;clearTimeout(notify.t);notify.t=setTimeout(()=>el.hidden=true,5000);
 }
 $('#notif').onclick=()=>$('#notif').hidden=true;
-$('#testAlert').onclick=()=>{const e=nextEvent();notify(`${e.name} starts in 30 minutes`,`Please make your way to ${e.venue}.`)};
 
-function renderLive(){
-  const now=Date.now(),start=HASTAMELAP.getTime(),end=start+2*36e5;
-  const live=now>=start-30*6e4&&now<=end,over=now>end,days=Math.ceil((start-now)/864e5);
-  $('#live').innerHTML=`<span class="badge ${live?'on':''}">${live?'● LIVE NOW':over?'REPLAY':'LIVE STREAM'}</span>
-   <h3>${live?'Watch the Hastamelap live':over?'Watch the Hastamelap again':'Can\'t be in Karjat? Watch live'}</h3>
-   ${live||over?'':`<div class="time">5:41 PM</div><p class="small" style="opacity:.9">Wednesday, 2 December · in ${days} days<br>Share this link with family abroad.</p>`}
-   <div class="row" style="flex-wrap:wrap"><a class="btn gold sm" href="${STREAM_URL}" target="_blank" rel="noopener">${live||over?'Watch now':'Open stream page'}</a>
-   <button class="btn ghost sm" id="copyStream">Copy link</button></div>`;
-  $('#copyStream').onclick=()=>navigator.clipboard.writeText(STREAM_URL).then(()=>toast('Link copied'),()=>toast(STREAM_URL));
-}
 $('#homeHelp').onclick=()=>{location.hash='more';show('more');goMore('help')};
 
 /* ---------- schedule ---------- */
@@ -721,7 +720,7 @@ function renderSchedule(){
   if(!days.some(d=>d.id===curDay))curDay=(days.find(d=>d.id===nextEvent().day)||days[0]).id;
   $('#days').innerHTML=days.map(d=>`<button aria-pressed="${d.id===curDay}" data-day="${d.id}"><span>${d.dow}</span><b>${d.d}</b><span>${d.m}</span></button>`).join('');
   $$('#days button').forEach(b=>b.onclick=()=>{curDay=b.dataset.day;renderSchedule()});
-  $('#events').innerHTML=mine.filter(e=>e.day===curDay).map(e=>{const on=alerts.on&&alerts.ev[e.id]!==false;return `
+  $('#events').innerHTML=mine.filter(e=>e.day===curDay).map(e=>{const on=alerts.on&&pushState()==='granted'&&alerts.ev[e.id]!==false;return `
    <article class="event"><div class="art"><img src="${e.img}" alt=""></div>
    <div class="body">
      <div><h2>${esc(evName(e))}</h2>${e.tag?`<p class="tag">${esc(e.tag)}</p>`:''}${!mySide()&&(e.side==='Groom'||e.side==='Bride')?`<span class="chip ${e.side==='Groom'?'plum':'sage'}" style="margin-top:6px">${e.side==='Groom'?'Groom\'s side':'Bride\'s side'}</span>`:''}</div>
@@ -737,7 +736,8 @@ function renderSchedule(){
   $$('[data-pk]').forEach(c=>c.onchange=()=>{packed[c.dataset.pk]=c.checked;store.set('packed',packed);c.parentElement.classList.toggle('done',c.checked)});
   $$('.rsvp button').forEach(b=>b.onclick=()=>{rsvp[b.dataset.ev]=b.dataset.v;store.set('rsvp',rsvp);renderSchedule();if(CLOUD_ON())CLOUD.saveRsvp(rsvp).catch(cloudErr);toast('RSVP saved')});
   $$('[data-bell]').forEach(b=>b.onclick=()=>{const id=b.dataset.bell;
-    if(!alerts.on){alerts.on=true;alerts.ev[id]=true}else alerts.ev[id]=alerts.ev[id]===false;
+    if(!(alerts.on&&pushState()==='granted')){alerts.ev[id]=true;store.set('alerts',alerts);return $('#alertSw').onclick()}
+    alerts.ev[id]=alerts.ev[id]===false;
     store.set('alerts',alerts);renderSchedule();renderAlerts();toast(alerts.ev[id]!==false?'We\'ll remind you 30 min before':'Reminder off')});
   $('#rsvpCount').textContent=`${mine.filter(e=>rsvp[e.id]==='Going').length}/${mine.length} going`;
 }
