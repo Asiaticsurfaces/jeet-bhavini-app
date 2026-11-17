@@ -291,6 +291,11 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div class="next" id="upnext"></div>
     </div>
 
+    <div class="card stack" id="wxCard">
+      <div class="row between"><p class="eyebrow">Karjat weather &amp; what to wear</p><span class="muted small" id="wxWhen"></span></div>
+      <div class="stack" id="wx"><p class="muted small">Loading the forecast…</p></div>
+    </div>
+
     <div class="card stack">
       <p class="eyebrow" data-t="pass">Your wedding pass</p>
       <div class="pass" id="pass"></div>
@@ -337,10 +342,18 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
 
     <div class="card stack">
       <h3 data-t="findMe">Find photos of me</h3>
-      <p class="muted small">Upload one selfie and get every wedding photo you appear in, from guests and the photographer.</p>
-      <label class="btn" for="selfie">Upload a selfie</label>
+      <p class="muted small">Take one selfie and see every photographer photo you're in. Your selfie stays on your phone, it is never uploaded.</p>
+      <div class="row"><label class="btn" for="selfie">Take a selfie</label><button class="btn ghost" id="faceAgain" hidden>Check for new photos</button></div>
       <input id="selfie" type="file" accept="image/*" capture="user" hidden>
       <div id="faceOut" class="stack"></div>
+    </div>
+
+    <div class="card stack">
+      <h3>Wedding photo frame</h3>
+      <p class="muted small">Pick any photo from your phone and get it back in our Jeet &amp; Bhavini frame, ready for WhatsApp and Instagram.</p>
+      <label class="btn" for="frameIn" style="align-self:flex-start">Choose a photo</label>
+      <input id="frameIn" type="file" accept="image/*" hidden>
+      <div id="frameOut" class="stack"></div>
     </div>
 
     <div class="tabs" role="group" aria-label="Photo view">
@@ -621,6 +634,7 @@ function tick(){
 tick();setInterval(tick,1000);
 function stayText(a,b){const f=d=>d?new Date(d+'T00:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'UTC'}):'';return a&&b?`${f(a)} → ${f(b)}`:f(a);}
 function renderHome(){
+  renderWeather();
   const nx=nextEvent();
   $('#hello').textContent=ME?ME.n.split(' ')[0]:'Guest';
   $('#upnext').innerHTML=`<div class="thumb"><img src="${nx.img}" alt=""></div>
@@ -752,14 +766,105 @@ function renderPhotos(){
   $('#phNote').textContent=phView==='mine'?`${myPhotos.length} photo${myPhotos.length===1?'':'s'}${myPhotos.some(p=>!isDev(p))?' · some still developing (ready 9 am)':''}`:'From every guest and the photographer';
   $('#photos').innerHTML=list.length?list.map(p=>photoHTML(p,p.mine&&!isDev(p))).join(''):'<p class="muted">No photos yet. Tap the shutter above to take your first one.</p>';
 }
-$('#selfie').onchange=e=>{
-  const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);e.target.value='';
-  $('#faceOut').innerHTML=`<div class="row"><div class="selfie" style="background-image:url(${url})"></div><div style="flex:1"><b>Scanning wedding photos…</b><div class="scan" style="margin-top:8px"><i id="scanBar"></i></div></div></div>`;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>$('#scanBar').style.width='100%'));
-  setTimeout(()=>{const hits=[...myPhotos.map(p=>({...p,mine:false})),PREWED[0],PREWED[2]];
-    $('#faceOut').innerHTML=`<div class="row"><div class="selfie" style="background-image:url(${url})"></div><div><b>Found ${hits.length} photos of you</b><p class="muted small">Preview result. The real app matches faces automatically.</p></div></div><div class="grid">${hits.map(p=>photoHTML(p,false)).join('')}</div>`;
-  },2000);
+/* ---------- find my photos (face match on this phone) ---------- */
+let faceSelf=store.get('faceSelf',null);   // this guest's face numbers, kept on this phone only
+$('#faceAgain').hidden=!faceSelf;
+const faceMsg=(html,url)=>{$('#faceOut').innerHTML=`<div class="row">${url?`<div class="selfie" style="background-image:url(${url})"></div>`:''}<div style="flex:1">${html}</div></div>`};
+async function findMe(url){
+  if(!CLOUD_ON())return faceMsg('<b>Available once the wedding photos are live.</b>',url);
+  try{
+    faceMsg('<b>Searching the photographer\'s photos…</b><div class="scan" style="margin-top:8px"><i id="scanBar"></i></div>',url);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{const b=$('#scanBar');if(b)b.style.width='90%'}));
+    const F=await import('./js/faces.js'),me=F.decode(faceSelf),idx=await CLOUD.faceIndex(),now=Date.now();
+    const shown=new Map(feedPhotos.filter(p=>now>=p.revealAt).map(p=>[p.id,p]));
+    const hits=idx.filter(x=>shown.has(x.id)).map(x=>({p:shown.get(x.id),d:Math.min(9,...x.f.map(s=>F.distance(me,F.decode(s))))})).filter(x=>x.d<F.SAME_PERSON).sort((a,b)=>a.d-b.d);
+    faceMsg(hits.length?`<b>Found ${hits.length} photo${hits.length===1?'':'s'} of you</b><p class="muted small">Tap a photo to open it. New photos are added through the wedding, check again later.</p>`
+      :`<b>No photos of you yet</b><p class="muted small">${idx.length?'The photographer adds photos through the wedding. Tap "Check for new photos" later.':'The photographer\'s photos aren\'t up yet. Check again after the first event.'}</p>`,url);
+    if(hits.length)$('#faceOut').insertAdjacentHTML('beforeend',`<div class="grid">${hits.map(h=>`<a href="${h.p.src}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${photoHTML(h.p,false)}</a>`).join('')}</div>`);
+  }catch(e){console.warn(e);faceMsg('<b>Couldn\'t search right now.</b><p class="muted small">Check your internet and try again.</p>',url)}
+}
+$('#selfie').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;e.target.value='';const url=URL.createObjectURL(f);
+  faceMsg('<b>Reading your selfie…</b><p class="muted small">The first time downloads about 12 MB, then it\'s quick.</p>',url);
+  try{
+    const F=await import('./js/faces.js'),img=new Image();img.src=url;await img.decode();
+    const d=await F.selfieFace(img);
+    if(!d)return faceMsg('<b>Couldn\'t see your face clearly.</b><p class="muted small">Try again facing the camera in good light, without sunglasses.</p>',url);
+    faceSelf=F.encode(d);store.set('faceSelf',faceSelf);$('#faceAgain').hidden=false;
+    findMe(url);
+  }catch(err){console.warn(err);faceMsg('<b>Couldn\'t load the face finder.</b><p class="muted small">Check your internet and try again.</p>',url)}
 };
+$('#faceAgain').onclick=()=>faceSelf&&findMe(null);
+
+/* ---------- wedding photo frame ---------- */
+const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src});
+async function framePhoto(file){
+  const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  await Promise.all(['92px "Alex Brush"','600 30px "Jost"','600 34px "Cormorant Garamond"'].map(f=>document.fonts.load(f).catch(()=>{})));
+  const [ph,mono,mogra]=await Promise.all([loadImg(URL.createObjectURL(file)),loadImg('assets/postcard_jb_monogram.png'),loadImg('assets/mogra_long.png')]);
+  x.fillStyle='#fbf6ee';x.fillRect(0,0,W,H);
+  // photo, cropped to fill, rounded
+  const px=56,py=56,pw=W-112,ph2=1010,r=28,k=Math.max(pw/ph.naturalWidth,ph2/ph.naturalHeight),sw=pw/k,sh=ph2/k;
+  x.save();x.beginPath();x.roundRect(px,py,pw,ph2,r);x.clip();
+  x.drawImage(ph,(ph.naturalWidth-sw)/2,(ph.naturalHeight-sh)/2,sw,sh,px,py,pw,ph2);x.restore();
+  x.strokeStyle='#a8894f';x.lineWidth=3;x.beginPath();x.roundRect(px-10,py-10,pw+20,ph2+20,r+8);x.stroke();
+  // mogra garlands hanging over the top corners
+  const gh=330,gw=gh*mogra.naturalWidth/mogra.naturalHeight;
+  x.drawImage(mogra,px+18,8,gw,gh);x.drawImage(mogra,px+pw-18-gw,8,gw,gh);
+  // monogram + names
+  const mh=228,mw=mh*mono.naturalWidth/mono.naturalHeight;
+  x.font='92px "Alex Brush"';const nameW=x.measureText('Jeet & Bhavini').width,gx=Math.max(60,(W-(mw+36+nameW))/2);
+  x.drawImage(mono,gx,py+ph2+30,mw,mh);
+  const tx=gx+mw+36;x.fillStyle='#5e1f3a';x.font='92px "Alex Brush"';x.textBaseline='alphabetic';x.fillText('Jeet & Bhavini',tx,py+ph2+150);
+  x.fillStyle='#7b5a2a';x.font='600 30px "Jost"';x.letterSpacing='4px';x.fillText('1 – 2 DECEMBER 2026',tx,py+ph2+205);
+  x.font='600 34px "Cormorant Garamond"';x.letterSpacing='1px';x.fillText('Oleander, Karjat',tx,py+ph2+250);
+  return new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+}
+$('#frameIn').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  $('#frameOut').innerHTML='<p class="muted small">Framing your photo…</p>';
+  try{
+    const blob=await framePhoto(f),url=URL.createObjectURL(blob),file=new File([blob],'Jeet-Bhavini-wedding.jpg',{type:'image/jpeg'});
+    const canShare=navigator.canShare&&navigator.canShare({files:[file]});
+    $('#frameOut').innerHTML=`<img src="${url}" alt="Your photo in the wedding frame" style="width:100%;border-radius:16px;border:1px solid var(--line)">
+      <div class="row">${canShare?'<button class="btn" id="frameShare">Share</button>':''}<a class="btn ${canShare?'ghost':''}" href="${url}" download="Jeet-Bhavini-wedding.jpg">Save photo</a></div>`;
+    if(canShare)$('#frameShare').onclick=()=>navigator.share({files:[file],text:'At Jeet & Bhavini\'s wedding 💛'}).catch(()=>{});
+  }catch(err){console.warn(err);$('#frameOut').innerHTML='<p class="muted small">Couldn\'t open that photo. Try another one.</p>'}
+};
+
+/* ---------- Karjat weather & what to wear ---------- */
+const WX_ICON=c=>c<=1?'☀️':c<=3?'⛅':c<=48?'🌫️':c<=67||(c>=80&&c<=82)?'🌧️':c>=95?'⛈️':'☁️';
+let wxP=null;   // one forecast request at a time
+function wxData(){
+  const k='wx2',hit=store.get(k,null);if(hit&&Date.now()-hit.at<3*36e5)return Promise.resolve(hit.d);
+  return wxP||=wxFetch(k).finally(()=>{wxP=null});
+}
+async function wxFetch(k){
+  const u='https://api.open-meteo.com/v1/forecast?latitude=18.91&longitude=73.33&timezone=Asia%2FKolkata&forecast_days=16'
+    +'&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&hourly=temperature_2m';
+  const d=await (await fetch(u)).json();if(!d.daily)throw new Error('no forecast');store.set(k,{at:Date.now(),d});return d;
+}
+async function renderWeather(){
+  const mine=myEvents(),days=[...new Set(mine.map(e=>e.day))].sort();
+  if(!days.length){$('#wxCard').hidden=true;return}
+  let d=null;try{d=await wxData()}catch(e){}
+  const tempAt=iso=>{if(!d?.hourly)return null;const h=iso.slice(0,13)+':00';const i=d.hourly.time.indexOf(h);return i<0?null:d.hourly.temperature_2m[i]};
+  const ist=t=>new Date(t+5.5*36e5).toISOString();
+  const coldest=e=>{const a=new Date(e.start).getTime(),L=[];for(let t=a;t<=a+(e.hrs||2)*36e5;t+=36e5){const v=tempAt(ist(t));if(v!==null)L.push(v)}return L.length?Math.min(...L):null};
+  $('#wx').innerHTML=days.map(day=>{
+    const i=d?d.daily.time.indexOf(day):-1,ev=mine.filter(e=>e.day===day);
+    if(i<0)return`<div class="item"><b>${dayText(day)}</b><p class="small muted">Forecast appears about 2 weeks before. Karjat in early December: warm sunny days around 30°C, cool nights around 15°C.</p></div>`;
+    const hi=Math.round(d.daily.temperature_2m_max[i]),lo=Math.round(d.daily.temperature_2m_min[i]),rain=d.daily.precipitation_probability_max[i]||0;
+    const tips=[];
+    const seen=new Set();ev.forEach(e=>{const n=evName(e);if(seen.has(n))return;seen.add(n);const t=coldest(e);if(t!==null&&t<=20)tips.push(`Carry a shawl or jacket for the ${esc(n)}, it gets down to about ${Math.round(t)}°C`)});
+    if(rain>=40)tips.push(`${rain}% chance of rain, keep an umbrella handy`);
+    if(hi>=31&&ev.some(e=>{const h=+new Date(new Date(e.start).getTime()+5.5*36e5).toISOString().slice(11,13);return h>=11&&h<=16}))tips.push('Hot afternoon: sunglasses and water');
+    if(!tips.length)tips.push(lo<=17?`Cool night (${lo}°C), a light layer helps`:'Pleasant day, dress as planned');
+    return`<div class="item"><div class="row between"><b>${dayText(day)}</b><span style="font-size:20px">${WX_ICON(d.daily.weather_code[i])} <b>${hi}°</b><span class="muted small"> / ${lo}°</span></span></div>
+      <p class="small muted">${[...new Set(ev.map(e=>evName(e)))].map(esc).join(' · ')}</p><ul class="small" style="margin:6px 0 0 18px;padding:0">${tips.map(t=>`<li>${t}</li>`).join('')}</ul></div>`;
+  }).join('');
+  $('#wxWhen').textContent=d?'Updated '+new Date(store.get('wx2',{}).at||Date.now()).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'}):'';
+}
 
 /* ---------- info ---------- */
 const subs=['help','lost','wishes','travel','map','family','stay','faq','songs','contacts'];

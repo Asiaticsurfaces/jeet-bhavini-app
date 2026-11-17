@@ -272,8 +272,8 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <section data-sec="photos" class="stack" hidden>
       <div class="card">
         <h3>Add photographer photos</h3>
-        <p class="muted small">JPEGs only (not RAW). They appear for guests straight away, labelled Photographer.</p>
-        <div class="row"><select id="phEvent" style="flex:1"><option>Mameru</option><option>Sangeet</option><option>Mandap Ropan</option><option>Wedding</option></select><input type="file" id="phFiles" accept="image/jpeg,image/png" multiple style="flex:2"></div>
+        <p class="muted small">JPEGs only (not RAW). They appear for guests straight away, labelled Photographer. Faces are indexed while uploading so guests can find themselves with a selfie (keep this tab open until it says Done).</p>
+        <div class="row"><select id="phEvent" style="flex:1"><option>Mameru</option><option>Sangeet</option><option>Mandap Ropan</option><option>Wedding</option><option>Sufi Night</option></select><input type="file" id="phFiles" accept="image/jpeg,image/png" multiple style="flex:2"></div>
         <p class="small" id="phProgress"></p>
       </div>
       <div class="row between"><p class="muted small" id="phCount"></p><select id="phFilter" style="width:auto"><option value="all">All photos</option><option value="guest">Guest camera</option><option value="photographer">Photographer</option><option value="hidden">Hidden</option></select></div>
@@ -1339,8 +1339,13 @@ async function start() {
           const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
           const path = `photos/${u.uid}/${Date.now()}-${n}.jpg`, r = S.ref(st, path);
           await S.uploadBytes(r, blob, { contentType: 'image/jpeg' });
-          await addDoc(collection(db, 'photos'), { uid: u.uid, name: 'Photographer', source: 'photographer', event: ev, path, url: await S.getDownloadURL(r),
+          const ref = await addDoc(collection(db, 'photos'), { uid: u.uid, name: 'Photographer', source: 'photographer', event: ev, path, url: await S.getDownloadURL(r),
             w: c.width, h: c.height, hidden: false, revealAt: Timestamp.now(), createdAt: serverTimestamp() });
+          // Face index for "Find my photos" (numbers only, no picture).
+          try { $('#phProgress').textContent = `Finding faces in photo ${n} of ${files.length}…`;
+            const F = await import('./js/faces.js'), list = await F.facesIn(c);
+            await setDoc(doc(db, 'faces', ref.id), { f: list.map(F.encode), n: list.length, at: serverTimestamp() });
+          } catch (err) { console.warn('face index', err); }
         } catch (err) { fail(err); }
       }
       $('#phProgress').textContent = `Done: ${files.length} photo(s) added to ${ev}.`;

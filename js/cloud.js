@@ -133,6 +133,8 @@ async function start() {
     ciOff?.(); ciOff = null; ciId = id; CHECKIN = null;
     if (id) ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
   };
+  // Face index of photographer photos, for "Find my photos" (read on demand, not live).
+  CLOUD.faceIndex = async () => (await getDocs(collection(db, 'faces'))).docs.map(d => ({ id: d.id, f: d.data().f || [] }));
   W.CLOUD = CLOUD;
 
   // ---- live data → app state ----
