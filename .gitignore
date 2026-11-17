@@ -7,3 +7,4 @@ assets/brass_elephant.png
 serviceAccount*.json
 _*.html
 node_modules/
+firebase-debug.log
