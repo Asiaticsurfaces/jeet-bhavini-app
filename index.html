@@ -316,9 +316,9 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     </div>
 
     <div class="card stack" id="wxCard">
-      <div class="row between"><p class="eyebrow">Karjat weather &amp; what to wear</p><span class="muted small" id="wxWhen"></span></div>
+      <div class="row between"><p class="eyebrow">Karjat weather</p><span class="muted small" id="wxWhen"></span></div>
       <div class="stack" id="wx"><p class="muted small">Loading the forecast…</p></div>
-      <button class="btn ghost sm" id="goPack" style="align-self:flex-start">Dress codes &amp; what to carry →</button>
+      <button class="btn ghost sm" id="goPack" style="align-self:flex-start">What to carry →</button>
     </div>
 
     <div class="card stack">
@@ -642,10 +642,11 @@ const evName=e=>lang==='gu'?e.gu:e.name;
 /* ---------- navigation ---------- */
 const TABS=['home','schedule','camera','more'];
 function show(tab){
-  let btn=tab;if(tab==='help')tab='more';
+  let btn=tab,sub='home';if(tab==='help'){tab='more';sub='help'}
+  if(tab==='pack'){tab=btn='more';sub='pack'}   // "Before you pack" opens straight away
   if(!TABS.includes(tab))tab=btn='home';
   TABS.forEach(t=>$('#s-'+t).hidden=t!==tab);
-  if(tab==='more')goMore(btn==='help'?'help':'home');
+  if(tab==='more')goMore(sub);
   $$('nav.bar button').forEach(b=>b.dataset.tab===btn?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
   window.scrollTo(0,0);
 }
@@ -747,7 +748,7 @@ function notify(title,body){
 }
 $('#notif').onclick=()=>$('#notif').hidden=true;
 
-$('#goPack').onclick=()=>{location.hash='more';show('more');goMore('pack')};
+$('#goPack').onclick=()=>{location.hash='pack';show('pack')};
 $('#homeHelp').onclick=()=>{location.hash='more';show('more');goMore('help')};
 
 /* ---------- schedule ---------- */
