@@ -701,8 +701,13 @@ $('#alertSw').onclick=async()=>{
   if(!CLOUD_ON())return toast('Notifications work in the live app');
   if(alerts.on&&pushState()==='granted'){alerts.on=false;store.set('alerts',alerts);CLOUD.pushOff();renderAlerts();renderSchedule();return toast('Notifications off')}
   if(isIOS&&!installed){renderAlerts();return toast('First add the app to your Home Screen')}
+  // Ask straight away, inside the tap (iPhone ignores a permission request that comes after other work).
+  if(!('Notification' in window)){renderAlerts();return toast('This browser can\'t show notifications. Use Chrome, or add to Home Screen on iPhone')}
+  if(Notification.permission!=='granted'){let p='default';try{p=await Notification.requestPermission()}catch(e){}
+    if(p!=='granted'){renderAlerts();return toast(p==='denied'?'Notifications are blocked. Allow them in settings':'Tap Allow to get notifications')}}
+  toast('Turning on notifications…');
   try{await CLOUD.pushEnable(remindOff());alerts.on=true;store.set('alerts',alerts);toast('Notifications on 🔔')}
-  catch(e){const m=String(e?.message||e);toast(m==='denied'?'Notifications are blocked. Allow them in settings':m==='unsupported'?'This browser can\'t show notifications. Use Chrome, or add to Home Screen on iPhone':'Couldn\'t turn on notifications. Try again')}
+  catch(e){console.warn(e);const m=String(e?.message||e);toast(m==='unsupported'?'This browser can\'t show notifications. Use Chrome, or add to Home Screen on iPhone':'Couldn\'t turn on notifications ('+m.slice(0,60)+')')}
   renderAlerts();renderSchedule();
 };
 function notify(title,body){
