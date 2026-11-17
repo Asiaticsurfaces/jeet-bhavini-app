@@ -384,7 +384,6 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
         <button class="tile" data-go="map"><b data-t="map">Venue map</b><small>Find every place</small></button>
         <button class="tile" data-go="stay"><b>Travel &amp; stay</b><small>Oleander, Karjat</small></button>
         <button class="tile" data-go="faq"><b>FAQs</b><small>Dress, gifts, food</small></button>
-        <button class="tile" data-go="songs"><b>Song requests</b><small>For the Sangeet</small></button>
         <button class="tile" data-go="contacts"><b>Contacts</b><small>Who to call</small></button>
         <button class="tile fam" data-go="family" style="grid-column:1/-1"><b>🔒 Family only</b><small>Duties, vendors and arrivals</small></button>
       </div>
@@ -475,7 +474,13 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <h1>Travel &amp; stay</h1>
       <div class="card stack"><h3>Venue</h3><p>Oleander, Karjat. All events are at the Ballroom, the Lawn or the Lake Side.</p><a class="btn ghost sm" style="align-self:flex-start" href="https://maps.google.com/?q=Oleander%20Karjat" target="_blank" rel="noopener">Open in Maps</a></div>
       <div class="card stack"><h3>Your room</h3><p>Your room number appears on your wedding pass once the family assigns it.</p></div>
-      <div class="card stack"><h3>Getting there</h3><p>Karjat is about 2 hours from Mumbai and 2.5 hours from Pune. Pickup details from Karjat station will be shared here.</p><span class="chip">Details coming soon</span></div>
+      <div class="card stack"><h3>Getting there</h3><p>Karjat is about 2 hours by road from Mumbai.</p>
+        <div class="stack" style="gap:10px">
+          <div><b>✈️ Nearest airport: Navi Mumbai (NMI)</b><p class="small muted">About 50 km, roughly 1 to 1½ hours by car.</p></div>
+          <div><b>✈️ Also close: Mumbai airport (BOM)</b><p class="small muted">About 75 km, roughly 2 to 2½ hours by car, longer in evening traffic.</p></div>
+          <div><b>🚆 By train: Karjat station</b><p class="small muted">On the Mumbai–Pune line. Local trains from CSMT and Dadar take about 2 hours, and many express trains stop here.</p></div>
+        </div>
+        <p class="small">Share your train or flight in <b>Info → My arrival</b> and the family will arrange your pickup.</p></div>
     </div>
 
     <div id="m-pack" class="screen" hidden>
@@ -493,13 +498,6 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       </div>
     </div>
 
-    <div id="m-songs" class="screen" hidden>
-      <button class="back" data-go="home">← Guest info</button>
-      <h1>Song requests</h1>
-      <p class="muted">For the Sangeet on 1 December. Vote up the ones you want to hear.</p>
-      <div class="row"><input type="text" id="songQ" placeholder="Song name"><button class="btn" id="songBtn">Add</button></div>
-      <div class="stack" id="songs"></div>
-    </div>
 
     <div id="m-contacts" class="screen" hidden>
       <button class="back" data-go="home">← Guest info</button>
@@ -550,7 +548,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/events-default.js?v=3"></script>
+<script src="js/events-default.js?v=4"></script>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{return JSON.parse(localStorage.getItem('jb_'+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem('jb_'+k,JSON.stringify(v))}catch(e){}}};
@@ -589,7 +587,6 @@ let POSTS=[
  {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
  {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
  {t:'Welcome to Oleander, Karjat!',b:'Check in at the hospitality desk in the lobby. Your welcome kit is in your room.',ago:'Just now',c:'var(--plum)'},
- {t:'Song requests are open',b:'Tell the Sangeet DJ what to play. Guest Info → Song requests.',ago:'2 h ago',c:'var(--gold)'},
 ];
 const GUESTS=[
  {n:'Riya Shah',phone:'9820012345',side:"Groom's side",sideKey:'Groom',room:'214',roomWhere:'Wing A · Ground floor',stayIn:'2026-12-01',stayOut:'2026-12-03',roommates:['Amit Shah','Pooja Shah','Meera Patel'],party:3,events:EVENTS.map(e=>e.id)},
@@ -915,7 +912,7 @@ async function renderWeather(){
 }
 
 /* ---------- info ---------- */
-const subs=['help','lost','wishes','travel','map','family','stay','faq','songs','contacts','pack'];
+const subs=['help','lost','wishes','travel','map','family','stay','faq','contacts','pack'];
 function goMore(g){if(g==='family')renderFamily();if(g==='pack')renderPack();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0);if(g==='map')renderMap()}
 $$('[data-go]').forEach(b=>b.onclick=()=>goMore(b.dataset.go));
 const CATS=['Cab or transport','Room issue','Medical','Food / dietary','Lost something','Something else'];
@@ -948,11 +945,6 @@ function renderWishes(){$('#wishes').innerHTML=wishes.length?wishes.map(x=>`<div
 $('#wishBtn').onclick=()=>{const w=$('#wishText').value.trim();if(!w)return toast('Write a blessing first');const n=$('#wishName').value.trim()||(ME?ME.n.split(' ')[0]:'A guest');
   if(CLOUD_ON()){CLOUD.addWish(n,w).then(()=>{$('#wishText').value='';toast('Blessing posted')}).catch(cloudErr);return}
   wishes.unshift({n,w});store.set('wishes',wishes);$('#wishText').value='';renderWishes();toast('Blessing posted')};
-let songs=store.get('songs',[]);
-function renderSongs(){songs.sort((a,b)=>b.v-a.v);$('#songs').innerHTML=songs.length?songs.map((x,i)=>`<div class="post" style="align-items:center"><span style="flex:1">${esc(x.s)}</span><button class="btn ghost sm" data-i="${i}">▲ ${x.v}</button></div>`).join(''):'<p class="muted">No requests yet. Add the first one.</p>';
-  $$('#songs button').forEach(b=>b.onclick=()=>{const x=songs[b.dataset.i];if(CLOUD_ON()){if(x.id)CLOUD.voteSong(x.id).catch(cloudErr);b.disabled=true;return}x.v++;store.set('songs',songs);renderSongs()})}
-$('#songBtn').onclick=()=>{const s=$('#songQ').value.trim();if(!s)return;if(CLOUD_ON()){CLOUD.addSong(s).then(()=>{$('#songQ').value='';toast('Added to the DJ list')}).catch(cloudErr);return}songs.push({s,v:1});store.set('songs',songs);$('#songQ').value='';renderSongs();toast('Added to the DJ list')};
-
 /* ---------- arrival form ---------- */
 const MODES=['Train','Flight','Car','Bus'];
 let tMode=travel?.mode||'Train',tPick=travel?travel.pickup:true;
@@ -1111,7 +1103,6 @@ function cloudRefresh(what){
   else if(what==='help')renderHelp();
   else if(what==='lost')renderLost();
   else if(what==='wishes')renderWishes();
-  else if(what==='songs')renderSongs();
   else if(what==='arrival'){renderTravel();renderPickup()}
   else if(what==='photos')renderPhotos();
   else if(what==='contacts')renderContacts();
@@ -1123,7 +1114,7 @@ function cloudRefresh(what){
 function renderAll(){
   renderAccount();
   $('#loginDemo').hidden=CLOUD_ON();
-  renderContacts();renderFeed();renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderSongs();renderTravel();renderMap();renderFamily();
+  renderContacts();renderFeed();renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderTravel();renderMap();renderFamily();
 }
 renderAll();applyLang();
 if(!ME&&!store.get('skipLogin',false))openLogin();

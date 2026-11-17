@@ -357,7 +357,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="js/events-default.js?v=3"></script>
+<script src="js/events-default.js?v=4"></script>
 <script type="module">
 import { FIREBASE_CONFIG } from './js/config.js';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -590,8 +590,7 @@ async function start() {
         moments: [['8:30 PM', 'Welcome & dinner'], ['9:30 PM', 'Qawwali begins']],
         pack: ['White, ivory or pastel outfit (kurta, anarkali or sharara)', 'Shawl or jacket, Karjat nights get cold', 'Comfortable footwear, it\'s on the lawn', 'A light dupatta or stole'],
         rites: [['Sufi music', 'Soulful songs of love and devotion from the Sufi tradition, sung live by the artists.'],
-          ['Qawwali', 'A group of singers with harmonium and tabla build the song slowly to a joyful, high-energy finish. Clap along!'],
-          ['Request a song', 'Have a favourite Sufi song? Add it under Song requests in Guest Info.']] };
+          ['Qawwali', 'A group of singers with harmonium and tabla build the song slowly to a joyful, high-energy finish. Clap along!']] };
       $('#evSufi').onclick = () => { openForm({ ...SUFI, id: null }); $('#evFormTitle').textContent = 'New: Sufi Night (check the date and time, then Save)'; };
       $('#evCancel').onclick = closeForm;
       // Same event for the other family, e.g. a different time for the bride's side.

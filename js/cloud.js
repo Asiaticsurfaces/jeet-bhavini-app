@@ -112,8 +112,6 @@ async function start() {
     addTicket: (cat, text) => addDoc(collection(db, 'tickets'), { ...who(), cat, text, status: 'open', createdAt: serverTimestamp() }),
     addLost: (item, where_) => addDoc(collection(db, 'lost'), { ...who(), item, where: where_, status: 'searching', createdAt: serverTimestamp() }),
     addWish: (name, text) => addDoc(collection(db, 'wishes'), { uid, name, text, hidden: false, createdAt: serverTimestamp() }),
-    addSong: title => addDoc(collection(db, 'songs'), { uid, title, votes: 1, createdAt: serverTimestamp() }),
-    voteSong: id => updateDoc(doc(db, 'songs', id), { votes: increment(1) }),
     saveRsvp: answers => setDoc(doc(db, 'rsvps', uid), { ...who(), answers, updatedAt: serverTimestamp() }),
     saveArrival: t => setDoc(doc(db, 'arrivals', uid), { ...who(), ...t, updatedAt: serverTimestamp() }, { merge: true }),
     async uploadPhoto(file, event) {
@@ -206,9 +204,6 @@ async function start() {
   });
   onSnapshot(collection(db, 'wishes'), s => {
     wishes = list(s).filter(w => !w.hidden).sort(byNew).map(w => ({ n: w.name, w: w.text })); refresh('wishes');
-  });
-  onSnapshot(collection(db, 'songs'), s => {
-    songs = list(s).map(x => ({ id: x.id, s: x.title, v: x.votes || 0 })); refresh('songs');
   });
   onSnapshot(doc(db, 'arrivals', uid), s => {
     if (!s.exists()) return;
