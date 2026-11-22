@@ -204,7 +204,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       </div>
       <div class="stats" id="guestStats"></div>
       <input id="guestQ" placeholder="Search by name, phone or room">
-      <div class="tablewrap"><table><thead><tr><th>Guest</th><th>Phone</th><th>Side</th><th>People</th><th>Room</th><th>Events</th><th>RSVP</th></tr></thead><tbody id="guestRows"></tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>Guest</th><th>Phone</th><th>Side</th><th>People</th><th>Room</th><th>Events</th><th>RSVP</th><th></th></tr></thead><tbody id="guestRows"></tbody></table></div>
     </section>
 
     <!-- ROOMS -->
@@ -853,14 +853,17 @@ async function start() {
         if (gfEditing) closeGF(); else { openGF(null); }                             // ready for the next guest
       } catch (e) { fail(e); } finally { $('#gfSave').disabled = false; }
     };
-    $('#gfDelete').onclick = async () => {
-      const g = GUESTS.find(x => x.id === gfEditing); if (!g || !confirm(`Delete ${g.name} from the guest list? Their pass stops working.`)) return;
+    // Delete a guest: their pass, login, notes and any room allotment (frees the beds).
+    const delGuest = async g => {
+      if (!g || !confirm(`Delete ${g.name} from the guest list? Their pass stops working${STAYS.some(s => s.guestId === g.id) ? ' and their room is freed' : ''}.`)) return false;
       try { const b = writeBatch(db);
         ['guests', 'guestIndex', 'guestNotes'].forEach(c => b.delete(doc(db, c, g.id)));
         LINKS.filter(l => l.guestId === g.id).forEach(l => b.delete(doc(db, 'phoneLinks', l.id)));
-        await b.commit(); toast('Guest deleted'); closeGF();
-      } catch (e) { fail(e); }
+        STAYS.filter(s => s.guestId === g.id).forEach(s => b.delete(doc(db, 'stays', s.id)));
+        await b.commit(); toast(`${g.name} deleted`); return true;
+      } catch (e) { fail(e); return false; }
     };
+    $('#gfDelete').onclick = async () => { if (await delGuest(GUESTS.find(x => x.id === gfEditing))) closeGF(); };
     function renderGuests() {
       const people = GUESTS.reduce((n, g) => n + (+g.people || 1), 0);
       const rs = Object.fromEntries(RSVP.filter(r => r.phone).map(r => [r.phone, r.answers || {}]));
@@ -875,9 +878,10 @@ async function start() {
       $('#guestStats').insertAdjacentHTML('beforeend', `<div><b>${GUESTS.filter(g => phonesOf(g).length).length}</b><span>Opened the app (number saved)</span></div>`);
       const rows = GUESTS.filter(g => !q || [g.name, ...phonesOf(g), g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
       $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr><td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}${can.owner ? `<br><button class="btn ghost sm" data-gedit="${esc(g.id)}" style="margin-top:4px">Edit</button>` : ''}</td><td>${phonesOf(g).map(p => `<a href="tel:+91${esc(p)}">${esc(p)}</a>`).join('<br>') || '<span class="muted small">Not yet</span>'}${phonesOf(g).length ? `<br><button class="btn ghost sm" data-free="${esc(g.id)}" style="margin-top:4px">Free up name</button>` : ''}</td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
-        <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td></tr>`).join('')
-        : `<tr><td colspan="7" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Tap + Add guest, or import the Excel.'}</td></tr>`;
+        <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td><td>${can.owner ? `<button class="btn danger sm" data-gdel="${esc(g.id)}">Delete</button>` : ''}</td></tr>`).join('')
+        : `<tr><td colspan="8" class="muted">${GUESTS.length ? 'No match.' : 'No guests yet. Tap + Add guest, or import the Excel.'}</td></tr>`;
       $$('[data-gedit]').forEach(b => b.onclick = () => openGF(GUESTS.find(x => x.id === b.dataset.gedit)));
+      $$('[data-gdel]').forEach(b => b.onclick = async () => { const g = GUESTS.find(x => x.id === b.dataset.gdel); if (await delGuest(g) && gfEditing === g?.id) closeGF(); });
       // Free a name so its rightful guest can pick it again (wrong person picked it, or a new number).
       $$('[data-free]').forEach(b => b.onclick = async () => {
         const g = GUESTS.find(x => x.id === b.dataset.free); if (!g) return;
