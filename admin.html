@@ -172,7 +172,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <section data-sec="guests" class="stack" hidden>
       <div class="card" id="importCard">
         <h3>Import the guest list</h3>
-        <p class="muted small">Choose the filled-in <b>Wedding guest list.xlsx</b>. It updates guests, volunteers, vendors, help contacts and drivers. You can import again any time after changes.</p>
+        <p class="muted small">Choose the filled-in <b>Wedding guest list.xlsx</b>. It updates guests, volunteers, vendors, help contacts and drivers. You can import the same file again any time: guests are matched by name, so they stay signed in, and a filled-in <b>Room</b> column allots their rooms. Guests missing from the file are kept unless you tick Remove.</p>
         <div class="row"><a class="btn ghost sm" href="assets/Wedding%20guest%20list%20-%20sample.xlsx" download="Wedding guest list.xlsx">Download sample Excel</a>
           <span class="muted small">Fill it in (delete the SAMPLE rows), then choose it below.</span></div>
         <input type="file" id="xlsx" accept=".xlsx,.xls">
@@ -1260,17 +1260,21 @@ async function start() {
         const sample = r => /sample/i.test(Object.values(r).join(' '));
         const yn = v => !/^n/i.test(String(v).trim());
         const errors = [], guests = new Map(), notes = [];
+        // Same name as a guest already in the app = the same guest (keeps their login, phone, invites and room).
+        const byName = new Map(GUESTS.map(g => [String(g.name || '').trim().toLowerCase(), g.id]));
+        const taken = new Set(GUESTS.map(g => g.id));
+        const evCol = (r, k, n) => { const hit = Object.keys(r).find(x => { const h = x.trim().toLowerCase(); return h === k || h.startsWith(n.toLowerCase()); }); return hit && String(r[hit]).trim() !== '' ? String(r[hit]).trim() : null; };
         rows('Guests').forEach((r, i) => {
           const name = val(r, 'guest name'); if (!name || sample(r)) return;
           const raw = val(r, 'phone'), phone = normPhone(raw);
           if (raw && phone.length !== 10) return errors.push(`Row ${i + 3}: ${name} — phone "${raw}" isn't 10 digits (leave it empty if you don't have it)`);
           if (phone && [...guests.values()].some(x => x.phone === phone)) return errors.push(`Row ${i + 3}: ${name} — same phone as ${[...guests.values()].find(x => x.phone === phone).name}`);
-          // Id: the number when there is one, else the name (Riya Shah → riya-shah, riya-shah-2 …).
-          let id = phone;
-          if (!id) { const base = name.toLowerCase().replace(/[^a-z0-9\u0A80-\u0AFF]+/g, '-').replace(/^-|-$/g, '') || 'guest'; id = base; for (let k = 2; guests.has(id); k++) id = `${base}-${k}`; }
+          let id = byName.get(name.toLowerCase());
+          if (id && guests.has(id)) return errors.push(`Row ${i + 3}: ${name} is in the file twice (only the first row is used)`);
+          if (!id) { const base = slugOf(name); id = base; for (let k = 2; taken.has(id) || guests.has(id); k++) id = `${base}-${k}`; }
+          const events = {}; EVK.forEach(([k, n]) => { const v = evCol(r, k, n); if (v !== null) events[k] = yn(v); });
           guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(1, parseInt(val(r, 'no. of people', 'people')) || 1),
-            room: val(r, 'room'), lang: val(r, 'language') || 'EN',
-            events: { mameru: yn(val(r, 'mameru')), sangeet: yn(val(r, 'sangeet')), mandap: yn(val(r, 'mandap')), wedding: yn(val(r, 'wedding')) } });
+            room: val(r, 'room'), lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
           const n = val(r, 'notes'); if (n) notes.push([id, n]);
         });
         const duties = rows('Volunteers').filter(r => val(r, 'volunteer') && !sample(r)).map(r => ({ who: val(r, 'volunteer'), phone: normPhone(val(r, 'phone')), task: val(r, 'duty'), date: val(r, 'date'), time: val(r, 'time'), place: val(r, 'place'), done: false }));
@@ -1279,26 +1283,34 @@ async function start() {
         const contacts = rows('Help contacts').filter(r => val(r, 'shown') && !sample(r)).map(r => ({ label: val(r, 'shown'), phone: normPhone(val(r, 'phone')), note: [val(r, 'name'), val(r, 'notes')].filter(Boolean).join(' · ') }));
         const gone = GUESTS.filter(g => !guests.has(g.id));
         const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
-        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people), <b>${duties.length}</b> duties, <b>${vendors.length}</b> vendors, <b>${drivers.length}</b> drivers, <b>${contacts.length}</b> help contacts.</p>
-          <p class="small muted">Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
-          ${gone.length ? `<p class="err">${gone.length} guest(s) already in the app are not in this file and will be removed: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>` : ''}
+        const added = [...guests.values()].filter(g => g.isNew).length;
+        const withRoom = [...guests.values()].filter(g => g.room).length;
+        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number in the file.</p>
+          <p class="small muted">Guests already signed in stay signed in. A row with an empty Room, Side or event column keeps what the app already has. Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
+          ${gone.length ? `<div class="card" style="padding:10px"><p class="small"><b>${gone.length} guest(s) in the app are not in this file</b> and will be kept: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>
+            <label class="row small"><input type="checkbox" id="impRemove" style="width:18px;height:18px"> Remove them from the app</label></div>` : ''}
           ${errors.length ? `<div class="err"><b>${errors.length} row(s) skipped:</b><br>${errors.map(esc).join('<br>')}</div>` : ''}
           <button class="btn" id="doImport" ${guests.size ? '' : 'disabled'}>Import into the app</button>`;
         $('#doImport').onclick = async () => {
+          const removing = gone.length && $('#impRemove')?.checked ? gone : [];
+          if (removing.length && !confirm(`Remove ${removing.length} guest(s) that are not in the file? They will be signed out of the app.`)) return;
           $('#doImport').disabled = true; $('#doImport').textContent = 'Importing…';
           const ops = [];
-          for (const [ph, g] of guests) {
-            // Keep rooms allotted in the Rooms tab (the Excel's Room column would wipe them).
-            const old = GUESTS.find(x => x.id === ph);
-            const keep = old && STAYS.some(s => s.guestId === ph) ? { room: old.room || '', roomWhere: old.roomWhere || '', stayIn: old.stayIn || '', stayOut: old.stayOut || '' } : {};
-            ops.push(b => b.set(doc(db, 'guests', ph), { ...g, ...keep, updatedAt: serverTimestamp() }));
+          for (const [id, g] of guests) {
+            const old = GUESTS.find(x => x.id === id) || {};
+            const data = { name: g.name, people: g.people, events: { ...(old.events || {}), ...g.events }, updatedAt: serverTimestamp() };
+            if (g.side || !old.side) data.side = g.side;
+            if (g.relation) data.relation = g.relation;
+            if (g.lang || !old.lang) data.lang = g.lang || 'EN';
+            if (g.phone) data.phone = g.phone;
+            // A typed room without the Rooms tab: show it on the pass as it is.
+            if (g.room && !roomsApi) data.room = g.room;
+            ops.push(b => b.set(doc(db, 'guests', id), data, { merge: true }));
             // Name search index for first login (keeps numbers guests already saved).
-            const words = g.name.toLowerCase().split(/[^a-z0-9\u0A80-\u0AFF]+/).filter(w => w.length >= 2);
-            const tokens = [...new Set(words.flatMap(w => Array.from({ length: Math.min(w.length, 12) - 1 }, (_, k) => w.slice(0, k + 2))))];
-            ops.push(b => b.set(doc(db, 'guestIndex', ph), { name: g.name, side: g.side || '', people: g.people, tokens, ...(g.phone ? { phones: [g.phone] } : {}) }, { merge: true }));
-            if (g.phone) ops.push(b => b.set(doc(db, 'phoneLinks', g.phone), { guestId: ph, name: g.name, at: serverTimestamp() }));
+            ops.push(b => b.set(doc(db, 'guestIndex', id), { name: g.name, side: data.side ?? old.side ?? '', people: g.people, tokens: nameTokens(g.name), ...(g.phone ? { phones: [g.phone] } : {}) }, { merge: true }));
+            if (g.phone) ops.push(b => b.set(doc(db, 'phoneLinks', g.phone), { guestId: id, name: g.name, at: serverTimestamp() }));
           }
-          for (const g of gone) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestIndex', g.id))); }
+          for (const g of removing) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestIndex', g.id))); }
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
             if (!items.length) continue;   // empty tab in the Excel: keep what was added in the panel
@@ -1308,7 +1320,24 @@ async function start() {
           }
           if (contacts.length) ops.push(b => b.set(doc(db, 'config', 'contacts'), { list: contacts }));
           for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db); ops.slice(i, i + 400).forEach(fn => fn(b)); await b.commit(); }
-          out.innerHTML = `<p class="chip sage">Imported ${guests.size} families</p>`; toast('Guest list imported');
+          // Rooms: allot each typed room in the Rooms tab, so the guest's pass, roommates and bed counts all update.
+          const roomErr = []; let roomsDone = 0;
+          const todo = roomsApi ? [...guests].filter(([id, g]) => g.room) : [];
+          if (todo.length) {
+            for (let t = 0; t < 50 && todo.some(([id]) => !GUESTS.some(x => x.id === id)); t++) await new Promise(r => setTimeout(r, 200));   // wait for new guests to arrive
+            for (const [id, g] of todo) {
+              $('#doImport').textContent = `Allotting rooms… ${roomsDone + roomErr.length + 1} of ${todo.length}`;
+              const mine = roomsApi.staysOf(id);
+              if (mine.length > 1) { roomErr.push(`${g.name}: has ${mine.length} rooms, change them in the Rooms tab`); continue; }
+              const inD = mine[0]?.in || '2026-12-01', outD = mine[0]?.out || '2026-12-03';
+              const err = roomsApi.check(id, g.people, g.room, inD, outD);
+              if (err) { roomErr.push(`${g.name}: ${err}`); continue; }
+              try { await roomsApi.assign(id, g.name, g.people, g.room, inD, outD); roomsDone++; } catch (e) { roomErr.push(`${g.name}: ${e.code || e.message}`); }
+            }
+          }
+          out.innerHTML = `<p class="chip sage">Imported ${guests.size} families${todo.length ? ` · ${roomsDone} rooms allotted` : ''}${removing.length ? ` · ${removing.length} removed` : ''}</p>`
+            + (roomErr.length ? `<div class="err"><b>${roomErr.length} room(s) not allotted:</b><br>${roomErr.map(esc).join('<br>')}</div>` : '');
+          toast('Guest list imported');
         };
       } catch (err) { console.error(err); out.innerHTML = '<p class="err">Couldn\'t read that file. Make sure it\'s the guest list Excel.</p>'; }
     };
