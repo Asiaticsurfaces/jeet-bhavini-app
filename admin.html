@@ -313,7 +313,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
 
       <div class="card" id="mapCard">
         <div class="row between"><h3>Venue map</h3><button class="btn ghost sm" id="mapReset">Reset view</button></div>
-        <p class="muted small">Place each location on the 3D map: tap <b>Set on map</b>, then tap the spot. Drag to turn the map, pinch or scroll to zoom. Guests see changes after you tap <b>Save map</b>.</p>
+        <p class="muted small">Place each location on the map: tap <b>Set on map</b>, then tap the spot. Drag to move the map, pinch, scroll or use + − to zoom. Guests see changes after you tap <b>Save map</b>.</p>
         <p class="chip plum" id="mapPicking" hidden></p>
         <div id="adminMap" style="height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--line);position:relative;background:#e2ebe4"></div>
         <div class="stack" id="placeList"></div>
@@ -678,7 +678,7 @@ async function start() {
         $$('[data-pdel]').forEach(b => b.onclick = () => { if (!confirm(`Remove "${PL[b.dataset.pdel].name}" from the map?`)) return; PL.splice(+b.dataset.pdel, 1); setDirty(true); drawList(); m3 && m3.setPlaces(PL); });
       };
       const boot = async () => {
-        mod = mod || await import('./js/map3d.js');
+        mod = mod || await import('./js/map2d.js');
         if (!m3) m3 = await mod.createMap($('#adminMap'), { places: PL, onPick: (x, y) => {
           if (picking == null) return;
           Object.assign(PL[picking], { x, y }); const id = PL[picking].id; picking = null;
@@ -696,12 +696,12 @@ async function start() {
       };
       onSnapshot(doc(db, 'config', 'map'), async s => {
         if (dirty) return;                          // don't overwrite edits in progress
-        mod = mod || await import('./js/map3d.js');
+        mod = mod || await import('./js/map2d.js');
         const L = s.exists() && s.data().v === mod.MAP_VERSION && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
         PL = L.map(p => ({ ...p })); drawList(); $('#mapState').textContent = s.exists() && s.data().v === mod.MAP_VERSION ? 'Saved' : 'Suggested spots on the new map, not saved yet';
-        if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">This browser can\'t show the 3D map.</p>'; });
+        if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">The map couldn\'t load.</p>'; });
       }, e => console.warn('map', e.code));
-      // build the 3D scene when the Events tab is opened
+      // build the map when the Events tab is opened
       const openTab = () => { if (cur === 'events') boot().catch(e => console.error(e)); };
       window.addEventListener('hashchange', openTab); openTab();
     }

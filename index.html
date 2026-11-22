@@ -446,8 +446,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div><p class="eyebrow">Oleander, Karjat</p><h1 data-t="map">Venue map</h1></div>
       <div class="legend" id="legend" role="group" aria-label="Highlight a place"></div>
       <div class="map" id="map"></div>
-      <div class="row" style="gap:8px;margin-top:-4px"><button class="btn ghost sm" id="mapTop">Top view</button><button class="btn ghost sm" id="mapHome">Whole map</button></div>
-      <p class="demo-note" style="margin:0">Drag to turn · pinch to zoom · tap a pin or a name</p>
+      <p class="demo-note" style="margin:0">Drag to move · pinch or tap + − to zoom · tap a pin</p>
       <div class="card stack" id="mapInfo"></div>
       <div class="card stack"><h3>Map key</h3>
         <div class="mapkey">
@@ -977,29 +976,28 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
   store.set('travel',travel);renderTravel();renderPickup();if(CLOUD_ON())CLOUD.saveArrival(travel).catch(cloudErr);toast('Arrival saved. Thank you!')};
 
 /* ---------- venue map ---------- */
-/* 3D venue map (js/map3d.js). Places come from the family panel (config/map), else the defaults. */
-let PLACES=null,mapSel=null,mapMod=null,map3d=null,mapBusy=null;
+/* Venue map (js/map2d.js). Places come from the family panel (config/map), else the defaults. */
+let PLACES=null,mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
 async function renderMap(){
-  try{mapMod=mapMod||await import('./js/map3d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
+  try{mapMod=mapMod||await import('./js/map2d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
   const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null).map(p=>{const ev=eventsAt(p);return{...p,sub:ev.map(e=>evName(e)).join(' · '),ev}});
   $('#legend').innerHTML=places.map(p=>`<button data-pl="${esc(p.id)}" aria-pressed="${p.id===mapSel}"><i style="background:${esc(p.color||'#8e3a5d')}"></i>${esc(p.name)}</button>`).join('');
   $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(b.dataset.pl));
   const p=places.find(x=>x.id===mapSel);
   $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${esc(p.name)}</h3>${p.ev.length?`<p><b>${p.ev.map(e=>`${esc(evName(e))}</b> · ${dayText(e.day)}, ${esc(e.time)}`).join('<br><b>')}</p>`:''}<p class="muted">${esc(p.desc||'')}</p>`
     :`<p class="muted">Tap a pin or a name above. Your next event: <b>${esc(evName(nextEvent()))}</b> at ${esc(nextEvent().venue)}.</p>`;
-  if($('#m-map').hidden)return;                      // build the 3D scene only when the map is on screen
-  if(!map3d){
-    mapBusy=mapBusy||mapMod.createMap($('#map'),{places,onSelect:id=>{mapSel=id;renderMap()}}).then(m=>map3d=m)
-      .catch(e=>{console.error(e);$('#map').innerHTML='<p class="muted" style="padding:24px">This phone can\'t show the 3D map. Use the list above.</p>'});
+  if($('#m-map').hidden)return;                      // build the map only when the map is on screen
+  if(!venueMap){
+    mapBusy=mapBusy||mapMod.createMap($('#map'),{places,onSelect:id=>{mapSel=id;renderMap()}}).then(m=>venueMap=m)
+      .catch(e=>{console.error(e);$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Use the list above.</p>'});
     await mapBusy;
-  }else map3d.setPlaces(places);
-  if(map3d&&mapSel)map3d.focus(mapSel);
+  }else venueMap.setPlaces(places);
+  if(venueMap&&mapSel)venueMap.focus(mapSel);
 }
 function focusPlace(id){mapSel=id;renderMap()}
 // Functions held at a map pin: matched by venue name (Ballroom → banquet hall pin, Lawn → garden lawn, Lake → lake side).
 const VENUE_PIN={ballroom:/ballroom|banquet/i,lawn:/lawn|garden/i,lake:/lake/i};
 function eventsAt(p){const re=VENUE_PIN[p.id],seen=new Set();return re?myEvents().filter(e=>re.test(e.venue||'')&&!seen.has(evName(e))&&seen.add(evName(e))):[]}
-$('#mapTop').onclick=()=>map3d&&map3d.topView();$('#mapHome').onclick=()=>{mapSel=null;map3d&&map3d.resetView();renderMap()};
 
 /* ---------- family only ---------- */
 const DUTIES=[
