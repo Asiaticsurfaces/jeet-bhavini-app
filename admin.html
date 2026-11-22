@@ -124,7 +124,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="muted small">Shows at the top of every guest's Home screen.</p>
         <input id="nowText" maxlength="140" placeholder="e.g. Varmala starts in 10 min. Please come to Lake Side.">
         <div class="row">
-          <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Lobby &amp; help desk</option><option value="ballroom">Ballroom</option><option value="lawn">Lawn</option><option value="lake">Lake Side</option><option value="rooms">Guest rooms</option><option value="parking">Parking &amp; main gate</option></select>
+          <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Concierge</option><option value="ballroom">Banquet hall</option><option value="lawn">Garden lawn</option><option value="lake">The Lake Side</option><option value="rooms">Guest rooms</option><option value="parking">Entrance &amp; parking</option><option value="food">Saltt Restaurant</option></select>
           <select id="nowSide" style="width:auto"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select>
           <button class="btn" id="nowSave">Show to guests</button><button class="btn ghost" id="nowOff">Hide banner</button>
         </div>
@@ -691,14 +691,14 @@ async function start() {
       $('#mapReset').onclick = () => m3 && m3.resetView();
       $('#mapSave').onclick = () => {
         if (PL.some(p => !p.name.trim())) return toast('Every place needs a name');
-        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), updatedBy: u.email, updatedAt: serverTimestamp() })
+        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), v: mod.MAP_VERSION, updatedBy: u.email, updatedAt: serverTimestamp() })
           .then(() => { setDirty(false); toast('Map saved. Guests see it now'); }).catch(fail);
       };
       onSnapshot(doc(db, 'config', 'map'), async s => {
         if (dirty) return;                          // don't overwrite edits in progress
         mod = mod || await import('./js/map3d.js');
-        const L = s.exists() && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
-        PL = L.map(p => ({ ...p })); drawList(); $('#mapState').textContent = s.exists() ? 'Saved' : 'Suggested spots, not saved yet';
+        const L = s.exists() && s.data().v === mod.MAP_VERSION && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
+        PL = L.map(p => ({ ...p })); drawList(); $('#mapState').textContent = s.exists() && s.data().v === mod.MAP_VERSION ? 'Saved' : 'Suggested spots on the new map, not saved yet';
         if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">This browser can\'t show the 3D map.</p>'; });
       }, e => console.warn('map', e.code));
       // build the 3D scene when the Events tab is opened

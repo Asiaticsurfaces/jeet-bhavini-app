@@ -1,12 +1,39 @@
-// 3D venue map of Oleander, Karjat, traced from the resort's site plan.
-// Map coordinates are pixels on that plan (about 1240 × 1240); the family
-// panel stores each place as {id, name, desc, color, x, y} in those units.
+// 3D venue map of Oleander Farms, Karjat, built from the resort's own illustrated map.
+// The picture (assets/venue-map.jpg) is draped over a terrain whose heights come from
+// assets/venue-height.png: the paper is flat, the land is raised, lakes dip, Hill Top rises.
 //
-//   const map = await createMap(el, { places, onSelect, onPick, labels })
-//   map.setPlaces(places); map.focus(id); map.setPickMode(true|false); map.destroy()
+// Map coordinates are pixels on that map (2000 × 3000). The family panel stores each
+// place as {id, name, desc, color, x, y} in those units, with v: MAP_VERSION on the doc.
+//
+//   const map = await createMap(el, { places, onSelect, onPick })
+//   map.setPlaces(places); map.focus(id); map.setPickMode(true|false); map.resetView(); map.destroy()
 
 const THREE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+const TEX_URL = new URL('../assets/venue-map.jpg?v=3', import.meta.url).href;
+const HEIGHT_URL = new URL('../assets/venue-height.png?v=2', import.meta.url).href;
+
+export const MAP_VERSION = 2;
+const PW = 2000, PH = 3000, S = 20;                 // plan px per world unit → world is 100 × 150
+const LIFT = 1.9;                                    // world height of the land
+
+export const DEFAULT_PLACES = [
+  { id: 'ballroom', name: 'Banquet hall', desc: 'Oleander Farms Banquet, at the main entrance. Mameru (1 Dec, morning) and Mandap Ropan (2 Dec, morning).', color: '#8e3a5d', x: 694, y: 66 },
+  { id: 'parking', name: 'Entrance & parking', desc: 'Gate 1 and Gate 2 open onto the main road. Car parking is just inside, on the left.', color: '#5b5550', x: 625, y: 486 },
+  { id: 'lobby', name: 'Concierge', desc: 'Help desk for anything you need: keys, luggage, buggies, lost & found.', color: '#c99a5b', x: 908, y: 952 },
+  { id: 'rooms', name: 'Guest rooms', desc: 'Rooms are around the pool and lawns, by the lake and in the cottages. Your room number is on your wedding pass.', color: '#a8894f', x: 745, y: 1030 },
+  { id: 'lawn', name: 'Garden lawn', desc: 'Oleander Farms Garden. Sangeet (1 Dec, evening) and dinner.', color: '#3d8b4e', x: 940, y: 1134 },
+  { id: 'food', name: 'Saltt Restaurant', desc: 'All-day dining with farm views.', color: '#b8322b', x: 658, y: 731 },
+  { id: 'lake', name: 'The Lake Side', desc: 'Wedding venue on the water\'s edge (2 Dec). Walk or take a buggy down the path past the cottages.', color: '#2f6fb3', x: 1615, y: 2795 },
+];
+
+// Area names shown on the land
+const AREAS = [
+  { text: 'SOUTH NEST', x: 560, y: 640 },
+  { text: 'NORTH NEST', x: 760, y: 1600 },
+  { text: 'HILL TOP', x: 300, y: 2040 },
+  { text: 'LAKE SIDE', x: 1660, y: 2240 },
+];
 
 let loading = null;
 function loadScript(src) {
@@ -16,64 +43,16 @@ export function ensureThree() {
   if (window.THREE && window.THREE.OrbitControls) return Promise.resolve();
   return loading || (loading = (window.THREE ? Promise.resolve() : loadScript(THREE_URL)).then(() => loadScript(ORBIT_URL)));
 }
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; });
 
-// ---- the site plan, traced (plan pixels) ----
-const CX = 600, CY = 680, S = 10;           // plan px → world units
-const PALE = '#97c1aa', BASE = '#e2ebe4';
-export const ZONES = [
-  // surrounding land
-  { h: 0.5, c: PALE, p: [[55,665],[110,640],[175,520],[210,470],[300,458],[300,525],[345,420],[390,410],[395,520],[350,612],[450,650],[520,680],[600,700],[660,700],[720,690],[800,690],[880,705],[960,740],[1055,790],[1050,830],[1015,865],[960,840],[900,790],[850,760],[840,740],[745,700],[655,710],[640,760],[600,760],[560,720],[480,700],[420,700],[330,770],[315,775],[290,740],[225,760],[160,720],[80,700]] },
-  { h: 0.5, c: PALE, p: [[640,790],[700,840],[690,890],[670,950],[700,1000],[735,1065],[760,1080],[800,1100],[850,1140],[855,1200],[800,1215],[700,1200],[670,1160],[700,1110],[660,1060],[650,1020],[640,950],[610,900],[625,840]] },
-  { h: 0.5, c: PALE, p: [[545,420],[560,370],[600,330],[620,400],[660,470],[700,440],[780,425],[830,440],[840,480],[800,520],[760,540],[720,560],[700,560],[655,485],[600,470],[545,480]] },
-  // South Nest
-  { h: 1.6, c: '#58a46a', label: 'SOUTH NEST', lx: 398, ly: 330, p: [[378,118],[540,124],[518,240],[495,262],[500,300],[530,340],[552,400],[545,480],[520,520],[420,522],[408,470],[385,410],[382,300],[376,210]] },
-  { h: 1.9, c: '#a9d68e', p: [[390,122],[520,130],[505,235],[470,250],[420,262],[394,262],[388,200]] },
-  { h: 1.9, c: '#a9d68e', p: [[397,268],[470,254],[488,264],[470,287],[420,300],[398,296]] },
-  { h: 2.3, c: '#1d6b40', ellipse: [500, 410, 30, 46] },
-  // North Nest (with its lake as a hole)
-  { h: 1.6, c: '#17803f', label: 'NORTH NEST', lx: 410, ly: 590,
-    p: [[350,612],[410,522],[545,522],[655,485],[700,560],[720,690],[600,700],[520,672],[450,645],[420,625]],
-    hole: [[490,622],[530,602],[640,578],[690,562],[698,650],[600,662],[530,656],[495,650]] },
-  // south-east green and the western grove
-  { h: 1.6, c: '#17803f', p: [[658,712],[745,700],[838,742],[848,920],[836,990],[795,995],[772,955],[748,880],[730,800],[662,764]] },
-  { h: 1.8, c: '#0f5c35', p: [[195,860],[222,762],[292,738],[318,772],[272,822]] },
-];
-export const WATER = [
-  [[490,622],[530,602],[640,578],[690,562],[698,650],[600,662],[530,656],[495,650]],
-  [[665,472],[780,430],[818,447],[826,478],[780,500],[668,532]],
-  [[690,895],[718,900],[770,968],[790,1062],[760,1076],[735,1062],[700,1000],[668,950]],
-];
-const ROADS = [
-  [[110,805],[160,700],[160,640],[240,632],[310,560],[372,505],[392,430],[388,330],[380,230]],
-  [[320,770],[380,712],[432,662],[470,650]],
-  [[470,650],[560,690],[660,706],[745,700],[838,742],[895,768]],
-  [[545,522],[600,505],[655,486]],
-];
-
-export const DEFAULT_PLACES = [
-  { id: 'lobby', name: 'Lobby & help desk', desc: 'Check-in, welcome kits, lost & found and the hospitality team.', color: '#c99a5b', x: 445, y: 205 },
-  { id: 'parking', name: 'Parking & main gate', desc: 'Car parking and the station shuttle stop.', color: '#5b5550', x: 492, y: 170 },
-  { id: 'ballroom', name: 'Ballroom', desc: 'Mameru (1 Dec, 9 AM) and Mandap Ropan (2 Dec, 8 AM).', color: '#8e3a5d', x: 432, y: 300 },
-  { id: 'wash', name: 'Washrooms', desc: 'Next to the Ballroom and near the Lawn.', color: '#7d7a74', x: 470, y: 345 },
-  { id: 'rooms', name: 'Guest rooms', desc: 'Your room number is on your wedding pass.', color: '#a8894f', x: 445, y: 470 },
-  { id: 'lawn', name: 'Lawn', desc: 'Sangeet (1 Dec, 7 PM) and dinner.', color: '#3d8b4e', x: 585, y: 545 },
-  { id: 'lake', name: 'Lake Side', desc: 'Wedding: Jaan 3:30 PM, Hastamelap 5:41 PM (2 Dec).', color: '#2f6fb3', x: 560, y: 615 },
-];
-
-const W = (x, y) => [(x - CX) / S, (y - CY) / S];  // plan → world x/z
-
-function insidePoly(x, y, p) {
-  let c = false;
-  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-    const [xi, yi] = p[i], [xj, yj] = p[j];
-    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
-  }
-  return c;
-}
+const W = (x, y) => [(x - PW / 2) / S, (y - PH / 2) / S];   // plan → world x/z
+const P = (a, b) => [Math.round(a * S + PW / 2), Math.round(b * S + PH / 2)];
 
 export async function createMap(el, opts = {}) {
   await ensureThree();
   const T = window.THREE;
+  const [hImg, texImg] = await Promise.all([loadImg(HEIGHT_URL), loadImg(TEX_URL)]);
+
   el.style.position = el.style.position || 'relative';
   el.style.touchAction = 'none';
   const W0 = el.clientWidth || 360, H0 = el.clientHeight || 420;
@@ -81,12 +60,11 @@ export async function createMap(el, opts = {}) {
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(W0, H0);
-  renderer.setClearColor('#dfe9e2');
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.outputEncoding = T.sRGBEncoding;
+  renderer.setClearColor('#faf4e2');
   el.appendChild(renderer.domElement);
   renderer.domElement.style.display = 'block';
-  renderer.domElement.setAttribute('aria-label', 'Interactive 3D map of Oleander, Karjat. Drag to rotate, pinch to zoom.');
+  renderer.domElement.setAttribute('aria-label', 'Interactive 3D map of Oleander Farms, Karjat. Drag to turn, pinch to zoom, tap a pin.');
   renderer.domElement.setAttribute('role', 'img');
 
   const overlay = document.createElement('div');
@@ -94,114 +72,94 @@ export async function createMap(el, opts = {}) {
   el.appendChild(overlay);
 
   const scene = new T.Scene();
-  scene.fog = new T.Fog('#dfe9e2', 150, 280);
-  const camera = new T.PerspectiveCamera(42, W0 / H0, 0.5, 600);
-  camera.position.set(-14, 62, 30);
+  const camera = new T.PerspectiveCamera(40, W0 / H0, 0.5, 900);
 
-  scene.add(new T.HemisphereLight('#ffffff', '#9fb5a8', 0.62));
-  scene.add(new T.AmbientLight('#ffffff', 0.12));
-  const sun = new T.DirectionalLight('#fff1d6', 0.8);
-  sun.position.set(-40, 80, 30); sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 200 });
-  scene.add(sun);
+  scene.add(new T.HemisphereLight('#ffffff', '#d8cfb4', 0.67));
+  const sun = new T.DirectionalLight('#fff6e6', 0.42);
+  sun.position.set(-60, 90, 40); scene.add(sun);
 
-  const ground = [];
-  const base = new T.Mesh(new T.PlaneGeometry(260, 260), new T.MeshLambertMaterial({ color: BASE }));
-  base.rotation.x = -Math.PI / 2; base.receiveShadow = true; scene.add(base); ground.push(base);
-
-  const shapeOf = pts => { const s = new T.Shape(); pts.forEach(([x, y], i) => { const [a, b] = W(x, y); i ? s.lineTo(a, -b) : s.moveTo(a, -b); }); s.closePath(); return s; };
-  const addSlab = (shape, h, color, y0 = 0) => {
-    const g = new T.ExtrudeGeometry(shape, { depth: h, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.15, bevelSegments: 1 });
-    const m = new T.Mesh(g, new T.MeshLambertMaterial({ color }));
-    m.rotation.x = -Math.PI / 2; m.position.y = y0; m.castShadow = true; m.receiveShadow = true;
-    scene.add(m); ground.push(m); return m;
+  // ---- terrain: the illustrated map draped over a height field ----
+  const cv = document.createElement('canvas'); cv.width = hImg.width; cv.height = hImg.height;
+  const cx = cv.getContext('2d'); cx.drawImage(hImg, 0, 0);
+  const hd = cx.getImageData(0, 0, cv.width, cv.height).data, HW = cv.width, HH = cv.height;
+  const heightAt = (px, py) => {             // plan px → world height (bilinear)
+    const fx = Math.max(0, Math.min(HW - 1.001, px / PW * HW - 0.5)), fy = Math.max(0, Math.min(HH - 1.001, py / PH * HH - 0.5));
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0, g = (x, y) => hd[(y * HW + x) * 4];
+    const v = (g(x0, y0) * (1 - tx) + g(x0 + 1, y0) * tx) * (1 - ty) + (g(x0, y0 + 1) * (1 - tx) + g(x0 + 1, y0 + 1) * tx) * ty;
+    return v / 70 * LIFT;
   };
-  const zoneLabels = [];
-  for (const z of ZONES) {
-    let shape;
-    if (z.ellipse) { const [x, y, rx, ry] = z.ellipse; const [a, b] = W(x, y); shape = new T.Shape(); shape.absellipse(a, -b, rx / S, ry / S, 0, Math.PI * 2, false, 0); }
-    else { shape = shapeOf(z.p); if (z.hole) shape.holes.push(shapeOf(z.hole)); }
-    addSlab(shape, z.h, z.c);
-    if (z.label) zoneLabels.push({ text: z.label, x: z.lx, y: z.ly, h: z.h });
-  }
-  const waterMat = new T.MeshPhongMaterial({ color: '#5b93d6', shininess: 90, specular: '#cfe3ff' });
-  for (const w of WATER) { const g = new T.ExtrudeGeometry(shapeOf(w), { depth: 0.6, bevelEnabled: false }); const m = new T.Mesh(g, waterMat); m.rotation.x = -Math.PI / 2; m.receiveShadow = true; scene.add(m); ground.push(m); }
+  const SEG_X = 200, SEG_Y = 300;
+  const geo = new T.PlaneGeometry(PW / S, PH / S, SEG_X, SEG_Y);
+  geo.rotateX(-Math.PI / 2);                  // plane now lies on x/z; uv (0,1) is the map's top-left
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const [px, py] = P(pos.getX(i), pos.getZ(i)); pos.setY(i, heightAt(px, py)); }
+  geo.computeVertexNormals();
+  const tex = new T.Texture(texImg); tex.encoding = T.sRGBEncoding; tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = T.LinearMipmapLinearFilter; tex.needsUpdate = true;
+  const terrain = new T.Mesh(geo, new T.MeshLambertMaterial({ map: tex }));
+  scene.add(terrain);
+  // paper beyond the map edges
+  const paper = new T.Mesh(new T.PlaneGeometry(900, 900), new T.MeshBasicMaterial({ color: new T.Color('#faf4e2').convertSRGBToLinear() }));
+  paper.rotation.x = -Math.PI / 2; paper.position.y = -0.05; scene.add(paper);
 
-  // roads: flat ribbons
-  const roadMat = new T.MeshLambertMaterial({ color: '#ffffff' });
-  for (const r of ROADS) for (let i = 1; i < r.length; i++) {
-    const [ax, az] = W(...r[i - 1]), [bx, bz] = W(...r[i]);
-    const len = Math.hypot(bx - ax, bz - az);
-    const m = new T.Mesh(new T.BoxGeometry(len + 0.6, 0.12, 1.1), roadMat);
-    m.position.set((ax + bx) / 2, 0.62, (az + bz) / 2); m.rotation.y = -Math.atan2(bz - az, bx - ax); m.receiveShadow = true; scene.add(m);
-  }
-
-  // trees on the green areas (deterministic)
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const greens = ZONES.filter(z => z.p && z.h >= 1.6 && z.h < 2.3);
-  const spots = [];
-  for (let i = 0; i < 2600 && spots.length < 170; i++) {
-    const x = 180 + rnd() * 700, y = 110 + rnd() * 900;
-    const z = greens.find(z => insidePoly(x, y, z.p) && !(z.hole && insidePoly(x, y, z.hole)));
-    if (z && !WATER.some(w => insidePoly(x, y, w))) spots.push([x, y, z.h]);
-  }
-  const trunkG = new T.CylinderGeometry(0.12, 0.16, 0.7, 5), leafG = new T.ConeGeometry(0.75, 1.8, 7);
-  const trunks = new T.InstancedMesh(trunkG, new T.MeshLambertMaterial({ color: '#6b4f33' }), spots.length);
-  const leaves = new T.InstancedMesh(leafG, new T.MeshLambertMaterial({ color: '#2e7d47' }), spots.length);
-  const M4 = new T.Matrix4(), Q = new T.Quaternion(), V = new T.Vector3();
-  spots.forEach(([x, y, h], i) => {
-    const [a, b] = W(x, y), s = 0.7 + rnd() * 0.6;
-    M4.compose(new T.Vector3(a, h + 0.5, b), Q, V.set(s, s, s)); trunks.setMatrixAt(i, M4);
-    M4.compose(new T.Vector3(a, h + 0.5 + 1.1 * s, b), Q, V.set(s, s, s)); leaves.setMatrixAt(i, M4);
-  });
-  leaves.castShadow = true; scene.add(trunks, leaves);
-
+  // ---- camera ----
+  const HOME = { target: new T.Vector3(0, 0, 4), pos: new T.Vector3(0, 150, 105) };
+  const fit = () => {               // pull back far enough that the whole map fits this box
+    const aspect = (el.clientWidth || 360) / Math.max(1, el.clientHeight || 420);
+    const t = Math.tan(T.MathUtils.degToRad(20));
+    const d = Math.max(75 * 0.86 / t * 0.8, 51 / aspect / t);   // fit the map's height (it is tilted) and its full width
+    HOME.pos.copy(HOME.target).add(new T.Vector3(0, 0.82, 0.57).setLength(d));
+  };
+  fit();
+  camera.position.copy(HOME.pos);
   const controls = new T.OrbitControls(camera, renderer.domElement);
-  controls.target.set(-9, 0, -18);
-  Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, minDistance: 25, maxDistance: 150, minPolarAngle: 0.25, maxPolarAngle: 1.25, screenSpacePanning: false });
+  controls.target.copy(HOME.target);
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, minDistance: 14, maxDistance: 320, minPolarAngle: 0, maxPolarAngle: 1.2, screenSpacePanning: false, panSpeed: 1.2 });
+  controls.touches = { ONE: T.TOUCH.ROTATE, TWO: T.TOUCH.DOLLY_PAN };
   controls.update();
+  const clampTarget = () => { const t = controls.target; t.x = Math.max(-50, Math.min(50, t.x)); t.z = Math.max(-75, Math.min(75, t.z)); t.y = 0; };
 
   // ---- places: pins + labels ----
-  const ray = new T.Raycaster(), down = new T.Vector3(0, -1, 0);
-  const topAt = (a, b) => { scene.updateMatrixWorld(true); ray.set(new T.Vector3(a, 50, b), down); const hit = ray.intersectObjects(ground)[0]; return hit ? hit.point.y : 0.5; };
+  const ray = new T.Raycaster();
   let pins = [], selected = opts.selectedId || null, pickMode = false;
   const pinGroup = new T.Group(); scene.add(pinGroup);
   function setPlaces(places) {
     pinGroup.clear(); pins.forEach(p => p.label.remove()); pins = [];
     for (const pl of places || []) {
       if (pl.x == null || pl.y == null) continue;
-      const [a, b] = W(pl.x, pl.y), y = topAt(a, b);
+      const [a, b] = W(pl.x, pl.y), y = heightAt(pl.x, pl.y);
       const g = new T.Group(); g.position.set(a, y, b); g.userData.id = pl.id;
-      const mat = new T.MeshLambertMaterial({ color: pl.color || '#8e3a5d' });
-      const stick = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 3.2, 6), new T.MeshLambertMaterial({ color: '#ffffff' })); stick.position.y = 1.6;
-      const head = new T.Mesh(new T.SphereGeometry(0.85, 18, 14), mat); head.position.y = 3.6; head.castShadow = true;
-      const ring = new T.Mesh(new T.RingGeometry(0.7, 1.2, 24), new T.MeshBasicMaterial({ color: pl.color || '#8e3a5d', transparent: true, opacity: 0.45, side: T.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
+      const color = pl.color || '#8e3a5d';
+      const stick = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 2.6, 6), new T.MeshLambertMaterial({ color: '#ffffff' })); stick.position.y = 1.3;
+      const head = new T.Mesh(new T.SphereGeometry(0.75, 18, 14), new T.MeshLambertMaterial({ color }));
+      head.position.y = 3;
+      const ring = new T.Mesh(new T.RingGeometry(0.55, 1.05, 24), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
       g.add(stick, head, ring); [stick, head].forEach(m => m.userData.id = pl.id);
       pinGroup.add(g);
       const label = document.createElement('div');
       label.textContent = pl.name;
-      label.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25)';
-      label.style.background = pl.color || '#8e3a5d';
+      label.style.cssText = 'position:absolute;left:0;top:0;white-space:nowrap;padding:4px 9px;border-radius:999px;font-size:11.5px;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.28);border:1.5px solid rgba(255,255,255,.9);will-change:transform';
+      label.style.background = color;
       overlay.appendChild(label);
-      pins.push({ id: pl.id, g, head, label, place: pl });
+      pins.push({ id: pl.id, g, label, place: pl });
     }
     highlight();
   }
-  const zoneEls = zoneLabels.map(z => { const d = document.createElement('div'); d.textContent = z.text;
-    d.style.cssText = 'position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-size:10px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.95);text-shadow:0 1px 3px rgba(0,0,0,.45)';
-    overlay.appendChild(d); const [a, b] = W(z.x, z.y); return { d, v: new T.Vector3(a, z.h + 0.3, b) }; });
+  const areaEls = AREAS.map(z => { const d = document.createElement('div'); d.textContent = z.text;
+    d.style.cssText = 'position:absolute;left:0;top:0;font-size:10px;font-weight:700;letter-spacing:.22em;color:#3b5a2a;background:rgba(255,252,240,.78);padding:2px 7px;border-radius:6px;will-change:transform';
+    overlay.appendChild(d); const [a, b] = W(z.x, z.y); return { d, v: new T.Vector3(a, heightAt(z.x, z.y) + 0.3, b) }; });
   function highlight() {
     for (const p of pins) {
       const on = !selected || p.id === selected;
-      p.g.scale.setScalar(p.id === selected ? 1.35 : 1);
-      p.label.style.opacity = on ? '1' : '0.45';
-      p.label.style.zIndex = p.id === selected ? '2' : '1';
+      p.g.scale.setScalar(p.id === selected ? 1.4 : 1);
+      p.label.style.opacity = on ? '1' : '0.5';
+      p.label.style.zIndex = p.id === selected ? '3' : '2';
+      p.label.style.fontSize = p.id === selected ? '13px' : '11.5px'; p.label._w = p.label._h = 0;
     }
   }
 
-  // ---- tap: select a pin, or (pick mode) choose a location ----
+  // ---- tap: select a pin, or (pick mode) choose a spot ----
   let downAt = null;
   renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
   renderer.domElement.addEventListener('pointerup', e => {
@@ -210,8 +168,10 @@ export async function createMap(el, opts = {}) {
     scene.updateMatrixWorld(true); camera.updateMatrixWorld(true);
     ray.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
     if (pickMode) {
-      const hit = ray.intersectObjects(ground)[0]; if (!hit) return;
-      opts.onPick && opts.onPick(Math.round(hit.point.x * S + CX), Math.round(hit.point.z * S + CY));
+      const hit = ray.intersectObject(terrain)[0]; if (!hit) return;
+      const [px, py] = P(hit.point.x, hit.point.z);
+      if (px < 0 || py < 0 || px > PW || py > PH) return;
+      opts.onPick && opts.onPick(px, py);
       return;
     }
     const hit = ray.intersectObjects(pinGroup.children, true)[0];
@@ -220,34 +180,48 @@ export async function createMap(el, opts = {}) {
   });
 
   let tween = null;
+  const flyTo = (toTarget, toPos, ms = 700) => {
+    const ft = controls.target.clone(), fp = camera.position.clone(), t0 = performance.now();
+    tween = now => { const k = Math.min(1, (now - t0) / ms), e = k * (2 - k);
+      controls.target.lerpVectors(ft, toTarget, e); camera.position.lerpVectors(fp, toPos, e); if (k >= 1) tween = null; };
+  };
   function focus(id) {
     selected = id; highlight();
     const p = pins.find(x => x.id === id); if (!p) return;
-    const to = p.g.position.clone(), from = controls.target.clone(), t0 = performance.now();
+    const to = p.g.position.clone(); to.y = 0;
     const offset = camera.position.clone().sub(controls.target);
-    const dist = Math.min(offset.length(), 55); offset.setLength(dist);
-    tween = now => { const k = Math.min(1, (now - t0) / 650), e = k * (2 - k);
-      controls.target.lerpVectors(from, to, e); camera.position.copy(controls.target).add(offset); if (k >= 1) tween = null; };
+    offset.setLength(Math.min(Math.max(offset.length(), 55), 75));
+    flyTo(to, to.clone().add(offset));
   }
 
   const v = new T.Vector3();
-  const place = (elx, vec, lift) => {
+  // Project a label; returns its box on screen (or null when off screen).
+  const place = (elx, vec, lift, up) => {
     v.copy(vec); v.y += lift; v.project(camera);
-    const vis = v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
-    elx.style.display = vis ? 'block' : 'none';
-    if (vis) elx.style.transform = `translate(${(v.x + 1) / 2 * el.clientWidth}px, ${(1 - v.y) / 2 * el.clientHeight}px) translate(-50%,-100%)`;
+    if (!(v.z < 1 && Math.abs(v.x) < 1.15 && Math.abs(v.y) < 1.15)) return null;
+    const w = elx._w || (elx._w = elx.offsetWidth) || 9 * elx.textContent.length + 18, h = elx._h || (elx._h = elx.offsetHeight) || 24;
+    const x = (v.x + 1) / 2 * el.clientWidth - w / 2, y = (1 - v.y) / 2 * el.clientHeight - (up ? h : h / 2);
+    return { elx, x, y, w, h };
   };
+  const overlaps = (a, b) => a.x < b.x + b.w + 4 && b.x < a.x + a.w + 4 && a.y < b.y + b.h + 2 && b.y < a.y + a.h + 2;
   let raf = 0, alive = true;
   const loop = now => {
     if (!alive) return;
     if (tween) tween(now);
-    controls.update(); renderer.render(scene, camera);
-    for (const p of pins) place(p.label, p.g.position, 5.2);
-    for (const z of zoneEls) { place(z.d, z.v, 0); z.d.style.transform += ' translate(0,50%)'; }
+    controls.update(); clampTarget();
+    renderer.render(scene, camera);
+    const order = [...pins].sort((a, b) => (b.id === selected) - (a.id === selected));
+    const boxes = [...order.map(p => place(p.label, p.g.position, 4.3 * p.g.scale.y, true)), ...areaEls.map(z => place(z.d, z.v, 0, false))];
+    const shown = [];
+    [...order.map(p => p.label), ...areaEls.map(z => z.d)].forEach((elx, i) => {
+      const b = boxes[i], ok = b && !shown.some(o => overlaps(o, b));
+      elx.style.display = ok ? 'block' : 'none';
+      if (ok) { shown.push(b); elx.style.transform = `translate(${b.x}px,${b.y}px)`; }
+    });
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);
-  const ro = new ResizeObserver(() => { const w = el.clientWidth, h = el.clientHeight; if (!w || !h) return; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); });
+  const ro = new ResizeObserver(() => { const w = el.clientWidth, h = el.clientHeight; if (!w || !h) return; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); fit(); });
   ro.observe(el);
 
   setPlaces(opts.places || DEFAULT_PLACES);
@@ -255,7 +229,8 @@ export async function createMap(el, opts = {}) {
     setPlaces, focus,
     select(id) { selected = id; highlight(); },
     setPickMode(on) { pickMode = !!on; renderer.domElement.style.cursor = on ? 'crosshair' : 'grab'; },
-    resetView() { controls.target.set(-9, 0, -18); camera.position.set(-14, 62, 30); selected = null; highlight(); },
+    resetView() { selected = null; highlight(); fit(); flyTo(HOME.target.clone(), HOME.pos.clone()); },
+    topView() { const t = controls.target.clone(); flyTo(t, t.clone().add(new T.Vector3(0, camera.position.distanceTo(t), 0.01))); },
     destroy() { alive = false; cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); el.innerHTML = ''; },
   };
 }

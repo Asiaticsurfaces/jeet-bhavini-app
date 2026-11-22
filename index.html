@@ -237,7 +237,7 @@ nav.bar .fab{justify-content:center;align-items:center;padding:0;gap:0}
 select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* Map */
-.map{height:430px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#e2ebe4;box-shadow:var(--shadow);position:relative}
+.map{height:min(560px,72vh);border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#e2ebe4;box-shadow:var(--shadow);position:relative}
 .map svg{display:block;width:100%;height:auto}
 .map .zone{cursor:pointer;transition:opacity .2s}
 .map .zone rect,.map .zone ellipse{stroke:#fff;stroke-width:3}
@@ -445,8 +445,10 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div><p class="eyebrow">Oleander, Karjat</p><h1 data-t="map">Venue map</h1></div>
       <div class="legend" id="legend" role="group" aria-label="Highlight a place"></div>
       <div class="map" id="map"></div>
-      <p class="demo-note">Drag to turn the map · pinch to zoom · tap a pin</p>
+      <div class="row" style="gap:8px;margin-top:-4px"><button class="btn ghost sm" id="mapTop">Top view</button><button class="btn ghost sm" id="mapHome">Whole map</button></div>
+      <p class="demo-note" style="margin:0">Drag to turn · pinch to zoom · tap a pin or a name</p>
       <div class="card stack" id="mapInfo"></div>
+      <div class="card stack"><h3>Map key</h3><img src="assets/venue-key.png" alt="Map key: parking, hotel, buggy parking, concierge, restrooms, pool and lawn view rooms, lake view rooms, the cottages, plunge pool rooms" style="width:100%;height:auto"></div>
     </div>
 
     <div id="m-family" class="screen" hidden>
@@ -980,6 +982,7 @@ async function renderMap(){
   if(map3d&&mapSel)map3d.focus(mapSel);
 }
 function focusPlace(id){mapSel=id;renderMap()}
+$('#mapTop').onclick=()=>map3d&&map3d.topView();$('#mapHome').onclick=()=>{mapSel=null;map3d&&map3d.resetView();renderMap()};
 
 /* ---------- family only ---------- */
 const DUTIES=[
