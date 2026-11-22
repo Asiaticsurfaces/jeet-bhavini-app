@@ -6,7 +6,8 @@
 // pin as {id, name, desc, color, x, y} in those units, with v: MAP_VERSION on the doc.
 // A pin may also carry `sub` (a second line, e.g. which functions happen there).
 //
-//   const map = await createMap(el, { places, onSelect, onPick })
+//   const map = await createMap(el, { places, onSelect, onPick, plain })
+//   plain: just the map picture; a pin shows only for the place you were sent to (focus).
 //   map.setPlaces(places); map.focus(id); map.setPickMode(true|false); map.resetView(); map.destroy()
 
 import { FEATURES, GROUPS } from './venue-data.js?v=1';
@@ -72,10 +73,11 @@ export async function createMap(el, opts = {}) {
       esc(short ? k.icon : (k.icon || '') + text));
     items.push({ el: d, x: f.x, y: f.y, lift: (f.d || 20) / 2, pri: k.pri, kind: 'static' });
   };
-  for (const g of GROUPS) addStatic(g, KIND[g.t], g.n);
+  const plain = !!opts.plain;
+  if (!plain) for (const g of GROUPS) addStatic(g, KIND[g.t], g.n);
   // the map already draws parking, restroom, buggy, concierge and gate icons: label the rest
-  for (const f of FEATURES) { const k = KIND[f.t]; if (k && f.n && !f.nolabel && !['parking', 'wc', 'buggy', 'concierge', 'gate'].includes(f.t)) addStatic(f, k, f.n); }
-  for (const a of AREAS) items.push({ el: div(overlay, chip + ';font-size:10px;font-weight:700;letter-spacing:.22em;color:#3b5a2a;background:rgba(255,252,240,.82);padding:2px 7px;border-radius:6px;box-shadow:none', a.text), x: a.x, y: a.y, lift: 0, pri: 0, kind: 'area', mid: 1 });
+  if (!plain) for (const f of FEATURES) { const k = KIND[f.t]; if (k && f.n && !f.nolabel && !['parking', 'wc', 'buggy', 'concierge', 'gate'].includes(f.t)) addStatic(f, k, f.n); }
+  if (!plain) for (const a of AREAS) items.push({ el: div(overlay, chip + ';font-size:10px;font-weight:700;letter-spacing:.22em;color:#3b5a2a;background:rgba(255,252,240,.82);padding:2px 7px;border-radius:6px;box-shadow:none', a.text), x: a.x, y: a.y, lift: 0, pri: 0, kind: 'area', mid: 1 });
 
   let pins = [], selected = opts.selectedId || null, pickMode = false;
   function setPlaces(places) {
@@ -114,7 +116,7 @@ export async function createMap(el, opts = {}) {
     stage.style.transform = `translate(${tx}px,${ty}px) scale(${k})`;
     const [W, H] = size(), z = k / fitK;      // z = how far zoomed in (1 = whole map)
     const list = [
-      ...pins.map(p => ({ el: p.el, pri: p.id === selected ? 99 : 10, x: p.place.x, y: p.place.y, lift: 0, pin: p })),
+      ...pins.filter(p => { const on = !plain || p.id === selected; p.mark.style.display = on ? 'block' : 'none'; if (!on) p.el.style.display = 'none'; return on; }).map(p => ({ el: p.el, pri: p.id === selected ? 99 : 10, x: p.place.x, y: p.place.y, lift: 0, pin: p })),
       ...items.map(it => ({ ...it, pri: it.dup ? -1 : it.kind === 'area' ? (z < 1.8 ? 6 : 0.5) : it.pri })),
     ].sort((a, b) => b.pri - a.pri);
     const shown = [];
@@ -204,7 +206,7 @@ export async function createMap(el, opts = {}) {
     const p = pins.find(x => x.id === id); if (!p) return draw();
     animateTo(centreOn(p.place.x, p.place.y, Math.max(k, fitK * 3)));
   }
-  function resetView() { selected = null; animateTo(fitView()); }
+  function resetView() { const had = selected; selected = null; animateTo(fitView()); if (had && opts.onSelect) opts.onSelect(null); }
 
   const ro = new ResizeObserver(() => { const wasFit = Math.abs(k - fitK) < 1e-6; const f = fitView(); if (wasFit) ({ k, tx, ty } = f); redraw(); });
   ro.observe(el);

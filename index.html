@@ -443,11 +443,10 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <div id="m-map" class="screen" hidden>
       <button class="back" data-go="home">← Guest info</button>
       <div><p class="eyebrow">Oleander, Karjat</p><h1 data-t="map">Venue map</h1></div>
-      <div class="legend" id="legend" role="group" aria-label="Highlight a place"></div>
+      <div class="legend" id="legend" role="group" aria-label="Highlight a place" hidden></div>
       <div class="map" id="map"></div>
-      <p class="demo-note" style="margin:0">Drag to move · pinch or tap + − to zoom · tap a pin</p>
+      <p class="demo-note" style="margin:0">Drag to move · pinch or tap + − to zoom</p>
       <div class="card stack" id="mapInfo"></div>
-      <div class="card stack"><p class="small muted">The icons are explained at the bottom of the map: parking, hotel rooms, buggy parking, concierge and restrooms. Your room number is on your wedding pass. Ask the concierge or the check-in desk to show you the way.</p></div>
     </div>
 
     <div id="m-family" class="screen" hidden>
@@ -914,7 +913,7 @@ async function renderWeather(){
 
 /* ---------- info ---------- */
 const subs=['help','lost','wishes','travel','map','family','stay','faq','contacts','pack'];
-function goMore(g){if(g==='family')renderFamily();if(g==='pack')renderPack();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0);if(g==='map')renderMap()}
+function goMore(g){if(g==='family')renderFamily();if(g==='pack')renderPack();$('#moreHome').hidden=g!=='home';subs.forEach(s=>$('#m-'+s).hidden=s!==g);window.scrollTo(0,0);if(g==='map'){if(!mapGo&&mapSel){mapSel=null;venueMap&&venueMap.resetView()}mapGo=false;renderMap()}}
 $$('[data-go]').forEach(b=>b.onclick=()=>goMore(b.dataset.go));
 const CATS=['Cab or transport','Room issue','Medical','Food / dietary','Lost something','Something else'];
 let helpCat=null;let tickets=store.get('tickets',[]);
@@ -964,7 +963,7 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
 
 /* ---------- venue map ---------- */
 /* Venue map (js/map2d.js). Places come from the family panel (config/map), else the defaults. */
-let PLACES=null,ROOMBLOCKS={},mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
+let PLACES=null,ROOMBLOCKS={},mapGo=false,mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
 async function renderMap(){
   try{mapMod=mapMod||await import('./js/map2d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
   const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null).map(p=>{const ev=eventsAt(p);return{...p,sub:ev.map(e=>evName(e)).join(' · '),ev}});
@@ -973,10 +972,11 @@ async function renderMap(){
   $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(b.dataset.pl));
   const p=places.find(x=>x.id===mapSel);
   $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${esc(p.name)}</h3>${p.ev.length?`<p><b>${p.ev.map(e=>`${esc(evName(e))}</b> · ${dayText(e.day)}, ${esc(e.time)}`).join('<br><b>')}</p>`:''}<p class="muted">${esc(p.desc||'')}</p>`
-    :`<p class="muted">Tap a pin or a name above. Your next event: <b>${esc(evName(nextEvent()))}</b> at ${esc(nextEvent().venue)}.</p>`;
+    :'';
+  $('#mapInfo').hidden=!p;
   if($('#m-map').hidden)return;                      // build the map only when the map is on screen
   if(!venueMap){
-    mapBusy=mapBusy||mapMod.createMap($('#map'),{places,onSelect:id=>{mapSel=id;renderMap()}}).then(m=>venueMap=m)
+    mapBusy=mapBusy||mapMod.createMap($('#map'),{places,plain:true,onSelect:id=>{mapSel=id;renderMap()}}).then(m=>venueMap=m)
       .catch(e=>{console.error(e);$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Use the list above.</p>'});
     await mapBusy;
   }else venueMap.setPlaces(places);
@@ -984,7 +984,7 @@ async function renderMap(){
 }
 function focusPlace(id){mapSel=id;renderMap()}
 // Open the venue map at a pin (event cards, the Happening now banner, the pass).
-function openMapAt(id){if(id)mapSel=id;location.hash='map';show('map')}
+function openMapAt(id){mapSel=id||null;mapGo=true;if(location.hash==='#map')show('map');else location.hash='map'}   // the hashchange shows it
 const pinForVenue=v=>Object.keys(VENUE_PIN).find(k=>VENUE_PIN[k].test(v||''))||null;
 document.addEventListener('click',e=>{const b=e.target.closest('[data-mapgo]');if(b){e.preventDefault();openMapAt(b.dataset.mapgo)}});
 // The guest's own room: its wing (from the Rooms tab) → a room block on the map.
