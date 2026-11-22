@@ -237,6 +237,7 @@ nav.bar .fab{justify-content:center;align-items:center;padding:0;gap:0}
 select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* Map */
+.mapkey{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px}.mapkey span{display:flex;align-items:center;gap:8px}.mapkey i{width:14px;height:14px;border-radius:4px;flex:none}.mapkey b{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:5px;font-size:11px;flex:none}.mapkey .kp{background:#2f6fb3;color:#fff}.mapkey .kw{background:#44403b}.mapkey .kc{background:#fff;border:1px solid var(--line)}
 .map{height:min(560px,72vh);border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#e2ebe4;box-shadow:var(--shadow);position:relative}
 .map svg{display:block;width:100%;height:auto}
 .map .zone{cursor:pointer;transition:opacity .2s}
@@ -448,7 +449,20 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div class="row" style="gap:8px;margin-top:-4px"><button class="btn ghost sm" id="mapTop">Top view</button><button class="btn ghost sm" id="mapHome">Whole map</button></div>
       <p class="demo-note" style="margin:0">Drag to turn · pinch to zoom · tap a pin or a name</p>
       <div class="card stack" id="mapInfo"></div>
-      <div class="card stack"><h3>Map key</h3><img src="assets/venue-key.png" alt="Map key: parking, hotel, buggy parking, concierge, restrooms, pool and lawn view rooms, lake view rooms, the cottages, plunge pool rooms" style="width:100%;height:auto"></div>
+      <div class="card stack"><h3>Map key</h3>
+        <div class="mapkey">
+          <span><i style="background:#8e3a5d"></i>Function venues</span>
+          <span><i style="background:#c8553d"></i>Pool &amp; Lawn View Rooms</span>
+          <span><i style="background:#7f8c99"></i>Lake View Rooms</span>
+          <span><i style="background:#4f4440"></i>Plunge Pool Rooms</span>
+          <span><i style="background:#8b5a2b"></i>The Cottages</span>
+          <span><i style="background:#c99a5b"></i>Food &amp; drink</span>
+          <span><i style="background:#e8cc96;border:1.5px solid #be965c"></i>Road</span>
+          <span><b class="kp">P</b>Parking</span>
+          <span><b class="kw">🚻</b>Restrooms</span>
+          <span><b class="kc">🛎</b>Concierge</span>
+        </div>
+        <p class="small muted">Your room number is on your wedding pass. Ask the concierge or the check-in desk to show you the way.</p></div>
     </div>
 
     <div id="m-family" class="screen" hidden>
@@ -967,11 +981,11 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
 let PLACES=null,mapSel=null,mapMod=null,map3d=null,mapBusy=null;
 async function renderMap(){
   try{mapMod=mapMod||await import('./js/map3d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
-  const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null);
+  const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null).map(p=>{const ev=eventsAt(p);return{...p,sub:ev.map(e=>evName(e)).join(' · '),ev}});
   $('#legend').innerHTML=places.map(p=>`<button data-pl="${esc(p.id)}" aria-pressed="${p.id===mapSel}"><i style="background:${esc(p.color||'#8e3a5d')}"></i>${esc(p.name)}</button>`).join('');
   $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(b.dataset.pl));
   const p=places.find(x=>x.id===mapSel);
-  $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${esc(p.name)}</h3><p class="muted">${esc(p.desc||'')}</p>`
+  $('#mapInfo').innerHTML=p?`<p class="eyebrow">Selected</p><h3>${esc(p.name)}</h3>${p.ev.length?`<p><b>${p.ev.map(e=>`${esc(evName(e))}</b> · ${dayText(e.day)}, ${esc(e.time)}`).join('<br><b>')}</p>`:''}<p class="muted">${esc(p.desc||'')}</p>`
     :`<p class="muted">Tap a pin or a name above. Your next event: <b>${esc(evName(nextEvent()))}</b> at ${esc(nextEvent().venue)}.</p>`;
   if($('#m-map').hidden)return;                      // build the 3D scene only when the map is on screen
   if(!map3d){
@@ -982,6 +996,9 @@ async function renderMap(){
   if(map3d&&mapSel)map3d.focus(mapSel);
 }
 function focusPlace(id){mapSel=id;renderMap()}
+// Functions held at a map pin: matched by venue name (Ballroom → banquet hall pin, Lawn → garden lawn, Lake → lake side).
+const VENUE_PIN={ballroom:/ballroom|banquet/i,lawn:/lawn|garden/i,lake:/lake/i};
+function eventsAt(p){const re=VENUE_PIN[p.id],seen=new Set();return re?myEvents().filter(e=>re.test(e.venue||'')&&!seen.has(evName(e))&&seen.add(evName(e))):[]}
 $('#mapTop').onclick=()=>map3d&&map3d.topView();$('#mapHome').onclick=()=>{mapSel=null;map3d&&map3d.resetView();renderMap()};
 
 /* ---------- family only ---------- */
