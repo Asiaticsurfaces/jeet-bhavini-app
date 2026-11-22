@@ -186,7 +186,7 @@ async function start() {
   });
   onSnapshot(doc(db, 'config', 'map'), s => {
     const d = s.exists() ? s.data() : null, L = d && d.v === 2 ? d.places : null;   // v 2 = pins on the Oleander Farms map
-    PLACES = Array.isArray(L) && L.length ? L : null; refresh('map');
+    PLACES = Array.isArray(L) && L.length ? L : null; ROOMBLOCKS = d && d.v === 2 && d.blocks || {}; refresh('map');
   });
   onSnapshot(doc(db, 'config', 'contacts'), s => {
     if (s.exists() && Array.isArray(s.data().list)) { CONTACTS = s.data().list.map(c => [c.label, c.phone || '', c.note || '']); refresh('contacts'); }

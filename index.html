@@ -638,7 +638,7 @@ const evName=e=>lang==='gu'?e.gu:e.name;
 const TABS=['home','schedule','camera','more'];
 function show(tab){
   let btn=tab,sub='home';if(tab==='help'){tab='more';sub='help'}
-  if(tab==='pack'){tab=btn='more';sub='pack'}   // "Before you pack" opens straight away
+  if(tab==='pack'||tab==='map'){sub=tab;tab=btn='more'}   // these open straight away
   if(!TABS.includes(tab))tab=btn='home';
   TABS.forEach(t=>$('#s-'+t).hidden=t!==tab);
   if(tab==='more')goMore(sub);
@@ -664,6 +664,7 @@ function renderHome(){
    <button class="btn sm" onclick="location.hash='schedule'">View</button>`;
   $('#pass').innerHTML=ME?`<div><span>Room</span>${ME.room?`<b>${esc(ME.room)}</b>`:`<b style="font-size:16px;line-height:1.3">Will be assigned soon</b>`}</div>${ME.side?`<div><span>Side</span><b style="font-size:18px">${esc(ME.side)}</b></div>`:''}
      ${ME.room&&(ME.roomWhere||ME.stayIn)?`<div style="grid-column:1/-1"><span>Your stay</span><b style="font-size:17px">${esc([ME.roomWhere,stayText(ME.stayIn,ME.stayOut)].filter(Boolean).join(' · '))}</b></div>`:''}
+     ${ME.room?`<button class="btn ghost sm" style="grid-column:1/-1;justify-self:start" data-mapgo="myroom">📍 Find my room on the map</button>`:''}
      ${CHECKIN&&CHECKIN.in?`<div style="grid-column:1/-1"><span>Check-in</span><b style="font-size:17px">✓ Checked in · ${new Date(CHECKIN.at?.toMillis?CHECKIN.at.toMillis():Date.now()).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</b></div>`:''}
      ${ME.room&&(ME.roommates||[]).length?`<div style="grid-column:1/-1"><span>Sharing your room with</span><div class="mates">${ME.roommates.map(n=>`<span class="mate">${esc(n)}</span>`).join('')}</div></div>`:''}`
     :'<p class="muted" style="grid-column:1/-1">Find your invite to see your room and events.</p>';
@@ -676,8 +677,8 @@ function renderNow(){
   if(NOWS_ALL)NOWS=NOWS_ALL.filter(forMe);
   $('#nowbar').hidden=!NOWS.length;if(!NOWS.length)return;
   const n=NOWS[nowI%NOWS.length];
-  $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now${CLOUD_ON()?'':' · sample'}</small><b>${esc(n.t)}</b></span><span class="go">›</span>`;
-  $('#nowbar').onclick=()=>{location.hash='more';show('more');goMore('map');focusPlace(n.place||null)};
+  $('#nowbar').innerHTML=`<span class="pulse"></span><span><small>Happening now${CLOUD_ON()?'':' · sample'}${n.place?' · tap for the map':''}</small><b>${esc(n.t)}</b></span><span class="go">${n.place?'📍':'›'}</span>`;
+  $('#nowbar').onclick=()=>openMapAt(n.place||null);
 }
 setInterval(()=>{nowI++;renderNow()},6000);
 function renderPickup(){
@@ -763,7 +764,7 @@ function renderSchedule(){
      ${e.pack.length?`<details><summary>What to bring</summary><div>${e.pack.map((x,i)=>{const k=e.id+i;return `<label class="pack ${packed[k]?'done':''}"><input type="checkbox" data-pk="${k}" ${packed[k]?'checked':''}><span>${esc(x)}</span></label>`}).join('')}</div></details>`:''}
      ${e.rites.length?`<details><summary>What happens here</summary><div>${e.rites.map(([n,d])=>`<div class="rite"><b>${esc(n)}</b>${d?`<p>${esc(d)}</p>`:''}</div>`).join('')}</div></details>`:''}
      <div class="rsvp" role="group" aria-label="RSVP for ${e.name}">${['Going','Maybe','Can\'t'].map(o=>`<button data-ev="${e.id}" data-v="${o}" aria-pressed="${rsvp[e.id]===o}">${o}</button>`).join('')}</div>
-     <div class="row"><a class="btn ghost sm" style="flex:1" href="https://maps.google.com/?q=${encodeURIComponent('Oleander Karjat')}" target="_blank" rel="noopener">Directions</a>
+     <div class="row"><a class="btn ghost sm" style="flex:1" href="https://maps.google.com/?q=${encodeURIComponent('Oleander Karjat')}" target="_blank" rel="noopener">Directions</a>${pinForVenue(e.venue)?`<button class="btn ghost sm" style="flex:1" data-mapgo="${pinForVenue(e.venue)}">📍 On venue map</button>`:''}
      <button class="bell" data-bell="${e.id}" aria-pressed="${on}">${on?'Reminder on':'Remind me'}</button></div>
    </div></article>`}).join('');
   $$('[data-pk]').forEach(c=>c.onchange=()=>{packed[c.dataset.pk]=c.checked;store.set('packed',packed);c.parentElement.classList.toggle('done',c.checked)});
@@ -977,10 +978,11 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
 
 /* ---------- venue map ---------- */
 /* Venue map (js/map2d.js). Places come from the family panel (config/map), else the defaults. */
-let PLACES=null,mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
+let PLACES=null,ROOMBLOCKS={},mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
 async function renderMap(){
   try{mapMod=mapMod||await import('./js/map2d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
   const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null).map(p=>{const ev=eventsAt(p);return{...p,sub:ev.map(e=>evName(e)).join(' · '),ev}});
+  const mine=myRoomPin();if(mine)places.unshift(mine);
   $('#legend').innerHTML=places.map(p=>`<button data-pl="${esc(p.id)}" aria-pressed="${p.id===mapSel}"><i style="background:${esc(p.color||'#8e3a5d')}"></i>${esc(p.name)}</button>`).join('');
   $$('#legend button').forEach(b=>b.onclick=()=>focusPlace(b.dataset.pl));
   const p=places.find(x=>x.id===mapSel);
@@ -995,6 +997,17 @@ async function renderMap(){
   if(venueMap&&mapSel)venueMap.focus(mapSel);
 }
 function focusPlace(id){mapSel=id;renderMap()}
+// Open the venue map at a pin (event cards, the Happening now banner, the pass).
+function openMapAt(id){if(id)mapSel=id;location.hash='map';show('map')}
+const pinForVenue=v=>Object.keys(VENUE_PIN).find(k=>VENUE_PIN[k].test(v||''))||null;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-mapgo]');if(b){e.preventDefault();openMapAt(b.dataset.mapgo)}});
+// The guest's own room: its wing (from the Rooms tab) → a room block on the map.
+function myRoomPin(){
+  if(!ME||!ME.room||!mapMod)return null;
+  const wing=String(ME.roomWhere||'').split(';')[0].split(' · ')[0].trim();
+  const t=ROOMBLOCKS[wing]||mapMod.guessBlock(wing);const g=mapMod.GROUPS.find(x=>x.t===t);if(!g)return null;
+  return{id:'myroom',name:`Your room ${ME.room}`,sub:g.n,desc:`Room ${ME.room}${ME.roomWhere?` · ${ME.roomWhere}`:''}, in the ${g.n}. Your key is at the check-in desk.`,color:'#b8322b',x:g.x,y:g.y+18,ev:[]};
+}
 // Functions held at a map pin: matched by venue name (Ballroom → banquet hall pin, Lawn → garden lawn, Lake → lake side).
 const VENUE_PIN={ballroom:/ballroom|banquet/i,lawn:/lawn|garden/i,lake:/lake/i};
 function eventsAt(p){const re=VENUE_PIN[p.id],seen=new Set();return re?myEvents().filter(e=>re.test(e.venue||'')&&!seen.has(evName(e))&&seen.add(evName(e))):[]}

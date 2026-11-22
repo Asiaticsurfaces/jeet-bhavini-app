@@ -124,7 +124,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="muted small">Shows at the top of every guest's Home screen.</p>
         <input id="nowText" maxlength="140" placeholder="e.g. Varmala starts in 10 min. Please come to Lake Side.">
         <div class="row">
-          <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Concierge</option><option value="ballroom">Banquet hall</option><option value="lawn">Garden lawn</option><option value="lake">The Lake Side</option><option value="rooms">Guest rooms</option><option value="parking">Entrance &amp; parking</option><option value="food">Saltt Restaurant</option></select>
+          <select id="nowPlace" style="flex:1"><option value="">No map place</option><option value="lobby">Concierge</option><option value="ballroom">Banquet hall</option><option value="lawn">Garden lawn</option><option value="lake">The Lake Side</option><option value="parking">Entrance &amp; parking</option></select>
           <select id="nowSide" style="width:auto"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select>
           <button class="btn" id="nowSave">Show to guests</button><button class="btn ghost" id="nowOff">Hide banner</button>
         </div>
@@ -317,6 +317,11 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="chip plum" id="mapPicking" hidden></p>
         <div id="adminMap" style="height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--line);position:relative;background:#e2ebe4"></div>
         <div class="stack" id="placeList"></div>
+        <div class="card stack" style="background:var(--ivory, #fbf6ee)">
+          <h3 style="margin:0">Which block is each wing in?</h3>
+          <p class="muted small">Guests with a room see a <b>Your room</b> pin on the block their wing is in. Wings come from the Rooms tab. Tap <b>Save map</b> after changing.</p>
+          <div class="stack" id="blockList"></div>
+        </div>
         <div class="row"><button class="btn ghost sm" id="placeAdd">+ Add place</button><button class="btn" id="mapSave">Save map</button><span class="small muted" id="mapState"></span></div>
       </div>
     </section>
@@ -659,7 +664,17 @@ async function start() {
     // ---------- venue map (events permission) ----------
     if (can.events) {
       const COLORS = ['#8e3a5d', '#c99a5b', '#3d8b4e', '#2f6fb3', '#a8894f', '#5b5550', '#7d7a74', '#b8322b'];
-      let mod = null, m3 = null, PL = [], picking = null, dirty = false;
+      let mod = null, m3 = null, PL = [], picking = null, dirty = false, BL = {}, WINGS = [];
+      // wing → room block (for the guests' "Your room" pin)
+      const drawBlocks = () => {
+        if (!mod) return;
+        const opts = [['', 'Not on the map'], ...mod.GROUPS.map(g => [g.t, g.n])];
+        $('#blockList').innerHTML = WINGS.length ? WINGS.map((w, i) => { const v = BL[w] ?? mod.guessBlock(w);
+          return `<label class="row between small" style="flex-wrap:nowrap;gap:10px"><b>${esc(w)}</b><select data-bl="${i}" style="width:auto;max-width:60%">${opts.map(([k, n]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`; }).join('')
+          : '<p class="muted small">No rooms added yet. Add them in the Rooms tab first.</p>';
+        $$('[data-bl]').forEach(s => s.onchange = () => { BL[WINGS[+s.dataset.bl]] = s.value; setDirty(true); });
+      };
+      onSnapshot(collection(db, 'rooms'), s => { WINGS = [...new Set(s.docs.map(d => d.data().wing || 'Rooms'))].sort(); drawBlocks(); }, e => console.warn('rooms for map', e.code));
       const setDirty = d => { dirty = d; $('#mapState').textContent = d ? 'Unsaved changes' : 'Saved'; };
       const drawList = () => {
         $('#placeList').innerHTML = PL.map((p, i) => `<div class="item"><div class="grid2">
@@ -691,14 +706,14 @@ async function start() {
       $('#mapReset').onclick = () => m3 && m3.resetView();
       $('#mapSave').onclick = () => {
         if (PL.some(p => !p.name.trim())) return toast('Every place needs a name');
-        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), v: mod.MAP_VERSION, updatedBy: u.email, updatedAt: serverTimestamp() })
+        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), v: mod.MAP_VERSION, blocks: Object.fromEntries(WINGS.map(w => [w, BL[w] ?? mod.guessBlock(w)])), updatedBy: u.email, updatedAt: serverTimestamp() })
           .then(() => { setDirty(false); toast('Map saved. Guests see it now'); }).catch(fail);
       };
       onSnapshot(doc(db, 'config', 'map'), async s => {
         if (dirty) return;                          // don't overwrite edits in progress
         mod = mod || await import('./js/map2d.js');
         const L = s.exists() && s.data().v === mod.MAP_VERSION && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
-        PL = L.map(p => ({ ...p })); drawList(); $('#mapState').textContent = s.exists() && s.data().v === mod.MAP_VERSION ? 'Saved' : 'Suggested spots on the new map, not saved yet';
+        PL = L.map(p => ({ ...p })); BL = s.exists() && s.data().v === mod.MAP_VERSION && s.data().blocks || {}; drawList(); drawBlocks(); $('#mapState').textContent = s.exists() && s.data().v === mod.MAP_VERSION ? 'Saved' : 'Suggested spots on the new map, not saved yet';
         if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">The map couldn\'t load.</p>'; });
       }, e => console.warn('map', e.code));
       // build the map when the Events tab is opened

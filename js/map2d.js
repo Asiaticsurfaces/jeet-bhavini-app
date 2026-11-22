@@ -13,6 +13,9 @@ import { FEATURES, GROUPS, TREES } from './venue-data.js?v=1';
 
 const TEX_URL = new URL('../assets/venue-map.jpg?v=4', import.meta.url).href;
 export const MAP_VERSION = 2;
+export { GROUPS };
+// Guess a room group from a wing name ("Lake View", "Cottage 3" …) when the family hasn't linked it.
+export const guessBlock = w => /cottage/i.test(w) ? 'cottage' : /plunge/i.test(w) ? 'room-pp' : /lake/i.test(w) ? 'room-lv' : /pool|lawn/i.test(w) ? 'room-pl' : '';
 const PW = 2000, PH = 2980;
 
 export const DEFAULT_PLACES = [
