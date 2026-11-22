@@ -12,7 +12,7 @@
 
 import { FEATURES, GROUPS } from './venue-data.js?v=1';
 
-const TEX_URL = new URL('../assets/venue-map.jpg?v=6', import.meta.url).href;   // the resort's own map, description text removed
+const TEX_URL = new URL('../assets/venue-map.jpg?v=7', import.meta.url).href;   // the resort's own map, description text removed
 export const MAP_VERSION = 2;
 export { GROUPS };
 // Guess a room group from a wing name ("Lake View", "Cottage 3" …) when the family hasn't linked it.
