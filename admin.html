@@ -1273,7 +1273,7 @@ async function start() {
           if (id && guests.has(id)) return errors.push(`Row ${i + 3}: ${name} is in the file twice (only the first row is used)`);
           if (!id) { const base = slugOf(name); id = base; for (let k = 2; taken.has(id) || guests.has(id); k++) id = `${base}-${k}`; }
           const events = {}; EVK.forEach(([k, n]) => { const v = evCol(r, k, n); if (v !== null) events[k] = yn(v); });
-          guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(1, parseInt(val(r, 'no. of people', 'people')) || 1),
+          guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(0, parseInt(val(r, 'no. of people', 'people')) || 0),   // 0 = no column: keep the app's count
             room: val(r, 'room'), lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
           const n = val(r, 'notes'); if (n) notes.push([id, n]);
         });
@@ -1282,6 +1282,7 @@ async function start() {
         const drivers = rows('Drivers').filter(r => val(r, 'driver') && !sample(r)).map(r => ({ name: val(r, 'driver'), phone: normPhone(val(r, 'phone')), car: val(r, 'car'), plate: val(r, 'number') }));
         const contacts = rows('Help contacts').filter(r => val(r, 'shown') && !sample(r)).map(r => ({ label: val(r, 'shown'), phone: normPhone(val(r, 'phone')), note: [val(r, 'name'), val(r, 'notes')].filter(Boolean).join(' · ') }));
         const gone = GUESTS.filter(g => !guests.has(g.id));
+        for (const [id, g] of guests) g.people = g.people || GUESTS.find(x => x.id === id)?.people || 1;
         const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
         const added = [...guests.values()].filter(g => g.isNew).length;
         const withRoom = [...guests.values()].filter(g => g.room).length;
