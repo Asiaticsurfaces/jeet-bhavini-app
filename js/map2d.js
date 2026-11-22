@@ -1,5 +1,5 @@
-// 2D venue map of Oleander Farms, Karjat: the clean redrawn map (assets/venue-map.jpg) with
-// every building drawn on top (js/venue-data.js), labels that stay readable at any zoom,
+// 2D venue map of Oleander Farms, Karjat: the resort's own illustrated map (assets/venue-map.jpg)
+// with name labels from js/venue-data.js that stay readable at any zoom,
 // and pins for the wedding's places. Drag to move, pinch / scroll / + − to zoom, double-tap to zoom in.
 //
 // Map coordinates are pixels on the resort's map (2000 × 3000). The family panel stores each
@@ -9,9 +9,9 @@
 //   const map = await createMap(el, { places, onSelect, onPick })
 //   map.setPlaces(places); map.focus(id); map.setPickMode(true|false); map.resetView(); map.destroy()
 
-import { FEATURES, GROUPS, TREES } from './venue-data.js?v=1';
+import { FEATURES, GROUPS } from './venue-data.js?v=1';
 
-const TEX_URL = new URL('../assets/venue-map.jpg?v=4', import.meta.url).href;
+const TEX_URL = new URL('../assets/venue-map.jpg?v=5', import.meta.url).href;   // the resort's own map, description text removed
 export const MAP_VERSION = 2;
 export { GROUPS };
 // Guess a room group from a wing name ("Lake View", "Cottage 3" …) when the family hasn't linked it.
@@ -42,17 +42,15 @@ const KIND = {
   gate:      { chip: '#5b3b26', ink: '#fff', pri: 3 },
 };
 const AREAS = [
-  { text: 'SOUTH NEST', x: 560, y: 640 }, { text: 'NORTH NEST', x: 560, y: 1700 },
-  { text: 'HILL TOP', x: 300, y: 2300 }, { text: 'LAKE SIDE', x: 1660, y: 2240 },
+  { text: 'HILL TOP', x: 300, y: 2330 }, { text: 'LAKE SIDE', x: 1660, y: 2240 },
 ];
-const shade = (hex, f) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const div = (parent, css, html = '') => { const d = document.createElement('div'); d.style.cssText = css; d.innerHTML = html; parent.appendChild(d); return d; };
 
 export async function createMap(el, opts = {}) {
   el.innerHTML = '';
   el.style.position = el.style.position || 'relative';
-  el.style.overflow = 'hidden'; el.style.touchAction = 'none'; el.style.background = '#faf4e2'; el.style.userSelect = 'none';
+  el.style.overflow = 'hidden'; el.style.touchAction = 'none'; el.style.background = '#fef9cb'; el.style.userSelect = 'none';
   el.setAttribute('role', 'img');
   el.setAttribute('aria-label', 'Map of Oleander Farms, Karjat, with roads, rooms and venues. Drag to move, pinch or use + and − to zoom.');
 
@@ -63,19 +61,6 @@ export async function createMap(el, opts = {}) {
   img.style.cssText = `position:absolute;left:0;top:0;width:${PW}px;height:3000px;pointer-events:none`;
   stage.appendChild(img);
   await new Promise(res => { if (img.complete) res(); else { img.onload = res; img.onerror = res; } });
-
-  for (const [x, y] of TREES) {
-    const s = 13 + ((x * 7 + y * 13) % 6);
-    div(stage, `position:absolute;left:${x - s / 2}px;top:${y - s / 2}px;width:${s}px;height:${s}px;border-radius:50%;background:#5f9e5c;box-shadow:inset -2px -3px 0 rgba(0,0,0,.14);opacity:.9`);
-  }
-  for (const f of FEATURES) {
-    const k = KIND[f.t]; if (!k) continue;
-    const w = f.w || 30, d = f.d || 30, base = `position:absolute;left:${f.x - w / 2}px;top:${f.y - d / 2}px;width:${w}px;height:${d}px;transform:rotate(${f.r || 0}deg);box-sizing:border-box;`;
-    if (f.t === 'pool') div(stage, base + 'background:#4aa3df;border:4px solid #fff;border-radius:5px;box-shadow:0 1px 3px rgba(0,0,0,.2)');
-    else if (f.n === 'Helipad') div(stage, base + 'border-radius:50%;background:#7d7a74;border:3px solid #fff;color:#fff;font:700 26px/52px sans-serif;text-align:center', 'H');
-    else if (f.t === 'gate') div(stage, `position:absolute;left:${f.x - 24}px;top:${f.y - 8}px;width:48px;height:16px;background:repeating-linear-gradient(90deg,#6b4a2e 0 5px,#a07a52 5px 9px);border-radius:3px`);
-    else if (f.h) div(stage, base + `background:${k.roof};border:2px solid ${shade(k.roof, 0.72)};border-radius:4px;box-shadow:3px 4px 0 rgba(60,40,20,.18);background-image:linear-gradient(135deg,rgba(255,255,255,.22) 0 50%,rgba(0,0,0,.06) 50%)`);
-  }
 
   // ---- screen layer: labels and pins (never scaled, always readable) ----
   const overlay = div(el, 'position:absolute;inset:0;pointer-events:none;overflow:hidden;font-family:inherit');
@@ -88,7 +73,8 @@ export async function createMap(el, opts = {}) {
     items.push({ el: d, x: f.x, y: f.y, lift: (f.d || 20) / 2, pri: k.pri, kind: 'static' });
   };
   for (const g of GROUPS) addStatic(g, KIND[g.t], g.n);
-  for (const f of FEATURES) { const k = KIND[f.t]; if (k && f.n && !f.nolabel) addStatic(f, k, f.n); }
+  // the map already draws parking, restroom, buggy, concierge and gate icons: label the rest
+  for (const f of FEATURES) { const k = KIND[f.t]; if (k && f.n && !f.nolabel && !['parking', 'wc', 'buggy', 'concierge', 'gate'].includes(f.t)) addStatic(f, k, f.n); }
   for (const a of AREAS) items.push({ el: div(overlay, chip + ';font-size:10px;font-weight:700;letter-spacing:.22em;color:#3b5a2a;background:rgba(255,252,240,.82);padding:2px 7px;border-radius:6px;box-shadow:none', a.text), x: a.x, y: a.y, lift: 0, pri: 0, kind: 'area', mid: 1 });
 
   let pins = [], selected = opts.selectedId || null, pickMode = false;
@@ -111,7 +97,7 @@ export async function createMap(el, opts = {}) {
   let k = 0.2, tx = 0, ty = 0, fitK = 0.2;
   const size = () => [el.clientWidth || 360, el.clientHeight || 480];
   const fitView = () => { const [w, h] = size(); fitK = Math.min(w / PW, h / PH) * 0.96; return { k: fitK, tx: (w - PW * fitK) / 2, ty: (h - PH * fitK) / 2 }; };
-  const MAXK = 1.6;
+  const MAXK = 1.4;
   const clamp = () => {
     const [w, h] = size(); k = Math.max(fitK * 0.9, Math.min(MAXK, k));
     const mw = PW * k, mh = PH * k;

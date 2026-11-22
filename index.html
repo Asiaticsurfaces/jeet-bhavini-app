@@ -237,7 +237,6 @@ nav.bar .fab{justify-content:center;align-items:center;padding:0;gap:0}
 select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* Map */
-.mapkey{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px}.mapkey span{display:flex;align-items:center;gap:8px}.mapkey i{width:14px;height:14px;border-radius:4px;flex:none}.mapkey b{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:5px;font-size:11px;flex:none}.mapkey .kp{background:#2f6fb3;color:#fff}.mapkey .kw{background:#44403b}.mapkey .kc{background:#fff;border:1px solid var(--line)}
 .map{height:min(560px,72vh);border-radius:22px;overflow:hidden;border:1px solid var(--line);background:#e2ebe4;box-shadow:var(--shadow);position:relative}
 .map svg{display:block;width:100%;height:auto}
 .map .zone{cursor:pointer;transition:opacity .2s}
@@ -448,20 +447,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <div class="map" id="map"></div>
       <p class="demo-note" style="margin:0">Drag to move · pinch or tap + − to zoom · tap a pin</p>
       <div class="card stack" id="mapInfo"></div>
-      <div class="card stack"><h3>Map key</h3>
-        <div class="mapkey">
-          <span><i style="background:#8e3a5d"></i>Function venues</span>
-          <span><i style="background:#c8553d"></i>Pool &amp; Lawn View Rooms</span>
-          <span><i style="background:#7f8c99"></i>Lake View Rooms</span>
-          <span><i style="background:#4f4440"></i>Plunge Pool Rooms</span>
-          <span><i style="background:#8b5a2b"></i>The Cottages</span>
-          <span><i style="background:#c99a5b"></i>Food &amp; drink</span>
-          <span><i style="background:#e8cc96;border:1.5px solid #be965c"></i>Road</span>
-          <span><b class="kp">P</b>Parking</span>
-          <span><b class="kw">🚻</b>Restrooms</span>
-          <span><b class="kc">🛎</b>Concierge</span>
-        </div>
-        <p class="small muted">Your room number is on your wedding pass. Ask the concierge or the check-in desk to show you the way.</p></div>
+      <div class="card stack"><p class="small muted">The icons are explained at the bottom of the map: parking, hotel rooms, buggy parking, concierge and restrooms. Your room number is on your wedding pass. Ask the concierge or the check-in desk to show you the way.</p></div>
     </div>
 
     <div id="m-family" class="screen" hidden>
