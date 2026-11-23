@@ -1424,28 +1424,43 @@ async function start() {
         } catch (e) { b.disabled = false; fail(e); }
       });
     }
+    // Photographer upload: 4 photos at a time. Each is shrunk, uploaded, then its faces are found
+    // for "Find my photos" (one photo at a time for that step, so the computer isn't overloaded).
     $('#phFiles').onchange = async e => {
       const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
-      const ev = $('#phEvent').value; let n = 0;
-      for (const f of files) {
-        $('#phProgress').textContent = `Uploading ${++n} of ${files.length}…`;
+      const ev = $('#phEvent').value, N = files.length, LANES = 4, stamp = Date.now();
+      let next = 0, up = 0, faced = 0, failed = 0, facing = Promise.resolve(), F = null;
+      const show = () => { $('#phProgress').textContent = `Uploaded ${up} of ${N}${faced < up ? ` · finding faces ${faced} of ${up}` : ''}${failed ? ` · ${failed} failed` : ''}… keep this page open`; };
+      const leave = ev2 => { ev2.preventDefault(); ev2.returnValue = ''; };
+      addEventListener('beforeunload', leave);
+      $('#phFiles').disabled = true; show();
+      const one = async i => {
+        const f = files[i];
         try {
           const bmp = await createImageBitmap(f); const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
           const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-          c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+          c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();
           const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
-          const path = `photos/${u.uid}/${Date.now()}-${n}.jpg`, r = S.ref(st, path);
+          const path = `photos/${u.uid}/${stamp}-${i + 1}.jpg`, r = S.ref(st, path);
           await S.uploadBytes(r, blob, { contentType: 'image/jpeg' });
           const ref = await addDoc(collection(db, 'photos'), { uid: u.uid, name: 'Photographer', source: 'photographer', event: ev, path, url: await S.getDownloadURL(r),
             w: c.width, h: c.height, hidden: false, revealAt: Timestamp.now(), createdAt: serverTimestamp() });
-          // Face index for "Find my photos" (numbers only, no picture).
-          try { $('#phProgress').textContent = `Finding faces in photo ${n} of ${files.length}…`;
-            const F = await import('./js/faces.js'), list = await F.facesIn(c);
-            await setDoc(doc(db, 'faces', ref.id), { f: list.map(F.encode), n: list.length, at: serverTimestamp() });
-          } catch (err) { console.warn('face index', err); }
-        } catch (err) { fail(err); }
-      }
-      $('#phProgress').textContent = `Done: ${files.length} photo(s) added to ${ev}.`;
+          up++; show();
+          // Face index (numbers only, no picture), queued one after another.
+          const mine = facing.then(async () => {
+            try { F = F || await import('./js/faces.js'); const list = await F.facesIn(c);
+              await setDoc(doc(db, 'faces', ref.id), { f: list.map(F.encode), n: list.length, at: serverTimestamp() });
+            } catch (err) { console.warn('face index', err); }
+            faced++; show();
+          });
+          facing = mine; await mine;      // this lane waits, so at most 4 photos are held in memory
+        } catch (err) { failed++; console.error(err); show(); }
+      };
+      const lane = async () => { while (next < N) await one(next++); };
+      await Promise.all(Array.from({ length: Math.min(LANES, N) }, lane));
+      removeEventListener('beforeunload', leave); $('#phFiles').disabled = false;
+      $('#phProgress').textContent = `Done: ${up} photo(s) added to ${ev}${failed ? `. ${failed} couldn't be uploaded, try those again` : ''}.`;
+      if (failed) toast(`${failed} photo(s) failed. Check the internet and upload them again`);
     };
 
     // ---------- team ----------
