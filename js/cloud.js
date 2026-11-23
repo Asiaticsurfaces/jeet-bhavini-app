@@ -62,16 +62,20 @@ async function start() {
     let t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 9, 0) - IST;
     return Timestamp.fromMillis(t);
   }
-  // Shrink to max 2000px JPEG before upload (keeps storage and data use low).
+  // Shrink to max 2000px JPEG before upload (keeps storage and data use low),
+  // plus a ~400px preview that the photo feeds load instead of the full photo.
+  const jpeg = (src, max, q) => {
+    const k = Math.min(1, max / Math.max(src.width, src.height));
+    const c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(b => r({ blob: b, w: c.width, h: c.height }), 'image/jpeg', q));
+  };
   async function shrink(file) {
     const bmp = await createImageBitmap(file).catch(() => null);
-    if (!bmp) return { blob: file, w: 3, h: 4 };
-    const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
-    const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(bmp, 0, 0, w, h);
-    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
-    return { blob, w, h };
+    if (!bmp) return { blob: file, w: 3, h: 4, thumb: null };
+    const full = await jpeg(bmp, 2000, 0.85), thumb = await jpeg(bmp, 400, 0.78);
+    bmp.close?.();
+    return { ...full, thumb: thumb.blob };
   }
 
   const CLOUD = {
@@ -118,12 +122,12 @@ async function start() {
     saveRsvp: answers => setDoc(doc(db, 'rsvps', uid), { ...who(), answers, updatedAt: serverTimestamp() }),
     saveArrival: t => setDoc(doc(db, 'arrivals', uid), { ...who(), ...t, updatedAt: serverTimestamp() }, { merge: true }),
     async uploadPhoto(file, event) {
-      const { blob, w, h } = await shrink(file);
-      const path = `photos/${uid}/${Date.now()}.jpg`;
-      const r = S.ref(st, path);
-      await S.uploadBytes(r, blob, { contentType: 'image/jpeg' });
-      const url = await S.getDownloadURL(r);
-      await addDoc(collection(db, 'photos'), { uid, name: who().name, event, path, url, w, h, hidden: false,
+      const { blob, w, h, thumb } = await shrink(file);
+      const t0 = Date.now(), path = `photos/${uid}/${t0}.jpg`, thumbPath = `photos/${uid}/${t0}_t.jpg`;
+      const r = S.ref(st, path), rt = S.ref(st, thumbPath);
+      await Promise.all([S.uploadBytes(r, blob, { contentType: 'image/jpeg' }), thumb && S.uploadBytes(rt, thumb, { contentType: 'image/jpeg' })]);
+      const [url, thumbUrl] = await Promise.all([S.getDownloadURL(r), thumb ? S.getDownloadURL(rt) : null]);
+      await addDoc(collection(db, 'photos'), { uid, name: who().name, event, path, url, ...(thumb ? { thumbPath, thumb: thumbUrl } : {}), w, h, hidden: false,
         source: 'guest', revealAt: revealTime(), createdAt: serverTimestamp() });
     },
   };
@@ -225,7 +229,7 @@ async function start() {
     DRIVER = a.driver && a.driver.n ? a.driver : null;
     refresh('arrival');
   });
-  const toPhoto = p => ({ id: p.id, src: p.url, by: p.uid === uid ? 'You' : (p.source === 'photographer' ? 'Photographer' : p.name || 'Guest'),
+  const toPhoto = p => ({ id: p.id, src: p.url, thumb: p.thumb || p.url, by: p.uid === uid ? 'You' : (p.source === 'photographer' ? 'Photographer' : p.name || 'Guest'),
     ev: p.event || '', ar: `${p.w || 3}/${p.h || 4}`, mine: p.uid === uid, revealAt: ms(p.revealAt), createdAt: p.createdAt });
   onSnapshot(query(collection(db, 'photos'), where('uid', '==', uid)), s => {
     myPhotos = list(s).sort(byNew).map(toPhoto); refresh('photos');

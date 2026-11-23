@@ -148,7 +148,11 @@ input[type=text],input[type=tel],textarea{width:100%;font:15px var(--body);paddi
 .tabs button[aria-pressed=true]{background:var(--card);color:var(--plum-deep);box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .grid{columns:2;column-gap:12px}
 .photo{break-inside:avoid;margin:0 0 12px;background:#fff;padding:7px 7px 2px;border-radius:4px;box-shadow:0 6px 18px rgba(51,50,46,.14)}
-.photo .img{width:100%;aspect-ratio:var(--ar,3/4);border-radius:2px;background-size:cover;background-position:center}
+.photo .img{display:block;width:100%;aspect-ratio:var(--ar,3/4);border-radius:2px;object-fit:cover;background:#efe8dc}
+.photo[data-full]{cursor:zoom-in}
+.viewer{position:fixed;inset:0;z-index:60;background:rgba(20,14,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px}
+.viewer img{max-width:100%;max-height:78vh;border-radius:6px;object-fit:contain;background-size:contain;background-repeat:no-repeat;background-position:center}
+.viewer .row{gap:10px}.viewer small{color:#e9dcc6}
 .photo .img.dev{filter:sepia(.9) blur(7px) brightness(.75)}
 .photo figcaption{font:400 21px var(--script);color:var(--plum-deep);display:flex;justify-content:space-between;align-items:baseline;gap:6px}
 .photo figcaption small{font:500 10.5px var(--body);color:var(--muted);text-align:right}
@@ -799,7 +803,17 @@ $('#shot').onchange=e=>{
 };
 $$('.tabs button').forEach(b=>b.onclick=()=>{phView=b.dataset.ph;renderPhotos()});
 $('#develop').onclick=()=>{developed=!developed;renderPhotos()};
-const photoHTML=(p,blur)=>`<figure class="photo"><div class="img ${blur?'dev':''}" style="--ar:${p.ar};background-image:url('${p.src}')"></div><figcaption>${esc(p.by)}<small>${esc(p.ev)}</small></figcaption></figure>`;
+// Grids load the small preview; tapping opens the full photo.
+const photoHTML=(p,blur)=>`<figure class="photo"${blur?'':` data-full="${esc(p.src)}" data-cap="${esc([p.by,p.ev].filter(Boolean).join(' · '))}"`}><img class="img ${blur?'dev':''}" style="--ar:${p.ar}" src="${esc(p.thumb||p.src)}" alt="" loading="lazy" decoding="async"><figcaption>${esc(p.by)}<small>${esc(p.ev)}</small></figcaption></figure>`;
+function openPhoto(full,thumb,cap){
+  const v=document.createElement('div');v.className='viewer';v.setAttribute('role','dialog');v.setAttribute('aria-label','Photo');
+  v.innerHTML=`<img alt="" style="background-image:url('${esc(thumb)}')"><small>${esc(cap||'')}</small><div class="row"><a class="btn sm" href="${esc(full)}" target="_blank" rel="noopener">Open full size to save</a><button class="btn ghost sm" style="color:#fff;border-color:#fff">Close</button></div>`;
+  const img=v.querySelector('img');img.src=full;img.onload=()=>img.style.backgroundImage='none';
+  const close=()=>{v.remove();removeEventListener('keydown',esc_)};const esc_=e=>{if(e.key==='Escape')close()};
+  v.querySelector('button').onclick=close;v.onclick=e=>{if(e.target===v)close()};addEventListener('keydown',esc_);
+  document.body.appendChild(v);
+}
+document.addEventListener('click',e=>{const f=e.target.closest('.photo[data-full]');if(!f||f.closest('a'))return;openPhoto(f.dataset.full,f.querySelector('img')?.src,f.dataset.cap)});
 function renderPhotos(){
   $$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ph===phView));
   const cloud=CLOUD_ON(),now=Date.now();
@@ -824,7 +838,7 @@ async function findMe(url){
     const hits=idx.filter(x=>shown.has(x.id)).map(x=>({p:shown.get(x.id),d:Math.min(9,...x.f.map(s=>F.distance(me,F.decode(s))))})).filter(x=>x.d<F.SAME_PERSON).sort((a,b)=>a.d-b.d);
     faceMsg(hits.length?`<b>Found ${hits.length} photo${hits.length===1?'':'s'} of you</b><p class="muted small">Tap a photo to open it. New photos are added through the wedding, check again later.</p>`
       :`<b>No photos of you yet</b><p class="muted small">${idx.length?'The photographer adds photos through the wedding. Tap "Check for new photos" later.':'The photographer\'s photos aren\'t up yet. Check again after the first event.'}</p>`,url);
-    if(hits.length)$('#faceOut').insertAdjacentHTML('beforeend',`<div class="grid">${hits.map(h=>`<a href="${h.p.src}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${photoHTML(h.p,false)}</a>`).join('')}</div>`);
+    if(hits.length)$('#faceOut').insertAdjacentHTML('beforeend',`<div class="grid">${hits.map(h=>photoHTML(h.p,false)).join('')}</div>`);
   }catch(e){console.warn(e);faceMsg('<b>Couldn\'t search right now.</b><p class="muted small">Check your internet and try again.</p>',url)}
 }
 $('#selfie').onchange=async e=>{
