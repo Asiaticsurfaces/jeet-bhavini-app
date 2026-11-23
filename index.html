@@ -1060,7 +1060,7 @@ async function searchNames(){
       :GUESTS.filter(g=>words.every(w=>g.n.toLowerCase().split(/\s+/).some(t=>t.startsWith(w)))).map(g=>({id:g.n,name:g.n,side:g.side,people:g.party}));
     if(q!==$('#nameQ').value.trim())return;
     $('#nameHits').innerHTML=nameHits.length?nameHits.map((g,i)=>`<button class="guest-hit" data-pick="${i}"><span><b>${esc(g.name)}</b><br><small>${esc(g.side==='Bride'?"Bride's side":g.side==='Groom'?"Groom's side":g.side||'')}${g.people?` · ${g.people} ${g.people==1?'person':'people'}`:''}</small></span><span class="chip sage">That's me</span></button>`).join('')
-      :'<p class="muted">No match yet. Try only your first name or surname. Still not there? Browse without signing in and tap Need help.</p>';
+      :'<p class="muted">No match yet. Try only your first name or surname. Still not there? Call the family using the number below.</p>';
     $$('[data-pick]').forEach(b=>b.onclick=()=>confirmName(nameHits[+b.dataset.pick]));
   }catch(e){console.error(e);$('#nameHits').innerHTML='<p class="muted">Couldn\'t search. Check your internet and try again.</p>'}
 }
@@ -1077,13 +1077,15 @@ function confirmName(g){
       if(!me)throw new Error('missing');
       guestWelcome({...me,phone:loginPhone});
     }catch(e){console.error(e);
-      if(e&&e.code==='permission-denied'){$('#nameHits').innerHTML=`<p class="muted">${esc(g.name)} is already registered with another number. If that's you, browse without signing in and tap <b>Need help</b>. The family can fix it.</p>`;renderLoginFoot();return}
+      if(e&&e.code==='permission-denied'){$('#nameHits').innerHTML=`<p class="muted">${esc(g.name)} is already registered with another number. If that's you, call the family using the number below. They can fix it.</p>`;renderLoginFoot();return}
       $('#pickYes').disabled=false;$('#pickYes').textContent='Yes, that\'s me';toast('Couldn\'t save. Check your internet and try again')}
   };
 }
+// No browsing without an invite: guests who are stuck get the family's numbers instead.
 function renderLoginFoot(){
-  if(!$('#skipLogin'))$('#loginHits').insertAdjacentHTML('beforeend','<button class="linkbtn" id="skipLogin">Browse without signing in</button>');
-  $('#skipLogin').onclick=()=>{store.set('skipLogin',true);closeLogin()};
+  const C=CONTACTS.filter(c=>c[1]);
+  if(!$('#loginHelp'))$('#loginHits').insertAdjacentHTML('beforeend','<div id="loginHelp" class="small muted" style="text-align:center"></div>');
+  $('#loginHelp').innerHTML=C.length?`Can't find your name? Call ${C.slice(0,2).map(c=>`<a href="tel:+91${esc(normPhone(c[1]))}">${esc(c[0])}</a>`).join(' or ')}.`:'Can\'t find your name? Message the family who sent you this link.';
   $('#loginDemo').hidden=CLOUD_ON();
 }
 function renderLogin(){backToPhone()}
@@ -1095,7 +1097,7 @@ $('#nameQ').oninput=()=>{clearTimeout(nameTimer);nameTimer=setTimeout(searchName
 function logout(){
   if(!ME)return openLogin();
   if(!confirm(`Log out ${ME.n}? Next time, enter a mobile number to open an invite.`))return;
-  ME=null;store.set('guest',null);store.set('skipLogin',false);store.set('welcomed',false);
+  ME=null;store.set('guest',null);store.set('welcomed',false);
   renderAll();show('home');location.hash='home';openLogin();toast('Logged out');
 }
 function renderAccount(){
@@ -1133,7 +1135,7 @@ function renderAll(){
   renderContacts();renderFeed();renderHome();renderSchedule();renderPhotos();renderHelp();renderLost();renderWishes();renderTravel();renderMap();renderFamily();
 }
 renderAll();applyLang();
-if(!ME&&!store.get('skipLogin',false))openLogin();
+if(!ME)openLogin();   // the app is for invited guests only
 show(location.hash.slice(1)||'home');
 </script>
 <script type="module" src="js/cloud.js"></script>

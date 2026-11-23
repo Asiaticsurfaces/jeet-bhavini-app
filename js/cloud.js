@@ -136,7 +136,8 @@ async function start() {
     if (!id) return;
     ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
     gOff = onSnapshot(doc(db, 'guests', id), s => {
-      if (!s.exists() || !ME || ME.id !== id) return;
+      if (!ME || ME.id !== id) return;
+      if (!s.exists()) { if (!s.metadata.fromCache) { ME = null; store.set('guest', null); window.openLogin?.(); refresh('events'); } return; }   // removed from the guest list
       const fresh = guestOf(id, ME.phone, s.data());
       if (Object.keys(fresh).every(k => JSON.stringify(fresh[k]) === JSON.stringify(ME[k]))) return;   // nothing changed
       Object.assign(ME, fresh); store.set('guest', ME); refresh('events');
