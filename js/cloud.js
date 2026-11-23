@@ -31,6 +31,18 @@ async function start() {
   // The app's state lives in index.html's top-level `let` variables (ME, POSTS, travel...),
   // which modules can read and assign by name; they are not window properties.
   const me = () => ME || null;
+  // A guest record → the app's ME object.
+  const guestOf = (id, phone, g) => {
+    const ev = g.events || {};
+    return {
+      id, n: g.name, phone, room: g.room || null, party: g.people || 1,
+      roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '', roommates: Array.isArray(g.roommates) ? g.roommates : [],
+      side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
+      sideKey: /bride/i.test(g.side || '') ? 'Bride' : /groom/i.test(g.side || '') ? 'Groom' : '',
+      skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
+      lang: g.lang || 'EN',
+    };
+  };
   const who = () => ({ uid, guestId: me()?.id || '', phone: me()?.phone || '', name: me()?.n || 'Guest', room: me()?.room || '' });
   const ms = t => (t && t.toMillis ? t.toMillis() : Date.now());
   const ago = t => {
@@ -94,16 +106,7 @@ async function start() {
     async loadGuest(id, phone) {
       const snap = await getDoc(doc(db, 'guests', id));
       if (!snap.exists()) return null;
-      const g = snap.data();
-      const ev = g.events || {};
-      return {
-        id, n: g.name, phone, room: g.room || null, party: g.people || 1,
-        roomWhere: g.roomWhere || '', stayIn: g.stayIn || '', stayOut: g.stayOut || '', roommates: Array.isArray(g.roommates) ? g.roommates : [],
-        side: g.side === 'Bride' ? "Bride's side" : g.side === 'Groom' ? "Groom's side" : (g.side || ''),
-        sideKey: /bride/i.test(g.side || '') ? 'Bride' : /groom/i.test(g.side || '') ? 'Groom' : '',
-        skip: Object.keys(ev).filter(k => ev[k] === false),   // events they're NOT invited to
-        lang: g.lang || 'EN',
-      };
+      return guestOf(id, phone, snap.data());
     },
     onGuest(g) {
       // Tag this device's arrival/rsvp with the guest's name and phone.
@@ -124,12 +127,20 @@ async function start() {
         source: 'guest', revealAt: revealTime(), createdAt: serverTimestamp() });
     },
   };
-  // Desk check-in status for the pass (re-subscribes when the guest changes).
-  let ciId = null, ciOff = null;
+  // Desk check-in status and the guest's own record, kept live (re-subscribes when the guest changes):
+  // a room allotted, invites changed or side fixed in the family panel shows up without logging in again.
+  let ciId = null, ciOff = null, gOff = null;
   CLOUD.watchCheckin = () => {
     const id = me()?.id || null; if (id === ciId) return;
-    ciOff?.(); ciOff = null; ciId = id; CHECKIN = null;
-    if (id) ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
+    ciOff?.(); gOff?.(); ciOff = gOff = null; ciId = id; CHECKIN = null;
+    if (!id) return;
+    ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
+    gOff = onSnapshot(doc(db, 'guests', id), s => {
+      if (!s.exists() || !ME || ME.id !== id) return;
+      const fresh = guestOf(id, ME.phone, s.data());
+      if (Object.keys(fresh).every(k => JSON.stringify(fresh[k]) === JSON.stringify(ME[k]))) return;   // nothing changed
+      Object.assign(ME, fresh); store.set('guest', ME); refresh('events');
+    }, () => {});
   };
   // Face index of photographer photos, for "Find my photos" (read on demand, not live).
   CLOUD.faceIndex = async () => (await getDocs(collection(db, 'faces'))).docs.map(d => ({ id: d.id, f: d.data().f || [] }));
