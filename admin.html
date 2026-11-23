@@ -348,7 +348,10 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <div class="row"><button class="btn sm" id="dSave">Save driver</button><button class="btn ghost sm" data-closeform="driver">Cancel</button></div>
       </div>
       <div class="stack" id="driverList"></div>
-      <h3>Help contacts (shown to guests)</h3><div class="stack" id="contactList"></div>
+      <h3>Help contacts (shown to guests)</h3>
+      <p class="muted small" id="conHint" hidden>Type the name guests see, the person's mobile number and a short note. Guests get a Call button, and the first two with a number also appear on the login screen for anyone who can't find their name. Tap <b>Save contacts</b> when done.</p>
+      <div class="stack" id="contactList"></div>
+      <div class="row" id="conBtns" hidden><button class="btn ghost sm" id="conAdd">+ Add contact</button><button class="btn sm" id="conSave">Save contacts</button><span class="small muted" id="conState"></span></div>
       <div class="card" id="peopleCard">
         <h3>People &amp; access</h3>
         <p class="muted small">Who can open this panel, and what they can do. They sign in with this Google (Gmail) account.</p>
@@ -1441,7 +1444,7 @@ async function start() {
     let DUT = [], VEN = [], CON = [];
     sub('team', collection(db, 'duties'), s => { DUT = list(s); renderTeam(); });
     sub('team', collection(db, 'vendors'), s => { VEN = list(s); renderTeam(); });
-    sub('team', doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; renderTeam(); });
+    sub('team', doc(db, 'config', 'contacts'), s => { CON = s.exists() ? s.data().list || [] : []; if (!CED) renderTeam(); });
     if (can.owner) {
       const grid = (id, p) => PERMS.map(([k, n, d]) => `<label><input type="checkbox" data-p="${k}" data-g="${id}" ${p[k] ? 'checked' : ''}><span>${n}<small>${d}</small></span></label>`).join('');
       const read = id => Object.fromEntries($$(`[data-g="${id}"]`).filter(c => c.checked).map(c => [c.dataset.p, true]));
@@ -1507,13 +1510,46 @@ async function start() {
       $$('[data-tdel]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.tdel.split(':');
         confirm(`Delete this ${k}?`) && deleteDoc(doc(db, forms[k].col, id)).then(() => toast('Deleted')).catch(fail); });
     }
+    // Help contacts: the owner edits them here (name guests see, mobile number, note); others just see them.
+    let CED = null;      // contacts being edited (null = showing what's saved)
+    const conDirty = on => { $('#conState').textContent = on ? 'Unsaved changes' : ''; if (!on) CED = null; };
+    function drawContacts() {
+      const edit = can.owner;
+      $('#conHint').hidden = $('#conBtns').hidden = !edit;
+      if (!edit) {
+        $('#contactList').innerHTML = CON.length ? CON.map(c => `<div class="item"><div class="row between"><div><b>${esc(c.label)}</b><p class="small muted">${esc(c.note || '')}</p></div>${tel(c.phone)}</div></div>`).join('') : '<p class="muted">No help contacts yet.</p>';
+        return;
+      }
+      const L = CED || CON.map(c => ({ label: c.label || '', phone: c.phone || '', note: c.note || '' }));
+      $('#contactList').innerHTML = L.length ? L.map((c, i) => `<div class="item stack" style="gap:8px">
+          <div class="grid2"><label class="fld"><span>Name guests see</span><input data-cl="${i}" value="${esc(c.label)}" placeholder="e.g. Jabuani family"></label>
+            <label class="fld"><span>Mobile number</span><input type="tel" inputmode="numeric" maxlength="14" data-cp="${i}" value="${esc(c.phone)}" placeholder="10-digit number"></label></div>
+          <label class="fld"><span>Note (who to ask for, what for)</span><input data-cn="${i}" value="${esc(c.note)}" placeholder="e.g. Ask for Arvind kaka · rooms and cabs"></label>
+          <div class="row">${tel(normPhone(c.phone))}<button class="btn danger sm" data-cdel="${i}">Remove</button></div></div>`).join('')
+        : '<p class="muted">No help contacts yet. Tap + Add contact.</p>';
+      const edits = () => (CED = CED || L.map(c => ({ ...c })));
+      $$('[data-cl]').forEach(x => x.oninput = () => { edits()[x.dataset.cl].label = x.value; conDirty(true); });
+      $$('[data-cp]').forEach(x => x.oninput = () => { edits()[x.dataset.cp].phone = x.value; conDirty(true); });
+      $$('[data-cn]').forEach(x => x.oninput = () => { edits()[x.dataset.cn].note = x.value; conDirty(true); });
+      $$('[data-cdel]').forEach(b => b.onclick = () => { const E = edits(); if (!confirm(`Remove "${E[b.dataset.cdel].label || 'this contact'}"?`)) return; E.splice(+b.dataset.cdel, 1); conDirty(true); drawContacts(); });
+    }
+    $('#conAdd').onclick = () => { CED = CED || CON.map(c => ({ label: c.label || '', phone: c.phone || '', note: c.note || '' })); CED.push({ label: '', phone: '', note: '' }); conDirty(true); drawContacts(); $$('[data-cl]').at(-1)?.focus(); };
+    $('#conSave').onclick = async () => {
+      const E = (CED || CON).map(c => ({ label: String(c.label || '').trim(), phone: normPhone(c.phone || ''), note: String(c.note || '').trim() }));
+      if (E.some(c => !c.label)) return toast('Every contact needs a name');
+      const bad = E.find(c => c.phone && c.phone.length !== 10); if (bad) return toast(`${bad.label}: the mobile number needs 10 digits`);
+      $('#conSave').disabled = true;
+      try { await setDoc(doc(db, 'config', 'contacts'), { list: E, updatedBy: u.email, updatedAt: serverTimestamp() }); conDirty(false); toast('Contacts saved. Guests see them now'); drawContacts(); }
+      catch (e) { fail(e); }
+      $('#conSave').disabled = false;
+    };
     function renderTeam() {
       const done = DUT.filter(d => d.done).length;
       $('#dutyList').innerHTML = DUT.length ? `<p class="muted small">${done} of ${DUT.length} done</p>` + DUT.map(d => `<label class="item ${d.done ? 'done' : ''}" style="flex-direction:row;align-items:flex-start;gap:12px"><input type="checkbox" data-duty="${d.id}" ${d.done ? 'checked' : ''} style="width:20px;height:20px;margin-top:3px;flex:none"><div style="flex:1"><b>${esc(d.task)}</b><p class="small muted">${esc(d.who)} · ${esc([d.date, d.time, d.place].filter(Boolean).join(' · '))}</p></div>${tel(d.phone)}</label>`).join('') : '<p class="muted">Import the Excel to add duties.</p>';
       $$('[data-duty]').forEach(c => c.onchange = () => updateDoc(doc(db, 'duties', c.dataset.duty), { done: c.checked }).catch(fail));
       $('#vendorList').innerHTML = VEN.length ? VEN.map(v => `<div class="item"><div class="row between"><div><b>${esc(v.role)}</b>${v.name ? ` · ${esc(v.name)}` : ''}<p class="small muted">${esc([v.phone, v.note].filter(Boolean).join(' · '))}</p></div><div class="row">${tel(v.phone)}${rowBtns('vendor', v.id)}</div></div></div>`).join('') : '<p class="muted">No vendors yet. Tap + Add vendor.</p>';
       $('#driverList').innerHTML = DRIVERS.length ? DRIVERS.map(d => `<div class="item"><div class="row between"><div><b>${esc(d.name)}</b><p class="small muted">${esc([d.phone, d.car, d.plate].filter(Boolean).join(' · '))}</p></div><div class="row">${tel(d.phone)}${rowBtns('driver', d.id)}</div></div></div>`).join('') : '<p class="muted">No drivers yet. Tap + Add driver.</p>';
-      $('#contactList').innerHTML = CON.length ? CON.map(c => `<div class="item"><div class="row between"><div><b>${esc(c.label)}</b><p class="small muted">${esc(c.note || '')}</p></div>${tel(c.phone)}</div></div>`).join('') : '<p class="muted">No help contacts yet.</p>';
+      drawContacts();
       wireTeamRows();
     }
   }
