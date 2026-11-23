@@ -1413,8 +1413,16 @@ async function start() {
       $('#phCount').textContent = `${PH.length} photos · ${PH.filter(p => p.hidden).length} hidden`;
       $('#photoGrid').innerHTML = L.length ? L.map(p => `<figure class="${p.hidden ? 'hid' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
         <figcaption><span>${esc(p.source === 'photographer' ? 'Photographer' : p.name || 'Guest')}<br><span class="muted">${esc(p.event || '')}</span></span>
-        <button class="btn ${p.hidden ? 'sage' : 'danger'} sm" data-ph="${p.id}" data-h="${p.hidden ? 0 : 1}">${p.hidden ? 'Show' : 'Hide'}</button></figcaption></figure>`).join('') : '<p class="muted">No photos yet.</p>';
+        <span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn ${p.hidden ? 'sage' : 'ghost'} sm" data-ph="${p.id}" data-h="${p.hidden ? 0 : 1}">${p.hidden ? 'Show' : 'Hide'}</button>${can.owner ? `<button class="btn danger sm" data-phdel="${p.id}" aria-label="Delete photo">Delete</button>` : ''}</span></figcaption></figure>`).join('') : '<p class="muted">No photos yet.</p>';
       $$('[data-ph]').forEach(b => b.onclick = () => updateDoc(doc(db, 'photos', b.dataset.ph), { hidden: b.dataset.h === '1' }).catch(fail));
+      // Delete for good: the picture file, its face index and its record.
+      $$('[data-phdel]').forEach(b => b.onclick = async () => {
+        const p = PH.find(x => x.id === b.dataset.phdel); if (!p || !confirm('Delete this photo for good? Guests will no longer see it, and it can\'t be brought back. (Hide keeps it, just out of sight.)')) return;
+        b.disabled = true;
+        try { if (p.path) await S.deleteObject(S.ref(st, p.path)).catch(e => { if (e.code !== 'storage/object-not-found') throw e; });
+          await deleteDoc(doc(db, 'faces', p.id)).catch(() => {}); await deleteDoc(doc(db, 'photos', p.id)); toast('Photo deleted');
+        } catch (e) { b.disabled = false; fail(e); }
+      });
     }
     $('#phFiles').onchange = async e => {
       const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
