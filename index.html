@@ -845,16 +845,13 @@ const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(
 async function framePhoto(file){
   const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
   await Promise.all(['92px "Alex Brush"','600 30px "Jost"','600 34px "Cormorant Garamond"'].map(f=>document.fonts.load(f).catch(()=>{})));
-  const [ph,mono,mogra]=await Promise.all([loadImg(URL.createObjectURL(file)),loadImg('assets/postcard_jb_monogram.png'),loadImg('assets/mogra_long.png')]);
+  const [ph,mono]=await Promise.all([loadImg(URL.createObjectURL(file)),loadImg('assets/postcard_jb_monogram.png')]);
   x.fillStyle='#fbf6ee';x.fillRect(0,0,W,H);
   // photo, cropped to fill, rounded
   const px=56,py=56,pw=W-112,ph2=1010,r=28,k=Math.max(pw/ph.naturalWidth,ph2/ph.naturalHeight),sw=pw/k,sh=ph2/k;
   x.save();x.beginPath();x.roundRect(px,py,pw,ph2,r);x.clip();
   x.drawImage(ph,(ph.naturalWidth-sw)/2,(ph.naturalHeight-sh)/2,sw,sh,px,py,pw,ph2);x.restore();
   x.strokeStyle='#a8894f';x.lineWidth=3;x.beginPath();x.roundRect(px-10,py-10,pw+20,ph2+20,r+8);x.stroke();
-  // mogra garlands hanging over the top corners
-  const gh=330,gw=gh*mogra.naturalWidth/mogra.naturalHeight;
-  x.drawImage(mogra,px+18,8,gw,gh);x.drawImage(mogra,px+pw-18-gw,8,gw,gh);
   // monogram + names
   const mh=228,mw=mh*mono.naturalWidth/mono.naturalHeight;
   x.font='92px "Alex Brush"';const nameW=x.measureText('Jeet & Bhavini').width,gx=Math.max(60,(W-(mw+36+nameW))/2);
