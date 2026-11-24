@@ -1371,7 +1371,11 @@ async function start() {
             ops.push(b => b.set(doc(db, 'guestIndex', id), { name: g.name, side: data.side ?? old.side ?? '', people: g.people, tokens: nameTokens(g.name), ...(g.phone ? { phones: [g.phone] } : {}) }, { merge: true }));
             if (g.phone) ops.push(b => b.set(doc(db, 'phoneLinks', g.phone), { guestId: id, name: g.name, at: serverTimestamp() }));
           }
-          for (const g of removing) { ops.push(b => b.delete(doc(db, 'guests', g.id))); ops.push(b => b.delete(doc(db, 'guestIndex', g.id))); }
+          for (const g of removing) {
+            ['guests', 'guestIndex', 'guestNotes'].forEach(c => ops.push(b => b.delete(doc(db, c, g.id))));
+            LINKS.filter(l => l.guestId === g.id).forEach(l => ops.push(b => b.delete(doc(db, 'phoneLinks', l.id))));   // free their numbers too
+            STAYS.filter(x => x.guestId === g.id).forEach(x => ops.push(b => b.delete(doc(db, 'stays', x.id))));
+          }
           for (const [ph, n] of notes) ops.push(b => b.set(doc(db, 'guestNotes', ph), { notes: n }));
           for (const [col, items] of [['duties', duties], ['vendors', vendors], ['drivers', drivers]]) {
             if (!items.length) continue;   // empty tab in the Excel: keep what was added in the panel

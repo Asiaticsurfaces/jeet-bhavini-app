@@ -92,6 +92,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['guestId', 'name', 'at'])
         && exists(/databases/$(db)/documents/guests/$(request.resource.data.guestId))
         && getAfter(/databases/$(db)/documents/guestIndex/$(request.resource.data.guestId)).data.get('phones', []).hasAny([phone]);
+      // A number left linked to a guest who was removed from the list can be taken over.
+      allow update: if signedIn() && phone.matches('[0-9]{10}')
+        && request.resource.data.keys().hasOnly(['guestId', 'name', 'at'])
+        && !exists(/databases/$(db)/documents/guests/$(resource.data.guestId))
+        && exists(/databases/$(db)/documents/guests/$(request.resource.data.guestId))
+        && getAfter(/databases/$(db)/documents/guestIndex/$(request.resource.data.guestId)).data.get('phones', []).hasAny([phone]);
       allow create, update, delete: if isOwner() || can('guests');
     }
     match /guestNotes/{phone} {
