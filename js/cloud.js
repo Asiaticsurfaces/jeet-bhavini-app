@@ -231,6 +231,8 @@ async function start() {
     tMode = travel.mode; tPick = travel.pickup;
     const d = [ownArr, teamArr].map(x => x && x.driver).find(x => x && x.n);
     DRIVER = d || null;
+    const dd = [ownArr, teamArr].map(x => x && x.dropDriver).find(x => x && x.n);
+    DROP = a.drop ? { day: a.leave, time: a.dropTime || '', to: a.dropTo || '', driver: dd || null } : null;
     refresh('arrival');
   };
   W.__applyArr = applyArr;

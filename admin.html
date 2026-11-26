@@ -178,7 +178,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <section data-sec="pickups" class="stack" hidden>
       <div class="stats" id="arrStats"></div>
       <p class="muted small">Assign a driver and the guest sees the name, car, number plate and a Call button on their Home screen. Drivers come from the Drivers tab of the Excel.</p>
-      <div class="row"><button class="btn" id="arrAdd">+ Add a pickup</button><span class="small muted">For guests who called or messaged instead of filling it in the app.</span></div>
+      <div class="row"><button class="btn" id="arrAdd">+ Add pickup / drop</button><span class="small muted">For guests who called or messaged instead of filling it in the app.</span></div>
       <div class="card stack" id="arrForm" hidden>
         <h3 id="arrFormTitle">Add a pickup</h3>
         <div class="grid2">
@@ -189,9 +189,15 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
           <label class="fld"><span>Arriving on</span><select id="afDay"><option value="30">Mon 30 Nov</option><option value="1" selected>Tue 1 Dec</option><option value="2">Wed 2 Dec</option></select></label>
           <label class="fld"><span>Arrival time</span><input id="afTime" type="time" value="08:00"></label>
           <label class="fld"><span>People</span><input id="afPeople" type="number" min="1" max="30" value="1"></label>
-          <label class="fld"><span>Leaving on</span><select id="afLeave"><option value="2">Wed 2 Dec night</option><option value="3" selected>Thu 3 Dec</option></select></label>
         </div>
         <label class="row small"><input type="checkbox" id="afPickup" checked style="width:18px;height:18px"> Needs a pickup from the station / airport</label>
+        <h3 style="margin-top:6px">Drop (going back)</h3>
+        <div class="grid2">
+          <label class="fld"><span>Leaving on</span><select id="afLeave"><option value="1">Tue 1 Dec</option><option value="2">Wed 2 Dec</option><option value="3" selected>Thu 3 Dec</option><option value="4">Fri 4 Dec</option></select></label>
+          <label class="fld"><span>Leave the venue at</span><input id="afDropTime" type="time" value="10:00"></label>
+          <label class="fld" style="grid-column:1/-1"><span>Drop to (station / airport, train or flight)</span><input id="afDropTo" placeholder="e.g. Mumbai airport T2 · 6E 512 at 3:40 PM"></label>
+        </div>
+        <label class="row small"><input type="checkbox" id="afDrop" checked style="width:18px;height:18px"> Needs a drop to the station / airport</label>
         <p class="small muted" id="afHint"></p>
         <div class="row"><button class="btn" id="afSave">Save pickup</button><button class="btn ghost" id="afCancel">Cancel</button></div>
       </div>
@@ -844,7 +850,7 @@ async function start() {
 
     // ---------- pickups ----------
     let DRIVERS = [], ARR = [];
-    const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec' })[d] || d;
+    const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec', 4: 'Fri 4 Dec' })[d] || d;
     sub('drivers', collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
     sub('pickups', collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
     // Team-added pickups: id g_<guest id> when the name is on the guest list (the guest's phone then
@@ -859,20 +865,23 @@ async function start() {
       $('#afName').value = a?.name || ''; $('#afName').disabled = !!a; $('#afPhone').value = a?.phone || ''; $('#afMode').value = a?.mode || 'Train';
       $('#afFrom').value = a?.from || ''; $('#afDay').value = a?.day || '1'; $('#afTime').value = a?.time || '08:00';
       $('#afPeople').value = a?.people || 1; $('#afLeave').value = a?.leave || '3'; $('#afPickup').checked = a ? !!a.pickup : true;
+      $('#afDropTime').value = a?.dropTime || '10:00'; $('#afDropTo').value = a?.dropTo || ''; $('#afDrop').checked = a ? !!a.drop : true;
       afHintDraw(); $('#arrForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); if (!a) $('#afName').focus();
     }
     $('#afName').oninput = () => { afHintDraw(); const g = afGuest(); if (g && !$('#afPhone').value) $('#afPhone').value = g.phone || ''; };
     $('#arrAdd').onclick = () => openAF(null);
     $('#afCancel').onclick = () => { $('#arrForm').hidden = true; afEditing = null; };
-    $('#afMode').onchange = () => { if ($('#afMode').value === 'Car') $('#afPickup').checked = false; };
+    $('#afMode').onchange = () => { if ($('#afMode').value === 'Car') $('#afPickup').checked = $('#afDrop').checked = false; };
     $('#afSave').onclick = async () => {
       const name = $('#afName').value.trim(); if (!name) return toast('Type the guest\'s name');
       const phone = normPhone($('#afPhone').value); if (phone && phone.length !== 10) return toast('The mobile number needs 10 digits');
       const g = afGuest();
       const id = afEditing || (g ? 'g_' + g.id : 't_' + Date.now());
       if (!afEditing && g && ARR.some(a => a.id === id)) return toast(`${g.name} already has a pickup added by the team. Tap Edit on it`);
+      if (!$('#afPickup').checked && !$('#afDrop').checked && $('#afMode').value !== 'Car') return toast('Tick pickup, drop or both');
       const data = { name: g ? g.name : name, guestId: g ? g.id : '', phone, mode: $('#afMode').value, from: $('#afFrom').value.trim(), day: $('#afDay').value,
         time: $('#afTime').value || '08:00', people: Math.max(1, +$('#afPeople').value || 1), leave: $('#afLeave').value, pickup: $('#afMode').value !== 'Car' && $('#afPickup').checked,
+        drop: $('#afDrop').checked, dropTime: $('#afDropTime').value || '10:00', dropTo: $('#afDropTo').value.trim(),
         byTeam: true, addedBy: u.email, updatedAt: serverTimestamp() };
       $('#afSave').disabled = true;
       try { await setDoc(doc(db, 'arrivals', id), data, { merge: true }); toast(afEditing ? 'Pickup updated' : 'Pickup added. Assign a driver below'); $('#arrForm').hidden = true; afEditing = null; }
@@ -882,17 +891,21 @@ async function start() {
     function renderArr() {
       const A2 = [...ARR].sort((a, b) => (+((a.day === '30') ? 0 : a.day) - +((b.day === '30') ? 0 : b.day)) || String(a.time).localeCompare(String(b.time)));
       const ppl = A2.reduce((n, a) => n + (+a.people || 1), 0), pk = A2.filter(a => a.pickup && a.mode !== 'Car'), un = pk.filter(a => !a.driver?.n);
-      $('#arrStats').innerHTML = `<div><b>${A2.length}</b><span>Families sent details</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>No driver yet</span></div>`;
-      badges.pickups = un.length || 0; tabs();
+      const dr = A2.filter(a => a.drop), dun = dr.filter(a => !a.dropDriver?.n);
+      $('#arrStats').innerHTML = `<div><b>${A2.length}</b><span>Families sent details</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>Pickup: no driver yet</span></div><div><b>${dr.length}</b><span>Need drop</span></div><div><b>${dun.length}</b><span>Drop: no driver yet</span></div>`;
+      badges.pickups = (un.length + dun.length) || 0; tabs();
       const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('');
-      $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${a.pickup && a.mode !== 'Car' && !a.driver?.n ? 'open' : ''}">
-        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="row" style="gap:6px">${a.byTeam ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span></span></div>
+      const drv = (a, k, pre, stages) => `<div class="grid2"><select data-${pre}drv="${a.id}">${opts(a[k])}</select>
+          <div class="row"><input data-${pre}eta="${a.id}" placeholder="${pre ? 'Pickup time at venue, e.g. 10:00 AM' : 'ETA, e.g. 7:50 AM'}" value="${esc(a[k]?.eta || '')}" style="flex:1">
+          <select data-${pre}stage="${a.id}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>`;
+      $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${(a.pickup && a.mode !== 'Car' && !a.driver?.n) || (a.drop && !a.dropDriver?.n) ? 'open' : ''}">
+        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="row" style="gap:6px">${a.byTeam ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
         <p class="small">${esc(a.mode)} · ${esc(a.from || '')} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
-        ${a.pickup && a.mode !== 'Car' ? `<div class="grid2"><select data-drv="${a.id}">${opts(a.driver)}</select>
-          <div class="row"><input data-eta="${a.id}" placeholder="ETA, e.g. 7:50 AM" value="${esc(a.driver?.eta || '')}" style="flex:1">
-          <select data-stage="${a.id}" style="width:auto">${['Assigned', 'On the way', 'Arrived'].map((n, i) => `<option value="${i}" ${(a.driver?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
-          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update driver' : 'Assign driver'}</button>` : ''}
+        ${a.pickup && a.mode !== 'Car' ? `<p class="small" style="margin:6px 0 0"><b>Pickup driver</b></p>${drv(a, 'driver', '', ['Assigned', 'On the way', 'Arrived'])}
+          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
+        ${a.drop ? `<p class="small" style="margin:8px 0 0"><b>Drop:</b> ${dayLbl(a.leave)}, leave the venue ${esc(a.dropTime || '')}${a.dropTo ? ` → ${esc(a.dropTo)}` : ''}</p>${drv(a, 'dropDriver', 'd', ['Assigned', 'On the way', 'Dropped'])}
+          <button class="btn sm" data-dassign="${a.id}" style="align-self:flex-start">${a.dropDriver?.n ? 'Update drop driver' : 'Assign drop driver'}</button>` : ''}
         ${a.byTeam ? `<div class="row" style="gap:6px"><button class="btn ghost sm" data-arredit="${a.id}">Edit</button><button class="btn danger sm" data-arrdel="${a.id}">Delete</button></div>` : ''}</div>`).join('') : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
       $$('[data-arredit]').forEach(b => b.onclick = () => openAF(ARR.find(a => a.id === b.dataset.arredit)));
       $$('[data-arrdel]').forEach(b => b.onclick = () => { const a = ARR.find(x => x.id === b.dataset.arrdel); if (!a || !confirm(`Delete the pickup for ${a.name}?`)) return;
@@ -902,6 +915,12 @@ async function start() {
         if (!d) return toast('Choose a driver');
         updateDoc(doc(db, 'arrivals', id), { driver: { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-eta="${id}"]`).value.trim(), stage: +$(`[data-stage="${id}"]`).value } })
           .then(() => toast('The guest can now see their driver')).catch(fail);
+      });
+      $$('[data-dassign]').forEach(b => b.onclick = () => {
+        const id = b.dataset.dassign, d = DRIVERS.find(x => x.id === $(`[data-ddrv="${id}"]`).value);
+        if (!d) return toast('Choose a driver');
+        updateDoc(doc(db, 'arrivals', id), { dropDriver: { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-deta="${id}"]`).value.trim(), stage: +$(`[data-dstage="${id}"]`).value } })
+          .then(() => toast('The guest can now see their drop driver')).catch(fail);
       });
     }
 

@@ -137,9 +137,9 @@ service cloud.firestore {
       allow read: if (signedIn() && request.auth.uid == uid) || can('pickups')
         || (signedIn() && uid.matches('g_.+'));
       allow create: if (signedIn() && request.auth.uid == uid
-                         && !request.resource.data.keys().hasAny(['driver'])) || can('pickups');
+                         && !request.resource.data.keys().hasAny(['driver', 'dropDriver'])) || can('pickups');
       allow update: if (signedIn() && request.auth.uid == uid
-                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver'])) || can('pickups');
+                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver', 'dropDriver'])) || can('pickups');
       allow delete: if isOwner() || (can('pickups') && resource.data.get('byTeam', false) == true);
     }
     match /rsvps/{uid} {

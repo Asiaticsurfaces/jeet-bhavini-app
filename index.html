@@ -643,6 +643,7 @@ let NOWS=[
  {t:'Shuttle to the hotel leaves from the Lake Side gate in 15 min.',place:'parking'},
 ];
 let nowI=0;
+let DROP=null;   // drop back to the station / airport (team-added), with its driver
 let DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
 let travel=store.get('travel',null);
 const evName=e=>lang==='gu'?e.gu:e.name;
@@ -704,9 +705,13 @@ function renderPickup(){
     <div class="steps">${[0,1,2].map(i=>`<div class="${i<=st?'on':''}"></div>`).join('')}</div>
     <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At Karjat station</span></div>
     <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}.${CLOUD_ON()?'':' Sample driver shown.'}</p>`}
+  if(DROP){const D=DROP.driver,st=D?D.stage||0:0;
+    el.insertAdjacentHTML('beforeend',`<div class="row between" style="margin-top:14px"><p class="eyebrow">Your drop</p><span class="chip ${D?'sage':''}">${D?['Assigned','On the way','Dropped'][st]:'Requested'}</span></div>
+    <h3>${dayLbl(DROP.day)||''}${DROP.time?', leave at '+fmtT(DROP.time):''}</h3>${DROP.to?`<p class="muted small">To ${esc(DROP.to)}</p>`:''}
+    ${D?`<div class="driver"><div class="av">${esc(D.n[0])}</div><div style="flex:1;min-width:0"><b>${esc(D.n)}</b><div class="muted small">${esc(D.car||'')}${D.eta?' · '+esc(D.eta):''}</div>${D.plate?`<span class="plate">${esc(D.plate)}</span>`:''}</div>${D.phone?`<a class="btn sm" href="tel:+91${esc(D.phone)}">Call</a>`:''}</div>`:'<p class="muted small">Your driver\'s name and number appear here once the family assigns one.</p>'}`)}
   $$('[data-open]').forEach(b=>b.onclick=()=>{location.hash='more';show('more');goMore(b.dataset.open)});
 }
-const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec'})[d];
+const dayLbl=d=>({30:'Mon 30 Nov',1:'Tue 1 Dec',2:'Wed 2 Dec',3:'Thu 3 Dec',4:'Fri 4 Dec'})[d];
 const fmtT=t=>{const[h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`};
 $('#qrBtn').onclick=()=>{
   if(!ME)return;const o=$('#qrOut');if(!o.hidden){o.hidden=true;$('#qrBtn').textContent='Show check-in QR';return}
