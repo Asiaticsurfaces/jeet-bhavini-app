@@ -211,6 +211,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <div class="card stack" id="sheetCard">
         <h3>Google Sheet (updates by itself)</h3>
         <p class="muted small">Keep the guest list in a Google Sheet and the app follows it. A <b>Guests</b> tab has the same columns as the Excel. Add one tab per night, named like <b>30 Nov</b>, <b>1 Dec</b>, <b>2 Dec</b>, with the names of guests staying that night: someone only in <b>1 Dec</b> stays 1 night (check in 1 Dec, check out 2 Dec).</p>
+        <p class="muted small"><b>Hotel rooming list works too:</b> a tab with a <b>Room Nos.</b> column, several <b>Guest -Name</b> columns and the block / floor column. Each name becomes a guest in that room, and the date in the title row (e.g. "01st Dec 2026") or tab name is the night. Make one tab per night.</p>
         <p class="small"><b>Set up once:</b> 1. <a href="assets/Wedding%20guest%20list%20-%20Google%20Sheet.xlsx" download>Download the starter file</a> and open it in Google Sheets (File → Import → Upload, "Replace spreadsheet"). 2. In the sheet: File → Share → <b>Publish to web</b> → Entire document → <b>Microsoft Excel (.xlsx)</b> → Publish. 3. Paste the link it gives below.</p>
         <p class="small muted">Anyone who has that published link can read the sheet, so share it with no one. The link is saved only for the owner.</p>
         <div class="row"><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=xlsx" style="flex:1 1 260px"><button class="btn sm" id="sheetSave">Save link</button><button class="btn ghost sm" id="sheetSync">Sync now</button></div>
@@ -1497,8 +1498,55 @@ async function start() {
             room: val(r, 'room'), lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
           const n = val(r, 'notes'); if (n) notes.push([id, n]);
         });
+        // Rooming-list tabs (the hotel's format): a title row with the date ("01st Dec 2026"), a header row
+        // with "Room Nos." and several "Guest -Name" columns, one room per row, and a block / floor column
+        // (often merged down many rows). Every name is one guest; the tab's date is a night they stay.
+        const MON = { nov: 11, dec: 12 };
+        const dateIn = t => { const m = String(t).match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s*(nov|dec)/i); return m ? `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}` : ''; };
+        const clean = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+        const roomTextOf = (room, block) => roomsApi && roomsApi.rooms().filter(r => String(r.number).toLowerCase() === room.toLowerCase()).length === 1 ? room : (block ? `${room} · ${block}` : room);
+        const roomTabs = [];
+        for (const k of Object.keys(wb.Sheets)) {
+          if (k.trim().toLowerCase() === 'guests') continue;
+          const ws = wb.Sheets[k], aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true });
+          const o = XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
+          for (const m of ws['!merges'] || []) {   // a merged cell's text applies to every row it covers
+            const v = aoa[m.s.r - o.r]?.[m.s.c - o.c]; if (v === '' || v == null) continue;
+            for (let r = m.s.r; r <= m.e.r; r++) for (let c = m.s.c; c <= m.e.c; c++) { const row = aoa[r - o.r] ||= []; if (row[c - o.c] === '' || row[c - o.c] == null) row[c - o.c] = v; }
+          }
+          const h = aoa.slice(0, 8).findIndex(r => r.some(c => /room/i.test(String(c))) && r.some(c => /name/i.test(String(c))));
+          if (h < 0) continue;
+          const hd = aoa[h].map(c => clean(c).toLowerCase());
+          const rc = hd.findIndex(c => /room/.test(c)), ncs = hd.map((c, i) => /name|children|guest/.test(c) ? i : -1).filter(i => i >= 0);
+          const bc = hd.findIndex(c => /floor|block|wing|building/.test(c));
+          const night = dateIn(k) || aoa.slice(0, h).flat().map(dateIn).find(Boolean) || '';
+          if (!night) { errors.push(`Tab "${k}": can't tell which night it is. Put the date in the tab name, like "1 Dec"`); continue; }
+          roomTabs.push(k);
+          const seen = new Map();
+          aoa.slice(h + 1).forEach((r, i) => {
+            const names = ncs.map(c => clean(r[c])).filter(n => n && !/^sample/i.test(n)); if (!names.length) return;
+            const room = clean(r[rc]);
+            if (!room) return errors.push(`Tab "${k}", row ${h + i + 2 + o.r}: ${names.join(', ')} have no room number`);
+            const block = bc >= 0 ? clean(r[bc]) : '';
+            for (const n of names) {
+              const key = n.toLowerCase();
+              if (seen.has(key)) { errors.push(`Tab "${k}": "${n}" is in room ${seen.get(key)} and room ${room}. If they are two people, add something to one name`); continue; }
+              seen.set(key, room);
+              let id = [...guests].find(([, g]) => g.name.toLowerCase() === key)?.[0];
+              if (!id) {
+                id = byName.get(key);
+                if (!id) { const base = slugOf(n); id = base; for (let q = 2; taken.has(id) || guests.has(id); q++) id = `${base}-${q}`; }
+                guests.set(id, { phone: '', name: n, side: '', relation: '', people: 0, room: '', lang: '', events: {}, isNew: !GUESTS.some(g => g.id === id) });
+              }
+              const g = guests.get(id), text = roomTextOf(room, block);
+              if (!g.roomTab) { g.room = text; g.roomTab = k; g.people = g.people || 1; }
+              else if (g.room.split(' · ')[0] !== room) errors.push(`${n} is in room ${g.room.split(' · ')[0]} on "${g.roomTab}" and room ${room} on "${k}". The app keeps room ${g.room.split(' · ')[0]}`);
+              (g.nights ||= new Set()).add(night);
+            }
+          });
+        }
         // Night tabs ("30 Nov", "1 Dec", "2 Dec"…): a guest listed in a tab stays that night.
-        const MON = { nov: 11, dec: 12 }, nightTabs = Object.keys(wb.Sheets).map(k => { const m = k.trim().match(/^(\d{1,2})\s*(nov|dec)/i); return m ? [k, `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}`] : null; }).filter(Boolean);
+        const nightTabs = Object.keys(wb.Sheets).filter(k => !roomTabs.includes(k)).map(k => { const m = k.trim().match(/^(\d{1,2})\s*(nov|dec)/i); return m ? [k, `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}`] : null; }).filter(Boolean);
         const byNameNew = new Map([...guests].map(([id, g]) => [g.name.trim().toLowerCase(), id]));
         for (const [tab, night] of nightTabs) {
           const aoa = XLSX.utils.sheet_to_json(wb.Sheets[tab], { header: 1, defval: '' });
@@ -1523,13 +1571,13 @@ async function start() {
         const withNights = [...guests.values()].filter(g => g.nights).length;
         // Sheet sync removes guests deleted from the sheet, but not a big chunk at once (a half-filled sheet, a wrong tab).
         const autoRemove = auto && gone.length && gone.length <= Math.max(5, Math.round(GUESTS.length * 0.3));
-        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number${nightTabs.length ? `, <b>${withNights}</b> are on a night tab (${nightTabs.map(t => esc(t[0])).join(', ')})` : ''}.</p>
+        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number${nightTabs.length || roomTabs.length ? `, <b>${withNights}</b> have nights (${[...roomTabs, ...nightTabs.map(t => t[0])].map(esc).join(', ')})` : ''}.</p>
           <p class="small muted">Guests already signed in stay signed in. A row with an empty Room, Side or event column keeps what the app already has. Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
           ${gone.length ? `<div class="card" style="padding:10px"><p class="small"><b>${gone.length} guest(s) in the app are not in this file</b> and will be kept: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>
             <label class="row small"><input type="checkbox" id="impRemove" ${autoRemove ? 'checked' : ''} style="width:18px;height:18px"> Remove them from the app</label></div>` : ''}
           ${errors.length ? `<div class="err"><b>${errors.length} row(s) skipped:</b><br>${errors.map(esc).join('<br>')}</div>` : ''}
           <button class="btn" id="doImport" ${guests.size ? '' : 'disabled'}>Import into the app</button>`;
-        if (auto && !guests.size) { out.innerHTML = '<p class="err">The sheet has no guests on a "Guests" tab, so nothing was changed.</p>'; return 'empty'; }
+        if (auto && !guests.size) { out.innerHTML = '<p class="err">No guests were found in the sheet (no "Guests" tab and no rooming tab with "Room" and "Guest Name" columns), so nothing was changed.</p>'; return 'empty'; }
         $('#doImport').onclick = async () => {
           const removing = gone.length && $('#impRemove')?.checked ? gone : [];
           if (removing.length && !(auto && autoRemove) && !confirm(`Remove ${removing.length} guest(s) that are not in the file? They will be signed out of the app.`)) return;
