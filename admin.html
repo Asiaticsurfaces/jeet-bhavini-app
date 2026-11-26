@@ -557,7 +557,7 @@ async function start() {
         await setDoc(doc(db, 'config', 'countdown'), { days: { [n]: { url: await S.getDownloadURL(r), path, label: cdLabel(+n) } }, updatedAt: serverTimestamp() }, { merge: true });
         if (old?.path) S.deleteObject(S.ref(st, old.path)).catch(() => {});
         toast(`"${cdLabel(+n)}" picture saved`);
-      } catch (err) { fail(err); drawCd(); }
+      } catch (err) { console.error(err); toast(`Couldn't upload (${err?.code || err?.message || 'error'}). Try again`); drawCd(); }
     };
     $('#nowOff').onclick = () => setDoc(doc(db, 'config', 'now'), { on: false, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast('Banner hidden')).catch(fail);
     $('#postSend').onclick = () => { const title = $('#postTitle').value.trim(); if (!title) return toast('Add a title');
