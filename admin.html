@@ -771,7 +771,25 @@ async function start() {
         $$('[data-bl]').forEach(s => s.onchange = () => { BL[WINGS[+s.dataset.bl]] = s.value; setDirty(true); });
       };
       onSnapshot(collection(db, 'rooms'), s => { WINGS = [...new Set(s.docs.map(d => d.data().wing || 'Rooms'))].sort(); drawBlocks(); }, e => console.warn('rooms for map', e.code));
-      const setDirty = d => { dirty = d; $('#mapState').textContent = d ? 'Unsaved changes' : 'Saved'; };
+      // Every change saves by itself a moment later (Save map still works too), so a refresh never loses it.
+      let saveT = null, saving = false;
+      const setDirty = d => { dirty = d; $('#mapState').textContent = d ? 'Saving…' : 'Saved'; clearTimeout(saveT); if (d) saveT = setTimeout(() => saveMap(true), 1200); };
+      const num = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 10) / 10 : null;
+      async function saveMap(auto) {
+        clearTimeout(saveT);
+        if (!mod) mod = await import('./js/map2d.js');
+        if (PL.some(p => !String(p.name || '').trim())) { $('#mapState').textContent = 'Not saved: every place needs a name'; if (!auto) toast('Every place needs a name'); return; }
+        if (saving) { saveT = setTimeout(() => saveMap(auto), 800); return; }
+        saving = true;
+        const places = PL.map(p => ({ id: String(p.id || 'p-' + Math.random().toString(36).slice(2, 7)), name: String(p.name).trim(), desc: String(p.desc || ''), color: String(p.color || COLORS[0]), x: num(p.x), y: num(p.y) }));
+        const blocks = {}; for (const w of WINGS) { const k = String(w || '').trim(); if (k && !/^__.*__$/.test(k)) blocks[k] = String(BL[w] ?? mod.guessBlock(w) ?? ''); }
+        try {
+          await setDoc(doc(db, 'config', 'map'), { places, v: mod.MAP_VERSION, blocks, updatedBy: u.email, updatedAt: serverTimestamp() });
+          dirty = false; $('#mapState').textContent = 'Saved · guests see it now'; if (!auto) toast('Map saved. Guests see it now');
+        } catch (e) { console.error('map save', e); $('#mapState').innerHTML = `<span class="err">Not saved (${esc(e?.code || e?.message || 'error')}). Tap Save map to try again.</span>`; toast(`Map not saved: ${e?.code || e?.message || 'error'}`); }
+        finally { saving = false; }
+      }
+      addEventListener('beforeunload', e => { if (dirty) { saveMap(true); e.preventDefault(); e.returnValue = ''; } });
       const drawList = () => {
         $('#placeList').innerHTML = PL.map((p, i) => `<div class="item"><div class="grid2">
             <input data-pn="${i}" value="${esc(p.name)}" placeholder="Place name">
@@ -800,11 +818,7 @@ async function start() {
       $('#placeAdd').onclick = () => { PL.push({ id: 'p-' + Math.random().toString(36).slice(2, 7), name: 'New place', desc: '', color: COLORS[PL.length % COLORS.length] });
         setDirty(true); drawList(); $$('[data-pn]').at(-1)?.focus(); };
       $('#mapReset').onclick = () => m3 && m3.resetView();
-      $('#mapSave').onclick = () => {
-        if (PL.some(p => !p.name.trim())) return toast('Every place needs a name');
-        setDoc(doc(db, 'config', 'map'), { places: PL.map(({ id, name, desc, color, x, y }) => ({ id, name: name.trim(), desc: desc || '', color, x: x ?? null, y: y ?? null })), v: mod.MAP_VERSION, blocks: Object.fromEntries(WINGS.map(w => [w, BL[w] ?? mod.guessBlock(w)])), updatedBy: u.email, updatedAt: serverTimestamp() })
-          .then(() => { setDirty(false); toast('Map saved. Guests see it now'); }).catch(fail);
-      };
+      $('#mapSave').onclick = () => saveMap(false);
       onSnapshot(doc(db, 'config', 'map'), async s => {
         if (dirty) return;                          // don't overwrite edits in progress
         mod = mod || await import('./js/map2d.js');
