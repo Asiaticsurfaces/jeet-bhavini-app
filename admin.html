@@ -213,9 +213,14 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <p class="muted small">Keep the guest list in a Google Sheet and the app follows it. Use the <b>Guest Stay Summary</b> format: a <b>Guest Summary</b> tab with one row per person: <b>Guest, Room, Check-in, Check-out, Room type, Side, Phone</b> and <b>Y / N</b> for each event. Each guest gets their room, roommates and stay dates on their pass. (A Guests tab, night tabs or the hotel rooming list also work.)</p>
         <p class="small"><b>Set up once:</b> 1. <a href="assets/Wedding%20guest%20list%20-%20Google%20Sheet.xlsx" download>Download the starter file</a> and open it in Google Sheets (File → Import → Upload, "Replace spreadsheet"). 2. In the sheet: File → Share → <b>Publish to web</b> → Entire document → <b>Microsoft Excel (.xlsx)</b> → Publish. 3. Paste the link it gives below.</p>
         <p class="small muted">Anyone who has that published link can read the sheet, so share it with no one. The link is saved only for the owner.</p>
-        <div class="row"><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=xlsx" style="flex:1 1 260px"><button class="btn sm" id="sheetSave">Save link</button><button class="btn ghost sm" id="sheetSync">Sync now</button></div>
+        <p class="small muted">Keep <b>two separate sheets</b>: one for the groom's side and one for the bride's side. Each sheet only adds, changes and removes guests of its own side, so they never get mixed. A guest with an empty Side column gets the side of the sheet they are in.</p>
+        <label class="fld"><span><b>Groom's side</b> sheet link</span><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=xlsx"></label>
         <p class="small muted" id="sheetState"></p>
         <div id="sheetOut" class="stack"></div>
+        <label class="fld"><span><b>Bride's side</b> sheet link</span><input id="sheetUrlB" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=xlsx"></label>
+        <p class="small muted" id="sheetStateB"></p>
+        <div id="sheetOutB" class="stack"></div>
+        <div class="row"><button class="btn sm" id="sheetSave">Save links</button><button class="btn ghost sm" id="sheetSync">Sync both now</button></div>
       </div>
       <div class="card" id="guestAdd">
         <div class="row between"><h3 id="gfTitle">Add a guest</h3><button class="btn sm" id="gfToggle">+ Add guest</button></div>
@@ -1465,8 +1470,11 @@ async function start() {
     // Reads a guest-list workbook (the Excel, or the published Google Sheet) and imports it.
     // auto = Google Sheet sync: imports straight away and removes guests no longer in the sheet
     // (unless that's a lot of them, then it asks first).
-    async function importWorkbook(wb, out, auto) {
-        $(out.id === 'importOut' ? '#sheetOut' : '#importOut').innerHTML = '';
+    // side ('Groom' / 'Bride', from that side's Google Sheet): fills an empty Side column, and the sheet
+    // only removes guests of that side, so the two sheets never touch each other's guests.
+    async function importWorkbook(wb, out, auto, side = '') {
+        if (out.id === 'importOut') { $('#sheetOut').innerHTML = $('#sheetOutB').innerHTML = ''; } else $('#importOut').innerHTML = '';
+        const sideKey = v => /bride/i.test(v || '') ? 'Bride' : /groom/i.test(v || '') ? 'Groom' : '';
         // A tab's header row can be row 1 (Google Sheet) or row 2 (the Excel has a title row first).
         const tabOf = name => Object.keys(wb.Sheets).find(k => k.trim().toLowerCase() === name.toLowerCase());
         const HEAD = { guests: 'guest name', volunteers: 'volunteer', vendors: 'role', drivers: 'driver', 'help contacts': 'shown' };
@@ -1486,7 +1494,10 @@ async function start() {
         const yn = v => !/^n/i.test(String(v).trim());
         const errors = [], guests = new Map(), notes = [];
         // Same name as a guest already in the app = the same guest (keeps their login, phone, invites and room).
-        const byName = new Map(GUESTS.map(g => [String(g.name || '').trim().toLowerCase(), g.id]));
+        const byName = new Map();
+        for (const g of GUESTS) { const k = String(g.name || '').trim().toLowerCase(), cur = byName.get(k);
+          if (side && sideKey(g.side) && sideKey(g.side) !== side) continue;          // the other side's guest with the same name is someone else
+          if (!cur || (side && sideKey(g.side) === side)) byName.set(k, g.id); }
         const taken = new Set(GUESTS.map(g => g.id));
         const MON = { nov: 11, dec: 12 };
         const dateIn = t => { const m = String(t).match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s*(nov|dec)/i); return m ? `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}` : ''; };
@@ -1511,7 +1522,7 @@ async function start() {
           if (id && guests.has(id)) return errors.push(`Row ${i + 3}: ${name} is in the file twice (only the first row is used)`);
           if (!id) { const base = slugOf(name); id = base; for (let k = 2; taken.has(id) || guests.has(id); k++) id = `${base}-${k}`; }
           const events = {}; EVK.forEach(([k, n]) => { const v = evCol(r, k, n); if (v !== null) events[k] = yn(v); });
-          guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(0, parseInt(val(r, 'no. of people', 'people')) || 0),   // 0 = no column: keep the app's count
+          guests.set(id, { phone, name, side: val(r, 'side') || side, relation: val(r, 'relation'), people: Math.max(0, parseInt(val(r, 'no. of people', 'people')) || 0),   // 0 = no column: keep the app's count
             room: '', lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
           const g = guests.get(id);
           // Room number + room type / block, and the stay dates when the sheet has them.
@@ -1556,7 +1567,7 @@ async function start() {
               if (!id) {
                 id = byName.get(key);
                 if (!id) { const base = slugOf(n); id = base; for (let q = 2; taken.has(id) || guests.has(id); q++) id = `${base}-${q}`; }
-                guests.set(id, { phone: '', name: n, side: '', relation: '', people: 0, room: '', lang: '', events: {}, isNew: !GUESTS.some(g => g.id === id) });
+                guests.set(id, { phone: '', name: n, side, relation: '', people: 0, room: '', lang: '', events: {}, isNew: !GUESTS.some(g => g.id === id) });
               }
               const g = guests.get(id), text = roomTextOf(room, block);
               if (!g.roomTab) { g.room = text; g.roomTab = k; g.people = g.people || 1; roomBeds.set(room, (roomBeds.get(room) || 0) + 1); }
@@ -1583,14 +1594,15 @@ async function start() {
         const vendors = rows('Vendors').filter(r => val(r, 'role') && !sample(r)).map(r => ({ role: val(r, 'role'), name: val(r, 'business'), phone: normPhone(val(r, 'phone')), note: val(r, 'notes') }));
         const drivers = rows('Drivers').filter(r => val(r, 'driver') && !sample(r)).map(r => ({ name: val(r, 'driver'), phone: normPhone(val(r, 'phone')), car: val(r, 'car'), plate: val(r, 'number') }));
         const contacts = rows('Help contacts').filter(r => val(r, 'shown') && !sample(r)).map(r => ({ label: val(r, 'shown'), phone: normPhone(val(r, 'phone')), note: [val(r, 'name'), val(r, 'notes')].filter(Boolean).join(' · ') }));
-        const gone = GUESTS.filter(g => !guests.has(g.id));
+        const mineAll = side ? GUESTS.filter(g => sideKey(g.side) === side) : GUESTS;   // guests this file is in charge of
+        const gone = mineAll.filter(g => !guests.has(g.id));
         for (const [id, g] of guests) g.people = g.people || GUESTS.find(x => x.id === id)?.people || 1;
         const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
         const added = [...guests.values()].filter(g => g.isNew).length;
         const withRoom = [...guests.values()].filter(g => g.room).length;
         const withNights = [...guests.values()].filter(g => g.stayIn).length;
         // Sheet sync removes guests deleted from the sheet, but not a big chunk at once (a half-filled sheet, a wrong tab).
-        const autoRemove = auto && gone.length && gone.length <= Math.max(5, Math.round(GUESTS.length * 0.3));
+        const autoRemove = auto && gone.length && gone.length <= Math.max(5, Math.round(mineAll.length * 0.3));
         out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number${withNights ? `, <b>${withNights}</b> have check-in / check-out dates` : ''}.</p>
           <p class="small muted">Guests already signed in stay signed in. A row with an empty Room, Side or event column keeps what the app already has. Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
           ${gone.length ? `<div class="card" style="padding:10px"><p class="small"><b>${gone.length} guest(s) in the app are not in this file</b> and will be kept: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>
@@ -1598,10 +1610,10 @@ async function start() {
           ${errors.length ? `<div class="err"><b>${errors.length} row(s) skipped:</b><br>${errors.map(esc).join('<br>')}</div>` : ''}
           <button class="btn" id="doImport" ${guests.size ? '' : 'disabled'}>Import into the app</button>`;
         if (auto && !guests.size) { out.innerHTML = '<p class="err">No guests were found in the sheet (no "Guests" tab and no rooming tab with "Room" and "Guest Name" columns), so nothing was changed.</p>'; return 'empty'; }
-        $('#doImport').onclick = async () => {
-          const removing = gone.length && $('#impRemove')?.checked ? gone : [];
+        out.querySelector('#doImport').onclick = async () => {
+          const removing = gone.length && out.querySelector('#impRemove')?.checked ? gone : [];
           if (removing.length && !(auto && autoRemove) && !confirm(`Remove ${removing.length} guest(s) that are not in the file? They will be signed out of the app.`)) return;
-          $('#doImport').disabled = true; $('#doImport').textContent = 'Importing…';
+          out.querySelector('#doImport').disabled = true; out.querySelector('#doImport').textContent = 'Importing…';
           const ops = [];
           for (const [id, g] of guests) {
             const old = GUESTS.find(x => x.id === id) || {};
@@ -1640,7 +1652,7 @@ async function start() {
           if (todo.length) {
             for (let t = 0; t < 50 && todo.some(([id]) => !GUESTS.some(x => x.id === id)); t++) await new Promise(r => setTimeout(r, 200));   // wait for new guests to arrive
             for (const [id, g] of todo) {
-              $('#doImport').textContent = `Allotting rooms… ${roomsDone + roomErr.length + 1} of ${todo.length}`;
+              out.querySelector('#doImport').textContent = `Allotting rooms… ${roomsDone + roomErr.length + 1} of ${todo.length}`;
               const mine = roomsApi.staysOf(id);
               if (mine.length > 1) { roomErr.push(`${g.name}: has ${mine.length} rooms, change them in the Rooms tab`); continue; }
               const inD = g.stayIn || mine[0]?.in || '2026-12-01', outD = g.stayOut || mine[0]?.out || '2026-12-03';
@@ -1657,42 +1669,59 @@ async function start() {
           if (auto && gone.length && !removing.length) out.insertAdjacentHTML('beforeend', `<p class="small err">${gone.length} guests in the app aren't in the sheet. That's a lot, so they were kept. Import with "Remove" ticked from the Excel box, or delete them in the list below.</p>`);
           return errors.length ? 'errors' : 'ok';
         };
-        if (auto) return await $('#doImport').onclick();
+        if (auto) return await out.querySelector('#doImport').onclick();
     }
 
     // ---------- Google Sheet sync ----------
     // The owner pastes the sheet's "Publish to web" link (xlsx). The panel reads it on open, every
     // 5 minutes while open, and on "Sync now"; it imports only when the sheet changed.
-    let SHEET = '', sheetBusy = false, sheetLast = '';
+    // Two sheets: groom's side (private/sheet.url) and bride's side (private/sheet.urlB), synced one after the other.
+    const SH = { Groom: { url: '', last: '', k: '', out: '#sheetOut', st: '#sheetState', inp: '#sheetUrl' },
+                 Bride: { url: '', last: '', k: 'B', out: '#sheetOutB', st: '#sheetStateB', inp: '#sheetUrlB' } };
+    let sheetBusy = false;
     const pubUrl = t => { t = t.trim(); const e = t.match(/\/spreadsheets\/d\/e\/([\w-]+)/); if (e) return `https://docs.google.com/spreadsheets/d/e/${e[1]}/pub?output=xlsx`; return ''; };
     const hashOf = async buf => [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
-    async function syncSheet(force) {
-      if (!SHEET || sheetBusy || !can.owner) return;
-      sheetBusy = true; $('#sheetSync').disabled = true; $('#sheetState').textContent = 'Reading the Google Sheet…';
+    async function syncOne(side, force) {
+      const S0 = SH[side]; if (!S0.url) return;
+      $(S0.st).textContent = 'Reading the Google Sheet…';
       try {
-        const r = await fetch(SHEET + (SHEET.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+        const r = await fetch(S0.url + (S0.url.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const buf = await r.arrayBuffer(), h = await hashOf(buf);
         const t = new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-        if (!force && h === sheetLast) { $('#sheetState').textContent = `Checked at ${t}: no changes in the sheet.`; return; }
+        if (!force && h === S0.last) { $(S0.st).textContent = `Checked at ${t}: no changes in the sheet.`; return; }
         if (!GUESTS.length && !force) await new Promise(res => setTimeout(res, 1500));   // let the guest list load first
-        const res = await importWorkbook(XLSX.read(buf, { type: 'array' }), $('#sheetOut'), true);
-        if (res !== 'empty') { sheetLast = h; setDoc(doc(db, 'private', 'sheet'), { last: h, syncedAt: serverTimestamp() }, { merge: true }).catch(() => {}); }
-        $('#sheetState').textContent = `Synced at ${t}${res === 'errors' ? ' · some rows need fixing (see below)' : ''}. Checks again every 5 minutes while this panel is open.`;
-      } catch (e) { console.error(e); $('#sheetState').innerHTML = '<span class="err">Couldn\'t read the sheet. Check it is still published (File → Share → Publish to web, as .xlsx) and the link is right.</span>'; }
+        const res = await importWorkbook(XLSX.read(buf, { type: 'array' }), $(S0.out), true, side);
+        if (res !== 'empty') { S0.last = h; setDoc(doc(db, 'private', 'sheet'), { ['last' + S0.k]: h, syncedAt: serverTimestamp() }, { merge: true }).catch(() => {}); }
+        $(S0.st).textContent = `Synced at ${t}${res === 'errors' ? ' · some rows need fixing (see below)' : ''}. Checks again every 5 minutes while this panel is open.`;
+      } catch (e) { console.error(e); $(S0.st).innerHTML = '<span class="err">Couldn\'t read this sheet. Check it is still published (File → Share → Publish to web, as .xlsx) and the link is right.</span>'; }
+    }
+    async function syncSheet(force) {
+      if (sheetBusy || !can.owner || !(SH.Groom.url || SH.Bride.url)) return;
+      sheetBusy = true; $('#sheetSync').disabled = true;
+      try { await syncOne('Groom', force); await syncOne('Bride', force); }
       finally { sheetBusy = false; $('#sheetSync').disabled = false; }
     }
     if (can.owner) {
-      getDoc(doc(db, 'private', 'sheet')).then(s => { const d = s.exists() ? s.data() : {}; SHEET = d.url || ''; sheetLast = d.last || ''; $('#sheetUrl').value = SHEET;
-        $('#sheetState').textContent = SHEET ? 'Connected.' : 'Not connected yet.'; if (SHEET) setTimeout(() => syncSheet(false), 3000); }).catch(() => {});
+      getDoc(doc(db, 'private', 'sheet')).then(s => { const d = s.exists() ? s.data() : {};
+        for (const [, S0] of Object.entries(SH)) { S0.url = d['url' + S0.k] || ''; S0.last = d['last' + S0.k] || ''; $(S0.inp).value = S0.url; $(S0.st).textContent = S0.url ? 'Connected.' : 'Not connected yet.'; }
+        if (SH.Groom.url || SH.Bride.url) setTimeout(() => syncSheet(false), 3000); }).catch(() => {});
       setInterval(() => { if (document.visibilityState === 'visible') syncSheet(false); }, 5 * 60 * 1000);
       $('#sheetSave').onclick = async () => {
-        const raw = $('#sheetUrl').value.trim(), url = raw ? pubUrl(raw) : '';
-        if (raw && !url) return toast('Use the "Publish to web" link (it has /d/e/ in it), not the normal sheet link');
-        try { await setDoc(doc(db, 'private', 'sheet'), { url, last: '' }, { merge: true }); SHEET = url; sheetLast = ''; $('#sheetUrl').value = url;
-          toast(url ? 'Link saved. Syncing now' : 'Google Sheet disconnected'); $('#sheetState').textContent = url ? 'Connected.' : 'Not connected yet.'; if (url) syncSheet(true); } catch (e) { fail(e); }
+        const upd = {};
+        for (const [side, S0] of Object.entries(SH)) {
+          const raw = $(S0.inp).value.trim(), url = raw ? pubUrl(raw) : '';
+          if (raw && !url) return toast(`${side}'s side: use the "Publish to web" link (it has /d/e/ in it), not the normal sheet link`);
+          if (url !== S0.url) { upd['url' + S0.k] = url; upd['last' + S0.k] = ''; }
+        }
+        if (upd.url && upd.url === (upd.urlB ?? SH.Bride.url) || (upd.urlB && upd.urlB === (upd.url ?? SH.Groom.url))) return toast('The groom and bride links are the same. Each side needs its own sheet');
+        if (!Object.keys(upd).length) return toast('No changes to the links');
+        try { await setDoc(doc(db, 'private', 'sheet'), upd, { merge: true });
+          for (const [, S0] of Object.entries(SH)) if (('url' + S0.k) in upd) { S0.url = upd['url' + S0.k]; S0.last = ''; $(S0.inp).value = S0.url; $(S0.st).textContent = S0.url ? 'Connected.' : 'Not connected yet.'; }
+          toast('Links saved. Syncing now'); syncSheet(true);
+        } catch (e) { fail(e); }
       };
-      $('#sheetSync').onclick = () => SHEET ? syncSheet(true) : toast('Paste the published link and tap Save link first');
+      $('#sheetSync').onclick = () => (SH.Groom.url || SH.Bride.url) ? syncSheet(true) : toast('Paste the published link(s) and tap Save links first');
     }
 
     // ---------- photos ----------
