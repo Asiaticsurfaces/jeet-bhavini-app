@@ -764,7 +764,7 @@ async function start() {
       // wing → room block (for the guests' "Your room" pin)
       const drawBlocks = () => {
         if (!mod) return;
-        const opts = [['', 'Not on the map'], ...mod.GROUPS.map(g => [g.t, g.n])];
+        const opts = [['', 'Not on the map'], ...mod.GROUPS.map(g => [g.t, g.n]), ...PL.filter(p => p.x != null && String(p.name || '').trim()).map(p => ['place:' + p.id, p.name.trim() + ' (your place)'])];
         $('#blockList').innerHTML = WINGS.length ? WINGS.map((w, i) => { const v = BL[w] ?? mod.guessBlock(w);
           return `<label class="row between small" style="flex-wrap:nowrap;gap:10px"><b>${esc(w)}</b><select data-bl="${i}" style="width:auto;max-width:60%">${opts.map(([k, n]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`; }).join('')
           : '<p class="muted small">No rooms added yet. Add them in the Rooms tab first.</p>';
@@ -777,7 +777,7 @@ async function start() {
       const num = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 10) / 10 : null;
       async function saveMap(auto) {
         clearTimeout(saveT);
-        if (!mod) mod = await import('./js/map2d.js');
+        if (!mod) mod = await import('./js/map2d.js?v=3');
         if (PL.some(p => !String(p.name || '').trim())) { $('#mapState').textContent = 'Not saved: every place needs a name'; if (!auto) toast('Every place needs a name'); return; }
         if (saving) { saveT = setTimeout(() => saveMap(auto), 800); return; }
         saving = true;
@@ -791,6 +791,7 @@ async function start() {
       }
       addEventListener('beforeunload', e => { if (dirty) { saveMap(true); e.preventDefault(); e.returnValue = ''; } });
       const drawList = () => {
+        setTimeout(drawBlocks, 0);   // wing dropdown lists the places too
         $('#placeList').innerHTML = PL.map((p, i) => `<div class="item"><div class="grid2">
             <input data-pn="${i}" value="${esc(p.name)}" placeholder="Place name">
             <div class="row" style="flex-wrap:nowrap">${COLORS.map(c => `<button aria-label="Colour ${c}" data-pc="${i}" data-c="${c}" style="width:24px;height:24px;border-radius:50%;border:${p.color === c ? '3px solid #33322e' : '1px solid #fff'};background:${c};cursor:pointer;flex:none"></button>`).join('')}</div></div>
@@ -807,7 +808,7 @@ async function start() {
         $$('[data-pdel]').forEach(b => b.onclick = () => { if (!confirm(`Remove "${PL[b.dataset.pdel].name}" from the map?`)) return; PL.splice(+b.dataset.pdel, 1); setDirty(true); drawList(); m3 && m3.setPlaces(PL); });
       };
       const boot = async () => {
-        mod = mod || await import('./js/map2d.js');
+        mod = mod || await import('./js/map2d.js?v=3');
         if (!m3) m3 = await mod.createMap($('#adminMap'), { places: PL, onPick: (x, y) => {
           if (picking == null) return;
           Object.assign(PL[picking], { x, y }); const id = PL[picking].id; picking = null;
@@ -821,7 +822,7 @@ async function start() {
       $('#mapSave').onclick = () => saveMap(false);
       onSnapshot(doc(db, 'config', 'map'), async s => {
         if (dirty) return;                          // don't overwrite edits in progress
-        mod = mod || await import('./js/map2d.js');
+        mod = mod || await import('./js/map2d.js?v=3');
         const L = s.exists() && s.data().v === mod.MAP_VERSION && Array.isArray(s.data().places) && s.data().places.length ? s.data().places : mod.DEFAULT_PLACES;
         PL = L.map(p => ({ ...p })); BL = s.exists() && s.data().v === mod.MAP_VERSION && s.data().blocks || {}; drawList(); drawBlocks(); $('#mapState').textContent = s.exists() && s.data().v === mod.MAP_VERSION ? 'Saved' : 'Suggested spots on the new map, not saved yet';
         if (cur === 'events') boot().catch(e => { console.error(e); $('#adminMap').innerHTML = '<p class="muted" style="padding:20px">The map couldn\'t load.</p>'; });

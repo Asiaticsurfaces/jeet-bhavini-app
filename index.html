@@ -1026,7 +1026,7 @@ $('#tSave').onclick=()=>{travel={mode:tMode,day:$('#tDay').value,time:$('#tTime'
 /* Venue map (js/map2d.js). Places come from the family panel (config/map), else the defaults. */
 let PLACES=null,ROOMBLOCKS={},mapGo=false,mapSel=null,mapMod=null,venueMap=null,mapBusy=null;
 async function renderMap(){
-  try{mapMod=mapMod||await import('./js/map2d.js')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
+  try{mapMod=mapMod||await import('./js/map2d.js?v=3')}catch(e){$('#map').innerHTML='<p class="muted" style="padding:24px">The map couldn\'t load. Check your internet and try again.</p>';return}
   const places=(PLACES||mapMod.DEFAULT_PLACES).filter(p=>p.x!=null&&p.y!=null).map(p=>{const ev=eventsAt(p);return{...p,sub:ev.map(e=>evName(e)).join(' · '),ev}});
   const mine=myRoomPin();if(mine)places.unshift(mine);
   $('#legend').innerHTML=places.map(p=>`<button data-pl="${esc(p.id)}" aria-pressed="${p.id===mapSel}"><i style="background:${esc(p.color||'#8e3a5d')}"></i>${esc(p.name)}</button>`).join('');
@@ -1052,7 +1052,10 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-mapgo]');i
 function myRoomPin(){
   if(!ME||!ME.room||!mapMod)return null;
   const wing=String(ME.roomWhere||'').split(';')[0].split(' · ')[0].trim();
-  const t=ROOMBLOCKS[wing]||mapMod.guessBlock(wing);const g=mapMod.GROUPS.find(x=>x.t===t);if(!g)return null;
+  const t=ROOMBLOCKS[wing]||mapMod.guessBlock(wing);
+  // a wing linked to a place the family added on the map ("place:<id>"), or one of the map's room groups
+  const pl=String(t).startsWith('place:')&&(PLACES||[]).find(p=>p.id===t.slice(6)&&p.x!=null);
+  const g=pl?{n:pl.name,x:pl.x,y:pl.y}:mapMod.GROUPS.find(x=>x.t===t);if(!g)return null;
   return{id:'myroom',name:`Your room ${ME.room}`,sub:g.n,desc:`Room ${ME.room}${ME.roomWhere?` · ${ME.roomWhere}`:''}, in the ${g.n}. Your key is at the check-in desk.`,color:'#b8322b',x:g.x,y:g.y+18,ev:[]};
 }
 // Functions held at a map pin: matched by venue name (Ballroom → banquet hall pin, Lawn → garden lawn, Lake → lake side).

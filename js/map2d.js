@@ -10,13 +10,13 @@
 //   plain: just the map picture; a pin shows only for the place you were sent to (focus).
 //   map.setPlaces(places); map.focus(id); map.setPickMode(true|false); map.resetView(); map.destroy()
 
-import { FEATURES, GROUPS } from './venue-data.js?v=1';
+import { FEATURES, GROUPS } from './venue-data.js?v=2';
 
 const TEX_URL = new URL('../assets/venue-map.jpg?v=7', import.meta.url).href;   // the resort's own map, description text removed
 export const MAP_VERSION = 2;
 export { GROUPS };
 // Guess a room group from a wing name ("Lake View", "Cottage 3" …) when the family hasn't linked it.
-export const guessBlock = w => /cottage/i.test(w) ? 'cottage' : /plunge/i.test(w) ? 'room-pp' : /lake/i.test(w) ? 'room-lv' : /pool|lawn/i.test(w) ? 'room-pl' : '';
+export const guessBlock = w => /rose/i.test(w) ? 'rose' : /cottage/i.test(w) ? 'cottage' : /plunge/i.test(w) ? 'room-pp' : /lake/i.test(w) ? 'room-lv' : /pool|lawn/i.test(w) ? 'room-pl' : '';
 const PW = 2000, PH = 2980;
 
 export const DEFAULT_PLACES = [
@@ -33,6 +33,7 @@ const KIND = {
   'room-pp': { roof: '#4f4440', chip: '#4f4440', ink: '#fff', pri: 5 },
   'room-lv': { roof: '#7f8c99', chip: '#5f6c79', ink: '#fff', pri: 5 },
   cottage:   { roof: '#8b5a2b', chip: '#8b5a2b', ink: '#fff', pri: 5 },
+  rose:      { roof: '#b8466a', chip: '#b8466a', ink: '#fff', pri: 5 },
   food:      { roof: '#c99a5b', chip: '#ffffff', ink: '#8a5a1c', pri: 3, icon: '🍽 ' },
   spot:      { roof: '#6b8f71', chip: '#ffffff', ink: '#41613f', pri: 1 },
   pool:      { chip: '#ffffff', ink: '#2b6f9e', pri: 1 },
