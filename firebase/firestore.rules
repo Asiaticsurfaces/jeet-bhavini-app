@@ -100,6 +100,10 @@ service cloud.firestore {
         && getAfter(/databases/$(db)/documents/guestIndex/$(request.resource.data.guestId)).data.get('phones', []).hasAny([phone]);
       allow create, update, delete: if isOwner() || can('guests');
     }
+    // Owner-only settings (e.g. the published Google Sheet link, which holds guest names).
+    match /private/{id} {
+      allow read, write: if isOwner();
+    }
     match /guestNotes/{phone} {
       allow read: if can('guests');
       allow write: if isOwner();
