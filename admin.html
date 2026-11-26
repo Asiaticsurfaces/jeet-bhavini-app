@@ -38,6 +38,10 @@ input,select,textarea{width:100%;font:15px var(--body);padding:10px 12px;border-
 .chip.sage{background:var(--sage-soft);color:var(--sage)}.chip.plum{background:var(--plum-soft);color:var(--plum)}.chip.red{background:var(--red-soft);color:var(--red)}
 .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
 .item.open{border-left:4px solid var(--red)}.item.working{border-left:4px solid var(--gold)}.item.done{opacity:.6}
+.cdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.cdslot{border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--card)}
+.cdslot.today{border:2px solid var(--plum)}
+.cdslot .ph{aspect-ratio:4/5;border-radius:10px;background:#efe8dc center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .stats div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
 .stats b{display:block;font:600 26px var(--display);color:var(--plum-deep)}.stats span{font-size:12px;color:var(--muted)}
@@ -139,6 +143,12 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         <textarea id="postBody" rows="2" maxlength="300" placeholder="Details, e.g. Buffet is ready on the Lawn. Jain counter on the left."></textarea>
         <label class="stack" style="gap:4px"><span class="small muted">Send to</span><select id="postSide"><option value="all">Everyone</option><option value="Groom">Groom's side only</option><option value="Bride">Bride's side only</option></select></label>
         <div class="row"><select id="postKind" style="flex:1"><option>Info</option><option>Ceremony</option><option>Food</option><option>Shuttle</option></select><button class="btn" id="postSend">Post</button></div>
+      </div>
+      <div class="card">
+        <h3>Countdown pictures</h3>
+        <p class="muted small">Upload a picture for each day. Guests see only today's picture at the top of their Home screen, and it changes by itself at midnight. Days are counted to the wedding day, 2 December.</p>
+        <div class="cdgrid" id="cdList"></div>
+        <input type="file" id="cdFile" accept="image/*" hidden>
       </div>
       <h3>Posted updates</h3>
       <div class="stack" id="postList"></div>
@@ -395,7 +405,7 @@ async function start() {
   // Own app name = own saved sign-in, so opening the guest app (anonymous) on this phone never signs the panel out.
   const app = initializeApp(FIREBASE_CONFIG, 'family-panel');
   const auth = A.getAuth(app), db = F.getFirestore(app), st = S.getStorage(app);
-  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp, writeBatch, Timestamp } = F;
+  const { doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp, writeBatch, Timestamp, deleteField } = F;
   const ms = t => (t && t.toMillis ? t.toMillis() : 0);
   const when = t => t ? new Date(ms(t)).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
   const list = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -477,6 +487,41 @@ async function start() {
     });
     $('#nowSave').onclick = () => { const text = $('#nowText').value.trim(); if (!text) return toast('Write the message first');
       setDoc(doc(db, 'config', 'now'), { text, place: $('#nowPlace').value, side: $('#nowSide').value, on: true, by: u.email, updatedAt: serverTimestamp() }).then(() => toast('Banner is live')).catch(fail); };
+    // Countdown pictures: config/countdown {days: {"6": {url, path, label}}}, files in countdown/.
+    const WED = Date.UTC(2026, 11, 2), istDay = t => Math.floor((t + 5.5 * 36e5) / 864e5);
+    const CD_SLOTS = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+    const cdLabel = n => n === 0 ? 'Wedding day' : n === 1 ? '1 day to go' : `${n} days to go`;
+    const cdDate = n => new Date(WED - n * 864e5).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    let CD = {}, cdFor = null;
+    function drawCd() {
+      const today = Math.floor(WED / 864e5) - istDay(Date.now());
+      $('#cdList').innerHTML = CD_SLOTS.map(n => { const p = CD[n];
+        return `<div class="cdslot ${n === today ? 'today' : ''}"><div class="ph" style="${p ? `background-image:url('${esc(p.url)}')` : ''}">${p ? '' : 'No picture'}</div>
+          <b class="small">${cdLabel(n)}</b><span class="small muted">Shows on ${cdDate(n)}${n === today ? ' · <b>today</b>' : n > today ? ' · done' : ''}</span>
+          <div class="row" style="gap:6px"><button class="btn sm" data-cdup="${n}">${p ? 'Replace' : 'Upload'}</button>${p ? `<button class="btn danger sm" data-cddel="${n}">Remove</button>` : ''}</div></div>`; }).join('');
+      $$('[data-cdup]').forEach(b => b.onclick = () => { cdFor = b.dataset.cdup; $('#cdFile').click(); });
+      $$('[data-cddel]').forEach(b => b.onclick = async () => { const n = b.dataset.cddel, p = CD[n]; if (!confirm(`Remove the "${cdLabel(+n)}" picture?`)) return;
+        try { await setDoc(doc(db, 'config', 'countdown'), { days: { [n]: deleteField() } }, { merge: true });
+          if (p?.path) await S.deleteObject(S.ref(st, p.path)).catch(() => {}); toast('Picture removed'); } catch (e) { fail(e); } });
+    }
+    onSnapshot(doc(db, 'config', 'countdown'), s => { CD = s.exists() ? s.data().days || {} : {}; drawCd(); });
+    $('#cdFile').onchange = async e => {
+      const f = e.target.files[0], n = cdFor; e.target.value = ''; if (!f || n == null) return;
+      const btn = $(`[data-cdup="${n}"]`); if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+      try {
+        // Keep it sharp but light for guests' phones: max 1600px JPEG.
+        const bmp = await createImageBitmap(f), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+        const path = `countdown/${n}-${Date.now()}.jpg`, r = S.ref(st, path);
+        await S.uploadBytes(r, blob, { contentType: 'image/jpeg' });
+        const old = CD[n];
+        await setDoc(doc(db, 'config', 'countdown'), { days: { [n]: { url: await S.getDownloadURL(r), path, label: cdLabel(+n) } }, updatedAt: serverTimestamp() }, { merge: true });
+        if (old?.path) S.deleteObject(S.ref(st, old.path)).catch(() => {});
+        toast(`"${cdLabel(+n)}" picture saved`);
+      } catch (err) { fail(err); drawCd(); }
+    };
     $('#nowOff').onclick = () => setDoc(doc(db, 'config', 'now'), { on: false, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast('Banner hidden')).catch(fail);
     $('#postSend').onclick = () => { const title = $('#postTitle').value.trim(); if (!title) return toast('Add a title');
       const side = $('#postSide').value;

@@ -109,7 +109,7 @@ service cloud.firestore {
     match /posts/{id} { allow read: if signedIn(); allow write: if can('live'); }
     match /config/{id} {
       allow read: if signedIn();
-      allow write: if isOwner() || (id == 'now' && can('live')) || (id == 'map' && can('events'));
+      allow write: if isOwner() || ((id == 'now' || id == 'countdown') && can('live')) || (id == 'map' && can('events'));
     }
     match /found/{id} { allow read: if signedIn(); allow write: if can('lost'); }
 

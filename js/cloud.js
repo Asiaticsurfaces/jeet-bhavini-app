@@ -200,6 +200,7 @@ async function start() {
     const n = s.exists() ? s.data() : null;
     NOWS_ALL = n && n.on && n.text ? [{ t: n.text, place: n.place || null, side: n.side || 'all' }] : []; nowI = 0; refresh('now');
   });
+  onSnapshot(doc(db, 'config', 'countdown'), s => { CDPICS = s.exists() ? s.data().days || {} : {}; refresh('countdown'); }, () => {});
   onSnapshot(doc(db, 'config', 'map'), s => {
     const d = s.exists() ? s.data() : null, L = d && d.v === 2 ? d.places : null;   // v 2 = pins on the Oleander Farms map
     PLACES = Array.isArray(L) && L.length ? L : null; ROOMBLOCKS = d && d.v === 2 && d.blocks || {}; refresh('map');
