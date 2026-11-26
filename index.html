@@ -189,6 +189,9 @@ details p{margin-top:6px;color:var(--muted)}
 .login .garland.l{left:max(6px,env(safe-area-inset-left,0px))} .login .garland.r{right:max(6px,env(safe-area-inset-right,0px))}
 .guest-hit{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:12px 16px;font:inherit;cursor:pointer}
 .guest-hit small{color:var(--muted)}
+.side-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.side-pick button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:14px 10px;font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center}
+.side-pick button b{font-size:16px;color:var(--plum-deep)}.side-pick button small{color:var(--muted)}
 
 /* Bottom nav */
 nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none}
@@ -539,9 +542,16 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
       <button class="btn" id="loginGo" style="width:100%">Continue</button>
     </div>
     <div id="nameStep" class="stack" style="width:100%" hidden>
-      <p class="muted small" style="margin:0">First time on <b id="nameFor"></b>. Find your name on the guest list:</p>
-      <input type="text" id="nameQ" placeholder="Type your first or last name" autocomplete="name">
-      <div class="stack" id="nameHits" style="width:100%"></div>
+      <p class="muted small" style="margin:0">First time on <b id="nameFor"></b>.</p>
+      <div id="sideStep" class="stack" style="width:100%">
+        <p style="margin:0"><b>Which side are you from?</b></p>
+        <div class="side-pick"><button data-side="Groom"><b>Groom's side</b><small>Jeet's family &amp; friends</small></button><button data-side="Bride"><b>Bride's side</b><small>Bhavini's family &amp; friends</small></button></div>
+      </div>
+      <div id="nameFind" class="stack" style="width:100%" hidden>
+        <p class="muted small" style="margin:0"><b id="sideNow"></b> · <button class="linkbtn" id="sideChange" style="display:inline;padding:0">change</button><br>Find your name on the guest list:</p>
+        <input type="text" id="nameQ" placeholder="Type your first or last name" autocomplete="name">
+        <div class="stack" id="nameHits" style="width:100%"></div>
+      </div>
       <button class="linkbtn" id="nameBack">← Use a different number</button>
     </div>
     <div class="stack" id="loginHits" style="width:100%"></div>
@@ -1040,7 +1050,7 @@ $$('.ftabs button').forEach(b=>b.onclick=()=>{famTab=b.dataset.ft;renderFamily()
 
 /* ---------- guest login ---------- */
 function guestWelcome(g){ME=g;store.set('guest',ME);closeLogin();toast(`Welcome, ${ME.n.split(' ')[0]}!`);if(CLOUD_ON())CLOUD.onGuest(ME)}
-let loginPhone='',nameTimer=null,nameHits=[];
+let loginPhone='',nameTimer=null,nameHits=[],loginSide='';
 // Step 1: mobile number. A number we know opens the pass straight away.
 async function tryLogin(){
   const ph=normPhone($('#loginQ').value);
@@ -1057,8 +1067,17 @@ async function tryLogin(){
 function showNameStep(){
   $('#phoneStep').hidden=true;$('#nameStep').hidden=false;
   $('#nameFor').textContent=`+91 ${loginPhone.slice(0,5)} ${loginPhone.slice(5)}`;
-  $('#nameQ').value='';$('#loginHits').innerHTML='';renderLoginFoot();$('#nameQ').focus();
+  $('#nameQ').value='';$('#loginHits').innerHTML='';renderLoginFoot();pickSide('');
 }
+// The guest says which side they're from first, so only that side's names are offered
+// (the same name can be on both sides). Guests with no side on the list show on both.
+function pickSide(sd){
+  loginSide=sd;$('#sideStep').hidden=!!sd;$('#nameFind').hidden=!sd;$('#nameHits').innerHTML='';
+  if(sd){$('#sideNow').textContent=sd==='Groom'?"Groom's side (Jeet)":"Bride's side (Bhavini)";$('#nameQ').value='';$('#nameQ').focus()}
+}
+$$('[data-side]').forEach(b=>b.onclick=()=>pickSide(b.dataset.side));
+$('#sideChange').onclick=()=>pickSide('');
+const sideOf=sd=>/bride/i.test(sd||'')?'Bride':/groom/i.test(sd||'')?'Groom':'';
 function backToPhone(){$('#phoneStep').hidden=false;$('#nameStep').hidden=true;$('#nameHits').innerHTML='';$('#loginHits').innerHTML='';renderLoginFoot()}
 async function searchNames(){
   const q=$('#nameQ').value.trim();
@@ -1066,11 +1085,13 @@ async function searchNames(){
   $('#nameHits').innerHTML='<p class="muted small">Searching…</p>';
   try{
     const words=q.toLowerCase().split(/\s+/).filter(Boolean);
-    nameHits=CLOUD_ON()?await CLOUD.searchGuests(q)
+    const all=CLOUD_ON()?await CLOUD.searchGuests(q)
       :GUESTS.filter(g=>words.every(w=>g.n.toLowerCase().split(/\s+/).some(t=>t.startsWith(w)))).map(g=>({id:g.n,name:g.n,side:g.side,people:g.party}));
     if(q!==$('#nameQ').value.trim())return;
+    nameHits=all.filter(g=>!sideOf(g.side)||sideOf(g.side)===loginSide);
+
     $('#nameHits').innerHTML=nameHits.length?nameHits.map((g,i)=>`<button class="guest-hit" data-pick="${i}"><span><b>${esc(g.name)}</b><br><small>${esc(g.side==='Bride'?"Bride's side":g.side==='Groom'?"Groom's side":g.side||'')}${g.people?` · ${g.people} ${g.people==1?'person':'people'}`:''}</small></span><span class="chip sage">That's me</span></button>`).join('')
-      :'<p class="muted">No match yet. Try only your first name or surname. Still not there? Call the family using the number below.</p>';
+      :`<p class="muted">No match on the ${loginSide==='Bride'?"bride's":"groom's"} side yet. Try only your first name or surname, or check you picked the right side. Still not there? Call the family using the number below.</p>`;
     $$('[data-pick]').forEach(b=>b.onclick=()=>confirmName(nameHits[+b.dataset.pick]));
   }catch(e){console.error(e);$('#nameHits').innerHTML='<p class="muted">Couldn\'t search. Check your internet and try again.</p>'}
 }
