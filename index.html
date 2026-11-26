@@ -73,8 +73,11 @@ input[type=text],input[type=tel],textarea{width:100%;font:15px var(--body);paddi
 .names{font:400 52px/1 var(--script);color:var(--plum);margin-top:6px}
 .names i{font-style:normal;color:var(--gold);font-size:40px;margin:0 6px}
 .dateline{font:500 13px var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--ink)}
-.cdpic{width:100%;border-radius:18px;overflow:hidden;box-shadow:0 6px 22px rgba(60,30,40,.14);background:#efe8dc;border:0;padding:0;cursor:zoom-in;display:block}
-.cdpic img{display:block;width:100%;height:auto}
+.cdpop{position:fixed;inset:0;z-index:70;background:rgba(20,14,12,.78);display:flex;align-items:center;justify-content:center;padding:18px;animation:cdIn .25s ease}
+.cdpop .box{position:relative;max-width:min(440px,100%);max-height:100%}
+.cdpop img{display:block;max-width:100%;max-height:calc(100vh - 60px);max-height:calc(100dvh - 60px);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.45);background:#efe8dc}
+.cdpop .x{position:absolute;top:-12px;right:-12px;width:38px;height:38px;border-radius:50%;border:0;background:#fff;color:#5e1f3a;font:600 22px/38px var(--body);box-shadow:0 3px 12px rgba(0,0,0,.35);cursor:pointer;padding:0}
+@keyframes cdIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 .countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;margin-top:4px}
 .locket{aspect-ratio:1;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 1.5px var(--gold),inset 0 0 0 5px var(--card),inset 0 0 0 6px var(--gold-soft);display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:100%}
 .locket b{font:600 26px/1 var(--display);color:var(--plum-deep);font-variant-numeric:tabular-nums}
@@ -291,7 +294,6 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     </div>
 
     <button class="nowbar" id="nowbar"></button>
-    <button class="cdpic" id="cdpic" hidden aria-label="Today's countdown picture"></button>
 
     <div class="hero">
       <div class="invocation"><img src="assets/ganesha_motif.png" alt="Shri Ganesha"><span>॥ શ્રી ગણેશાય નમઃ ॥</span></div>
@@ -602,14 +604,26 @@ let POSTS_ALL=null,NOWS_ALL=null,CDPICS={};
 // Days are counted in India time to the wedding day, 2 December (2 Dec itself = 0).
 const istDay=t=>Math.floor((t+5.5*36e5)/864e5);
 const daysToGo=()=>istDay(HASTAMELAP.getTime())-istDay(Date.now());
-let cdShown='';
+// Today's countdown picture pops up each time the app is opened (and again when the guest comes
+// back to it after a while); the × closes it until the next open.
+let cdPopDone=false,cdHiddenAt=0;
 function renderCdPic(){
-  const p=CDPICS[String(daysToGo())],el=$('#cdpic');
-  if(!p||!p.url){el.hidden=true;el.innerHTML='';cdShown='';return}
-  if(cdShown!==p.url){el.innerHTML=`<img src="${esc(p.url)}" alt="${esc(p.label||'Countdown')}">`;cdShown=p.url}
-  el.hidden=false;el.onclick=()=>openPhoto(p.url,p.url,p.label||'');
+  if(cdPopDone||$('.cdpop'))return;
+  const p=CDPICS[String(daysToGo())];
+  if(!p||!p.url||!ME||!$('#login').hidden)return;        // only for a signed-in guest, not over the login screen
+  cdPopDone=true;
+  const v=document.createElement('div');v.className='cdpop';v.setAttribute('role','dialog');v.setAttribute('aria-label',p.label||'Countdown');
+  v.innerHTML=`<div class="box"><img src="${esc(p.url)}" alt="${esc(p.label||'Countdown')}"><button class="x" aria-label="Close">×</button></div>`;
+  const close=()=>{v.remove();removeEventListener('keydown',k)};const k=e=>{if(e.key==='Escape')close()};
+  v.querySelector('.x').onclick=close;v.onclick=e=>{if(e.target===v)close()};addEventListener('keydown',k);
+  document.body.appendChild(v);
 }
-setInterval(renderCdPic,60000);   // switches to the next picture at midnight
+// Back to the app after 10+ minutes away counts as opening it again.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){cdHiddenAt=Date.now();return}
+  if(cdHiddenAt&&Date.now()-cdHiddenAt>10*60*1000){cdPopDone=false;renderCdPic()}
+});
+setInterval(renderCdPic,60000);   // pictures that arrive late still pop up once
 let POSTS=[
  {t:'Dinner is open',b:'Buffet is ready on the Lawn. Jain counter is on the left.',ago:'5 min ago',c:'var(--sage)',k:'Food'},
  {t:'Shuttle to the hotel in 15 min',b:'Leaves from the Lake Side gate at 10:30 PM.',ago:'12 min ago',c:'var(--gold)',k:'Shuttle'},
