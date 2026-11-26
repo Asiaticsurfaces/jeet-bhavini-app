@@ -178,6 +178,23 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <section data-sec="pickups" class="stack" hidden>
       <div class="stats" id="arrStats"></div>
       <p class="muted small">Assign a driver and the guest sees the name, car, number plate and a Call button on their Home screen. Drivers come from the Drivers tab of the Excel.</p>
+      <div class="row"><button class="btn" id="arrAdd">+ Add a pickup</button><span class="small muted">For guests who called or messaged instead of filling it in the app.</span></div>
+      <div class="card stack" id="arrForm" hidden>
+        <h3 id="arrFormTitle">Add a pickup</h3>
+        <div class="grid2">
+          <label class="fld"><span>Guest name</span><input id="afName" list="afGuests" placeholder="Start typing a name from the guest list"><datalist id="afGuests"></datalist></label>
+          <label class="fld"><span>Mobile number</span><input id="afPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="10-digit number"></label>
+          <label class="fld"><span>Coming by</span><select id="afMode"><option>Train</option><option>Flight</option><option>Bus</option><option>Car</option></select></label>
+          <label class="fld"><span>Train / flight / from</span><input id="afFrom" placeholder="e.g. 11007 Deccan Express"></label>
+          <label class="fld"><span>Arriving on</span><select id="afDay"><option value="30">Mon 30 Nov</option><option value="1" selected>Tue 1 Dec</option><option value="2">Wed 2 Dec</option></select></label>
+          <label class="fld"><span>Arrival time</span><input id="afTime" type="time" value="08:00"></label>
+          <label class="fld"><span>People</span><input id="afPeople" type="number" min="1" max="30" value="1"></label>
+          <label class="fld"><span>Leaving on</span><select id="afLeave"><option value="2">Wed 2 Dec night</option><option value="3" selected>Thu 3 Dec</option></select></label>
+        </div>
+        <label class="row small"><input type="checkbox" id="afPickup" checked style="width:18px;height:18px"> Needs a pickup from the station / airport</label>
+        <p class="small muted" id="afHint"></p>
+        <div class="row"><button class="btn" id="afSave">Save pickup</button><button class="btn ghost" id="afCancel">Cancel</button></div>
+      </div>
       <div class="stack" id="arrList"></div>
     </section>
 
@@ -816,6 +833,38 @@ async function start() {
     const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec' })[d] || d;
     sub('drivers', collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
     sub('pickups', collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
+    // Team-added pickups: id g_<guest id> when the name is on the guest list (the guest's phone then
+    // shows the driver too), otherwise t_<time>. Marked byTeam so the team can edit and delete them.
+    let afEditing = null;
+    const afGuest = () => { const n = $('#afName').value.trim().toLowerCase(); return n ? (GUESTS || []).find(g => String(g.name).trim().toLowerCase() === n) : null; };
+    const afHintDraw = () => { const g = afGuest();
+      $('#afHint').textContent = !$('#afName').value.trim() ? '' : g ? `On the guest list. ${g.name} will also see this pickup and their driver in the app.` : 'Not on the guest list: the team sees this pickup, but no guest app shows it.'; };
+    function openAF(a) {
+      afEditing = a ? a.id : null; $('#arrForm').hidden = false; $('#arrFormTitle').textContent = a ? 'Edit pickup' : 'Add a pickup';
+      $('#afGuests').innerHTML = (GUESTS || []).map(g => `<option value="${esc(g.name)}">`).join('');
+      $('#afName').value = a?.name || ''; $('#afName').disabled = !!a; $('#afPhone').value = a?.phone || ''; $('#afMode').value = a?.mode || 'Train';
+      $('#afFrom').value = a?.from || ''; $('#afDay').value = a?.day || '1'; $('#afTime').value = a?.time || '08:00';
+      $('#afPeople').value = a?.people || 1; $('#afLeave').value = a?.leave || '3'; $('#afPickup').checked = a ? !!a.pickup : true;
+      afHintDraw(); $('#arrForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); if (!a) $('#afName').focus();
+    }
+    $('#afName').oninput = () => { afHintDraw(); const g = afGuest(); if (g && !$('#afPhone').value) $('#afPhone').value = g.phone || ''; };
+    $('#arrAdd').onclick = () => openAF(null);
+    $('#afCancel').onclick = () => { $('#arrForm').hidden = true; afEditing = null; };
+    $('#afMode').onchange = () => { if ($('#afMode').value === 'Car') $('#afPickup').checked = false; };
+    $('#afSave').onclick = async () => {
+      const name = $('#afName').value.trim(); if (!name) return toast('Type the guest\'s name');
+      const phone = normPhone($('#afPhone').value); if (phone && phone.length !== 10) return toast('The mobile number needs 10 digits');
+      const g = afGuest();
+      const id = afEditing || (g ? 'g_' + g.id : 't_' + Date.now());
+      if (!afEditing && g && ARR.some(a => a.id === id)) return toast(`${g.name} already has a pickup added by the team. Tap Edit on it`);
+      const data = { name: g ? g.name : name, guestId: g ? g.id : '', phone, mode: $('#afMode').value, from: $('#afFrom').value.trim(), day: $('#afDay').value,
+        time: $('#afTime').value || '08:00', people: Math.max(1, +$('#afPeople').value || 1), leave: $('#afLeave').value, pickup: $('#afMode').value !== 'Car' && $('#afPickup').checked,
+        byTeam: true, addedBy: u.email, updatedAt: serverTimestamp() };
+      $('#afSave').disabled = true;
+      try { await setDoc(doc(db, 'arrivals', id), data, { merge: true }); toast(afEditing ? 'Pickup updated' : 'Pickup added. Assign a driver below'); $('#arrForm').hidden = true; afEditing = null; }
+      catch (e) { fail(e); }
+      $('#afSave').disabled = false;
+    };
     function renderArr() {
       const A2 = [...ARR].sort((a, b) => (+((a.day === '30') ? 0 : a.day) - +((b.day === '30') ? 0 : b.day)) || String(a.time).localeCompare(String(b.time)));
       const ppl = A2.reduce((n, a) => n + (+a.people || 1), 0), pk = A2.filter(a => a.pickup && a.mode !== 'Car'), un = pk.filter(a => !a.driver?.n);
@@ -823,13 +872,17 @@ async function start() {
       badges.pickups = un.length || 0; tabs();
       const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('');
       $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${a.pickup && a.mode !== 'Car' && !a.driver?.n ? 'open' : ''}">
-        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span></div>
+        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="row" style="gap:6px">${a.byTeam ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span></span></div>
         <p class="small">${esc(a.mode)} · ${esc(a.from || '')} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
         ${a.pickup && a.mode !== 'Car' ? `<div class="grid2"><select data-drv="${a.id}">${opts(a.driver)}</select>
           <div class="row"><input data-eta="${a.id}" placeholder="ETA, e.g. 7:50 AM" value="${esc(a.driver?.eta || '')}" style="flex:1">
           <select data-stage="${a.id}" style="width:auto">${['Assigned', 'On the way', 'Arrived'].map((n, i) => `<option value="${i}" ${(a.driver?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
-          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update driver' : 'Assign driver'}</button>` : ''}</div>`).join('') : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
+          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update driver' : 'Assign driver'}</button>` : ''}
+        ${a.byTeam ? `<div class="row" style="gap:6px"><button class="btn ghost sm" data-arredit="${a.id}">Edit</button><button class="btn danger sm" data-arrdel="${a.id}">Delete</button></div>` : ''}</div>`).join('') : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
+      $$('[data-arredit]').forEach(b => b.onclick = () => openAF(ARR.find(a => a.id === b.dataset.arredit)));
+      $$('[data-arrdel]').forEach(b => b.onclick = () => { const a = ARR.find(x => x.id === b.dataset.arrdel); if (!a || !confirm(`Delete the pickup for ${a.name}?`)) return;
+        deleteDoc(doc(db, 'arrivals', a.id)).then(() => toast('Pickup deleted')).catch(fail); });
       $$('[data-assign]').forEach(b => b.onclick = () => {
         const id = b.dataset.assign, d = DRIVERS.find(x => x.id === $(`[data-drv="${id}"]`).value);
         if (!d) return toast('Choose a driver');

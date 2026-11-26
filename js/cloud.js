@@ -133,11 +133,13 @@ async function start() {
   };
   // Desk check-in status and the guest's own record, kept live (re-subscribes when the guest changes):
   // a room allotted, invites changed or side fixed in the family panel shows up without logging in again.
-  let ciId = null, ciOff = null, gOff = null;
+  let ciId = null, ciOff = null, gOff = null, taOff = null, ownArr = null, teamArr = null;
+  const teamArrWatch = id => onSnapshot(doc(db, 'arrivals', 'g_' + id), s => { teamArr = s.exists() ? s.data() : null; window.__applyArr?.(); }, () => {});
   CLOUD.watchCheckin = () => {
     const id = me()?.id || null; if (id === ciId) return;
-    ciOff?.(); gOff?.(); ciOff = gOff = null; ciId = id; CHECKIN = null;
+    ciOff?.(); gOff?.(); taOff?.(); ciOff = gOff = taOff = null; ciId = id; CHECKIN = null;
     if (!id) return;
+    taOff = teamArrWatch(id);
     ciOff = onSnapshot(doc(db, 'checkins', id), s => { CHECKIN = s.exists() ? s.data() : null; refresh('guest'); }, () => {});
     gOff = onSnapshot(doc(db, 'guests', id), s => {
       if (!ME || ME.id !== id) return;
@@ -222,14 +224,17 @@ async function start() {
   onSnapshot(collection(db, 'wishes'), s => {
     wishes = list(s).filter(w => !w.hidden).sort(byNew).map(w => ({ n: w.name, w: w.text })); refresh('wishes');
   });
-  onSnapshot(doc(db, 'arrivals', uid), s => {
-    if (!s.exists()) return;
-    const a = s.data();
+  // The guest's own arrival details, or ones the pickup team added for them (arrivals/g_<guest id>).
+  const applyArr = () => {
+    const a = ownArr || teamArr; if (!a) return;
     travel = { mode: a.mode, day: a.day, time: a.time, from: a.from || '', people: a.people || 1, leave: a.leave, pickup: !!a.pickup };
     tMode = travel.mode; tPick = travel.pickup;
-    DRIVER = a.driver && a.driver.n ? a.driver : null;
+    const d = [ownArr, teamArr].map(x => x && x.driver).find(x => x && x.n);
+    DRIVER = d || null;
     refresh('arrival');
-  });
+  };
+  W.__applyArr = applyArr;
+  onSnapshot(doc(db, 'arrivals', uid), s => { ownArr = s.exists() ? s.data() : null; applyArr(); });
   const toPhoto = p => ({ id: p.id, src: p.url, thumb: p.thumb || p.url, by: p.uid === uid ? 'You' : (p.source === 'photographer' ? 'Photographer' : p.name || 'Guest'),
     ev: p.event || '', ar: `${p.w || 3}/${p.h || 4}`, mine: p.uid === uid, revealAt: ms(p.revealAt), createdAt: p.createdAt });
   onSnapshot(query(collection(db, 'photos'), where('uid', '==', uid)), s => {

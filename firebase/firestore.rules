@@ -127,13 +127,16 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
     // Arrival details, one per guest device; family assigns the driver.
+    // Team-added pickups use the id g_<guest id>; that guest's phone reads it
+    // (same exposure as their guests/{id} record, which any signed-in guest can get).
     match /arrivals/{uid} {
-      allow read: if (signedIn() && request.auth.uid == uid) || can('pickups');
+      allow read: if (signedIn() && request.auth.uid == uid) || can('pickups')
+        || (signedIn() && uid.matches('g_.+'));
       allow create: if (signedIn() && request.auth.uid == uid
                          && !request.resource.data.keys().hasAny(['driver'])) || can('pickups');
       allow update: if (signedIn() && request.auth.uid == uid
                          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['driver'])) || can('pickups');
-      allow delete: if isOwner();
+      allow delete: if isOwner() || (can('pickups') && resource.data.get('byTeam', false) == true);
     }
     match /rsvps/{uid} {
       allow read: if (signedIn() && request.auth.uid == uid) || can('guests');
