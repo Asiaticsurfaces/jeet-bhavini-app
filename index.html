@@ -618,10 +618,10 @@ function renderCdPic(){
   v.querySelector('.x').onclick=close;v.onclick=e=>{if(e.target===v)close()};addEventListener('keydown',k);
   document.body.appendChild(v);
 }
-// Back to the app after 10+ minutes away counts as opening it again.
+// Back to the app after 5+ minutes away counts as opening it again.
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){cdHiddenAt=Date.now();return}
-  if(cdHiddenAt&&Date.now()-cdHiddenAt>10*60*1000){cdPopDone=false;renderCdPic()}
+  if(cdHiddenAt&&Date.now()-cdHiddenAt>5*60*1000){cdPopDone=false;renderCdPic()}
 });
 setInterval(renderCdPic,60000);   // pictures that arrive late still pop up once
 let POSTS=[
