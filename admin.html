@@ -210,8 +210,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       </div>
       <div class="card stack" id="sheetCard">
         <h3>Google Sheet (updates by itself)</h3>
-        <p class="muted small">Keep the guest list in a Google Sheet and the app follows it. A <b>Guests</b> tab has the same columns as the Excel. Add one tab per night, named like <b>30 Nov</b>, <b>1 Dec</b>, <b>2 Dec</b>, with the names of guests staying that night: someone only in <b>1 Dec</b> stays 1 night (check in 1 Dec, check out 2 Dec).</p>
-        <p class="muted small"><b>Hotel rooming list works too:</b> a tab with a <b>Room Nos.</b> column, several <b>Guest -Name</b> columns and the block / floor column. Each name becomes a guest in that room, and the date in the title row (e.g. "01st Dec 2026") or tab name is the night. Make one tab per night.</p>
+        <p class="muted small">Keep the guest list in a Google Sheet and the app follows it. Use the <b>Guest Stay Summary</b> format: a <b>Guest Summary</b> tab with one row per person: <b>Guest, Room, Check-in, Check-out, Room type, Side, Phone</b> and <b>Y / N</b> for each event. Each guest gets their room, roommates and stay dates on their pass. (A Guests tab, night tabs or the hotel rooming list also work.)</p>
         <p class="small"><b>Set up once:</b> 1. <a href="assets/Wedding%20guest%20list%20-%20Google%20Sheet.xlsx" download>Download the starter file</a> and open it in Google Sheets (File → Import → Upload, "Replace spreadsheet"). 2. In the sheet: File → Share → <b>Publish to web</b> → Entire document → <b>Microsoft Excel (.xlsx)</b> → Publish. 3. Paste the link it gives below.</p>
         <p class="small muted">Anyone who has that published link can read the sheet, so share it with no one. The link is saved only for the owner.</p>
         <div class="row"><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?output=xlsx" style="flex:1 1 260px"><button class="btn sm" id="sheetSave">Save link</button><button class="btn ghost sm" id="sheetSync">Sync now</button></div>
@@ -1254,7 +1253,7 @@ async function start() {
           let { num, wing, hits } = matchRoom(text), r = hits[0], created = false;
           if (!r) {   // not in the Rooms list yet: add it
             const ref = doc(collection(db, 'rooms'));
-            r = { id: ref.id, wing: wing || 'Other', area: '', number: num, beds: Math.max(4, people) };
+            r = { id: ref.id, wing: wing || 'Other', area: '', number: num, beds: Math.max(4, people, +roomsApi.bedsHint?.[num] || 0) };
             await setDoc(ref, { wing: r.wing, area: r.area, number: r.number, beds: r.beds });
             if (!ROOMS.some(x => x.id === r.id)) ROOMS.push(r); created = true;
           }
@@ -1471,9 +1470,14 @@ async function start() {
         // A tab's header row can be row 1 (Google Sheet) or row 2 (the Excel has a title row first).
         const tabOf = name => Object.keys(wb.Sheets).find(k => k.trim().toLowerCase() === name.toLowerCase());
         const HEAD = { guests: 'guest name', volunteers: 'volunteer', vendors: 'role', drivers: 'driver', 'help contacts': 'shown' };
-        const rows = name => { const k = tabOf(name); if (!k) return [];
+        // The guest list tab: "Guests", "Guest Summary" (the stay summary: one row per person with room and
+        // check-in / check-out), or any tab whose header row has a "Guest" or "Guest name" column.
+        const isGuestHead = c => /^guest( -?name)?$|^guest name/i.test(String(c).trim());
+        const guestTab = tabOf('Guests') || tabOf('Guest Summary') || Object.keys(wb.Sheets).find(k =>
+          XLSX.utils.sheet_to_json(wb.Sheets[k], { header: 1, defval: '' }).slice(0, 20).some(r => r.some(isGuestHead) && r.some(c => /room|side|phone|check/i.test(String(c)))));
+        const rows = name => { const k = name === 'Guests' ? guestTab : tabOf(name); if (!k) return [];
           const aoa = XLSX.utils.sheet_to_json(wb.Sheets[k], { header: 1, defval: '' }), key = HEAD[name.toLowerCase()];
-          let h = aoa.slice(0, 6).findIndex(r => r.some(c => String(c).trim().toLowerCase().startsWith(key))); if (h < 0) h = 1;
+          let h = aoa.slice(0, 20).findIndex(r => r.some(c => name === 'Guests' ? isGuestHead(c) : String(c).trim().toLowerCase().startsWith(key))); if (h < 0) h = 1;
           const hd = aoa[h] || [];
           return aoa.slice(h + 1).filter(r => r.some(c => String(c).trim() !== '')).map(r => Object.fromEntries(hd.map((x, i) => [String(x || `col${i}`), r[i] ?? ''])));
         };
@@ -1484,9 +1488,22 @@ async function start() {
         // Same name as a guest already in the app = the same guest (keeps their login, phone, invites and room).
         const byName = new Map(GUESTS.map(g => [String(g.name || '').trim().toLowerCase(), g.id]));
         const taken = new Set(GUESTS.map(g => g.id));
+        const MON = { nov: 11, dec: 12 };
+        const dateIn = t => { const m = String(t).match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s*(nov|dec)/i); return m ? `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}` : ''; };
+        const clean = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+        const roomTextOf = (room, block) => roomsApi && roomsApi.rooms().filter(r => String(r.number).toLowerCase() === room.toLowerCase()).length === 1 ? room : (block ? `${room} · ${block}` : room);
+        // A date cell: Excel date number, a date, "2026-12-01", "1 Dec" or "01/12/2026".
+        const isoOf = v => { if (v === '' || v == null) return '';
+          if (typeof v === 'number' && v > 40000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
+          if (v instanceof Date) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+          const t = String(v).trim(), m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+          const d = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/); if (d) return `${d[3].length === 2 ? '20' + d[3] : d[3]}-${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}`;
+          return dateIn(t); };
+        const col = (r, test) => { const hit = Object.keys(r).find(x => test(x.trim().toLowerCase())); return hit === undefined ? '' : r[hit]; };
+        const roomBeds = new Map();   // people per room number in the file, so a room added from it gets enough beds
         const evCol = (r, k, n) => { const hit = Object.keys(r).find(x => { const h = x.trim().toLowerCase(); return h === k || h.startsWith(n.toLowerCase()); }); return hit && String(r[hit]).trim() !== '' ? String(r[hit]).trim() : null; };
         rows('Guests').forEach((r, i) => {
-          const name = val(r, 'guest name'); if (!name || sample(r)) return;
+          const name = clean(col(r, isGuestHead)); if (!name || sample(r)) return;
           const raw = val(r, 'phone'), phone = normPhone(raw);
           if (raw && phone.length !== 10) return errors.push(`Row ${i + 3}: ${name} — phone "${raw}" isn't 10 digits (leave it empty if you don't have it)`);
           if (phone && [...guests.values()].some(x => x.phone === phone)) return errors.push(`Row ${i + 3}: ${name} — same phone as ${[...guests.values()].find(x => x.phone === phone).name}`);
@@ -1495,19 +1512,22 @@ async function start() {
           if (!id) { const base = slugOf(name); id = base; for (let k = 2; taken.has(id) || guests.has(id); k++) id = `${base}-${k}`; }
           const events = {}; EVK.forEach(([k, n]) => { const v = evCol(r, k, n); if (v !== null) events[k] = yn(v); });
           guests.set(id, { phone, name, side: val(r, 'side'), relation: val(r, 'relation'), people: Math.max(0, parseInt(val(r, 'no. of people', 'people')) || 0),   // 0 = no column: keep the app's count
-            room: val(r, 'room'), lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
+            room: '', lang: val(r, 'language'), events, isNew: !GUESTS.some(g => g.id === id) });
+          const g = guests.get(id);
+          // Room number + room type / block, and the stay dates when the sheet has them.
+          const room = clean(col(r, h => /^room( ?no\.?s?| ?number)?\.?$/.test(h))), type = clean(col(r, h => /^(room type|block|wing|building)/.test(h)));
+          if (room) { g.room = roomTextOf(room, type); roomBeds.set(room, (roomBeds.get(room) || 0) + 1); }
+          const ci = isoOf(col(r, h => /^check.?in/.test(h))), co = isoOf(col(r, h => /^check.?out/.test(h)));
+          if (ci && co && co > ci) { g.stayIn = ci; g.stayOut = co; }
+          else if (ci || co) errors.push(`${name}: check-in / check-out dates look wrong (${ci || '?'} → ${co || '?'})`);
           const n = val(r, 'notes'); if (n) notes.push([id, n]);
         });
         // Rooming-list tabs (the hotel's format): a title row with the date ("01st Dec 2026"), a header row
         // with "Room Nos." and several "Guest -Name" columns, one room per row, and a block / floor column
         // (often merged down many rows). Every name is one guest; the tab's date is a night they stay.
-        const MON = { nov: 11, dec: 12 };
-        const dateIn = t => { const m = String(t).match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s*(nov|dec)/i); return m ? `2026-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}` : ''; };
-        const clean = v => String(v ?? '').replace(/\s+/g, ' ').trim();
-        const roomTextOf = (room, block) => roomsApi && roomsApi.rooms().filter(r => String(r.number).toLowerCase() === room.toLowerCase()).length === 1 ? room : (block ? `${room} · ${block}` : room);
         const roomTabs = [];
         for (const k of Object.keys(wb.Sheets)) {
-          if (k.trim().toLowerCase() === 'guests') continue;
+          if (k === guestTab) continue;
           const ws = wb.Sheets[k], aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true });
           const o = XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
           for (const m of ws['!merges'] || []) {   // a merged cell's text applies to every row it covers
@@ -1539,7 +1559,7 @@ async function start() {
                 guests.set(id, { phone: '', name: n, side: '', relation: '', people: 0, room: '', lang: '', events: {}, isNew: !GUESTS.some(g => g.id === id) });
               }
               const g = guests.get(id), text = roomTextOf(room, block);
-              if (!g.roomTab) { g.room = text; g.roomTab = k; g.people = g.people || 1; }
+              if (!g.roomTab) { g.room = text; g.roomTab = k; g.people = g.people || 1; roomBeds.set(room, (roomBeds.get(room) || 0) + 1); }
               else if (g.room.split(' · ')[0] !== room) errors.push(`${n} is in room ${g.room.split(' · ')[0]} on "${g.roomTab}" and room ${room} on "${k}". The app keeps room ${g.room.split(' · ')[0]}`);
               (g.nights ||= new Set()).add(night);
             }
@@ -1568,10 +1588,10 @@ async function start() {
         const people = [...guests.values()].reduce((n, g) => n + g.people, 0);
         const added = [...guests.values()].filter(g => g.isNew).length;
         const withRoom = [...guests.values()].filter(g => g.room).length;
-        const withNights = [...guests.values()].filter(g => g.nights).length;
+        const withNights = [...guests.values()].filter(g => g.stayIn).length;
         // Sheet sync removes guests deleted from the sheet, but not a big chunk at once (a half-filled sheet, a wrong tab).
         const autoRemove = auto && gone.length && gone.length <= Math.max(5, Math.round(GUESTS.length * 0.3));
-        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number${nightTabs.length || roomTabs.length ? `, <b>${withNights}</b> have nights (${[...roomTabs, ...nightTabs.map(t => t[0])].map(esc).join(', ')})` : ''}.</p>
+        out.innerHTML = `<p><b>${guests.size}</b> families (${people} people): <b>${guests.size - added}</b> already in the app will be updated, <b>${added}</b> new. <b>${withRoom}</b> have a room number${withNights ? `, <b>${withNights}</b> have check-in / check-out dates` : ''}.</p>
           <p class="small muted">Guests already signed in stay signed in. A row with an empty Room, Side or event column keeps what the app already has. Vendors, drivers and duties in the Excel replace the ones in the panel (a tab left empty in the Excel keeps the panel's list).</p>
           ${gone.length ? `<div class="card" style="padding:10px"><p class="small"><b>${gone.length} guest(s) in the app are not in this file</b> and will be kept: ${gone.slice(0, 8).map(g => esc(g.name)).join(', ')}${gone.length > 8 ? '…' : ''}</p>
             <label class="row small"><input type="checkbox" id="impRemove" ${autoRemove ? 'checked' : ''} style="width:18px;height:18px"> Remove them from the app</label></div>` : ''}
@@ -1616,6 +1636,7 @@ async function start() {
           // Rooms: allot each typed room in the Rooms tab, so the guest's pass, roommates and bed counts all update.
           const roomErr = []; let roomsDone = 0;
           const todo = roomsApi ? [...guests].filter(([id, g]) => g.room || (g.stayIn && roomsApi.staysOf(id).length === 1)) : [];
+          roomsApi && (roomsApi.bedsHint = Object.fromEntries(roomBeds));
           if (todo.length) {
             for (let t = 0; t < 50 && todo.some(([id]) => !GUESTS.some(x => x.id === id)); t++) await new Promise(r => setTimeout(r, 200));   // wait for new guests to arrive
             for (const [id, g] of todo) {
