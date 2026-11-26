@@ -436,7 +436,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
     <div id="m-travel" class="screen" hidden>
       <button class="back" data-go="home">← Guest info</button>
       <div><p class="eyebrow">Help us plan your pickup</p><h1 data-t="arrival">My arrival</h1></div>
-      <p class="muted">Tell us how you're coming. The family sees one list and arranges cabs from Karjat station.</p>
+      <p class="muted">Tell us how you're coming. The family sees one list and arranges cabs from the station or airport.</p>
       <div class="field"><span>How are you coming?</span><div class="chips" id="tMode" role="group" aria-label="Travel mode"></div></div>
       <div class="two">
         <label class="field"><span>Arriving on</span><select id="tDay"><option value="30">Mon, 30 Nov</option><option value="1" selected>Tue, 1 Dec</option><option value="2">Wed, 2 Dec</option></select></label>
@@ -447,7 +447,7 @@ select,input[type=time],input[type=number]{width:100%;font:15px var(--body);padd
         <label class="field"><span>People with you</span><input type="number" id="tPeople" min="1" max="12" value="2"></label>
         <label class="field"><span>Leaving on</span><select id="tLeave"><option value="2">Wed, 2 Dec night</option><option value="3" selected>Thu, 3 Dec</option></select></label>
       </div>
-      <div class="card"><div class="row between"><div><h3 style="font-size:19px">Pickup from Karjat station</h3><p class="muted small">Free shuttle for guests</p></div><button class="switch" id="tPickup" role="switch" aria-checked="true" aria-label="Need pickup"></button></div></div>
+      <div class="card"><div class="row between"><div><h3 style="font-size:19px">Pickup from the station / airport</h3><p class="muted small">Free shuttle for guests</p></div><button class="switch" id="tPickup" role="switch" aria-checked="true" aria-label="Need pickup"></button></div></div>
       <button class="btn" id="tSave">Save my arrival</button>
       <div id="tDone"></div>
     </div>
@@ -713,15 +713,17 @@ function renderNow(){
   $('#nowbar').onclick=()=>openMapAt(n.place||null);
 }
 setInterval(()=>{nowI++;renderNow()},6000);
+// Where the driver meets the guest: the pickup point the family typed, else by how they travel.
+const pickAt=t=>t.pickAt||({Flight:'the airport',Train:'the station',Bus:'the bus stop'})[t.mode]||'the pickup point';
 function renderPickup(){
   const el=$('#pickup');
-  if(!travel){el.innerHTML=`<p class="eyebrow">Your pickup</p><h3>How are you reaching Karjat?</h3><p class="muted small">Add your train, flight or car details and we'll arrange a pickup from Karjat station.</p><button class="btn sm" style="align-self:flex-start" data-open="travel">Add arrival details</button>`}
+  if(!travel){el.innerHTML=`<p class="eyebrow">Your pickup</p><h3>How are you reaching Karjat?</h3><p class="muted small">Add your train, flight or car details and we'll arrange a pickup from the station or airporn.</p><button class="btn sm" style="align-self:flex-start" data-open="travel">Add arrival details</button>`}
   else if(!travel.pickup||travel.mode==='Car'){el.innerHTML=`<p class="eyebrow">Your arrival</p><h3>${travel.mode} · ${dayLbl(travel.day)}, ${fmtT(travel.time)}</h3><p class="muted small">${travel.people} ${travel.people==1?'person':'people'} · No pickup needed. Parking is at the main gate.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
-  else if(!DRIVER){el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip">Requested</span></div><h3>Pickup from Karjat station</h3><p class="muted small">${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}. Your driver's name and number appear here once the family assigns one.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
+  else if(!DRIVER){el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip">Requested</span></div><h3>Pickup from ${esc(pickAt(travel))}</h3><p class="muted small">${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}. Your driver's name and number appear here once the family assigns one.</p><button class="linkbtn" style="align-self:flex-start" data-open="travel">Edit</button>`}
   else{const st=DRIVER.stage||0;el.innerHTML=`<div class="row between"><p class="eyebrow">Your pickup</p><span class="chip sage">${['Assigned','On the way','Arrived'][st]}</span></div>
     <div class="driver"><div class="av">${DRIVER.n[0]}</div><div style="flex:1;min-width:0"><b>${esc(DRIVER.n)}</b><div class="muted small">${esc(DRIVER.car||'')}${DRIVER.eta?' · '+esc(DRIVER.eta):''}</div>${DRIVER.plate?`<span class="plate">${esc(DRIVER.plate)}</span>`:''}</div>${DRIVER.phone?`<a class="btn sm" href="tel:+91${esc(DRIVER.phone)}">Call</a>`:''}</div>
     <div class="steps">${[0,1,2].map(i=>`<div class="${i<=st?'on':''}"></div>`).join('')}</div>
-    <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At Karjat station</span></div>
+    <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At ${esc(pickAt(travel))}</span></div>
     <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}.${CLOUD_ON()?'':' Sample driver shown.'}</p>`}
   if(DROP){const D=DROP.driver,st=D?D.stage||0:0;
     el.insertAdjacentHTML('beforeend',`<div class="row between" style="margin-top:14px"><p class="eyebrow">Your drop</p><span class="chip ${D?'sage':''}">${D?['Assigned','On the way','Dropped'][st]:'Requested'}</span></div>

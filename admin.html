@@ -186,6 +186,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
           <label class="fld"><span>Mobile number</span><input id="afPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="10-digit number"></label>
           <label class="fld"><span>Coming by</span><select id="afMode"><option>Train</option><option>Flight</option><option>Bus</option><option>Car</option></select></label>
           <label class="fld"><span>Train / flight / from</span><input id="afFrom" placeholder="e.g. 11007 Deccan Express"></label>
+          <label class="fld"><span>Pickup point (guest sees "At …")</span><input id="afPickAt" list="afPickList" placeholder="e.g. Navi Mumbai airport"><datalist id="afPickList"><option value="Karjat station"><option value="Navi Mumbai airport"><option value="Mumbai airport T2"><option value="Pune airport"><option value="Panvel station"></datalist></label>
           <label class="fld"><span>Arriving on</span><select id="afDay"><option value="30">Mon 30 Nov</option><option value="1" selected>Tue 1 Dec</option><option value="2">Wed 2 Dec</option></select></label>
           <label class="fld"><span>Arrival time</span><input id="afTime" type="time" value="08:00"></label>
           <label class="fld"><span>People</span><input id="afPeople" type="number" min="1" max="30" value="1"></label>
@@ -865,7 +866,7 @@ async function start() {
       $('#afName').value = a?.name || ''; $('#afName').disabled = !!a; $('#afPhone').value = a?.phone || ''; $('#afMode').value = a?.mode || 'Train';
       $('#afFrom').value = a?.from || ''; $('#afDay').value = a?.day || '1'; $('#afTime').value = a?.time || '08:00';
       $('#afPeople').value = a?.people || 1; $('#afLeave').value = a?.leave || '3'; $('#afPickup').checked = a ? !!a.pickup : true;
-      $('#afDropTime').value = a?.dropTime || '10:00'; $('#afDropTo').value = a?.dropTo || ''; $('#afDrop').checked = a ? !!a.drop : true;
+      $('#afPickAt').value = a?.pickAt || ''; $('#afDropTime').value = a?.dropTime || '10:00'; $('#afDropTo').value = a?.dropTo || ''; $('#afDrop').checked = a ? !!a.drop : true;
       afHintDraw(); $('#arrForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); if (!a) $('#afName').focus();
     }
     $('#afName').oninput = () => { afHintDraw(); const g = afGuest(); if (g && !$('#afPhone').value) $('#afPhone').value = g.phone || ''; };
@@ -881,7 +882,7 @@ async function start() {
       if (!$('#afPickup').checked && !$('#afDrop').checked && $('#afMode').value !== 'Car') return toast('Tick pickup, drop or both');
       const data = { name: g ? g.name : name, guestId: g ? g.id : '', phone, mode: $('#afMode').value, from: $('#afFrom').value.trim(), day: $('#afDay').value,
         time: $('#afTime').value || '08:00', people: Math.max(1, +$('#afPeople').value || 1), leave: $('#afLeave').value, pickup: $('#afMode').value !== 'Car' && $('#afPickup').checked,
-        drop: $('#afDrop').checked, dropTime: $('#afDropTime').value || '10:00', dropTo: $('#afDropTo').value.trim(),
+        pickAt: $('#afPickAt').value.trim(), drop: $('#afDrop').checked, dropTime: $('#afDropTime').value || '10:00', dropTo: $('#afDropTo').value.trim(),
         byTeam: true, addedBy: u.email, updatedAt: serverTimestamp() };
       $('#afSave').disabled = true;
       try { await setDoc(doc(db, 'arrivals', id), data, { merge: true }); toast(afEditing ? 'Pickup updated' : 'Pickup added. Assign a driver below'); $('#arrForm').hidden = true; afEditing = null; }
@@ -900,7 +901,7 @@ async function start() {
           <select data-${pre}stage="${a.id}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>`;
       $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${(a.pickup && a.mode !== 'Car' && !a.driver?.n) || (a.drop && !a.dropDriver?.n) ? 'open' : ''}">
         <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="row" style="gap:6px">${a.byTeam ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
-        <p class="small">${esc(a.mode)} · ${esc(a.from || '')} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
+        <p class="small">${esc(a.mode)} · ${esc(a.from || '')}${a.pickAt ? ` · pickup at <b>${esc(a.pickAt)}</b>` : ''} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
         ${a.pickup && a.mode !== 'Car' ? `<p class="small" style="margin:6px 0 0"><b>Pickup driver</b></p>${drv(a, 'driver', '', ['Assigned', 'On the way', 'Arrived'])}
           <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
