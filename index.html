@@ -637,6 +637,9 @@ const GUESTS=[
 let CONTACTS=[['Hospitality desk','','Rooms, cabs, anything at the venue'],['Jabuani family','',"Groom's side"],['Nakrani family','',"Bride's side"]];
 /* When js/cloud.js connects to Firebase it sets window.CLOUD; until then the app runs on sample data. */
 const CLOUD_ON=()=>!!window.CLOUD;
+// On the real site the sample banner, updates, driver and lost items never show, not even for the
+// few seconds before the live data loads. Samples are only for previews on this computer.
+const REAL_SITE=!/^(localhost|127\.0\.0\.1|\[::1\]|)$/.test(location.hostname);
 const normPhone=v=>String(v||'').replace(/\D/g,'').slice(-10);
 const PREWED=[
  {by:'Photographer',ev:'Pre-wedding',src:'assets/gallery-03-beach-hands.jpg',ar:'3/4'},
@@ -659,6 +662,7 @@ let NOWS=[
 let nowI=0;
 let DROP=null;   // drop back to the station / airport (team-added), with its driver
 let DRIVER={n:'Ramesh Patil',car:'White Innova',plate:'MH 46 AB 1234',eta:'Arriving 6:10 AM',stage:1};
+if(REAL_SITE){POSTS=[];NOWS=[];DRIVER=null}
 let travel=store.get('travel',null);
 const evName=e=>lang==='gu'?e.gu:e.name;
 
@@ -985,6 +989,7 @@ $('#helpSend').onclick=()=>{
   store.set('tickets',tickets);helpCat=null;$('#helpText').value='';renderHelp();toast('Sent to the hospitality team (preview)');
 };
 let FOUND=[['One gold jhumka','Oleander Lawn, after the Sangeet'],['Black sunglasses','Ballroom, after the Mameru'],['Kid\'s mojari, size 10','Lake Side'],['Maroon dupatta with gota work','Ballroom, near the stage']];
+if(REAL_SITE)FOUND=[];
 let lost=store.get('lost',[]);
 function renderLost(){
   $('#found').innerHTML=FOUND.length?FOUND.map(([i,w])=>`<div class="post" style="align-items:center"><div style="flex:1;min-width:0"><b>${i}</b><span class="muted small">${w}</span></div><button class="btn ghost sm" data-claim>It's mine</button></div>`).join(''):'<p class="muted">Nothing handed in yet.</p>';
