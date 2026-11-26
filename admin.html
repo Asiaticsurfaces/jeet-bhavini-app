@@ -41,6 +41,9 @@ input,select,textarea{width:100%;font:15px var(--body);padding:10px 12px;border-
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .stats div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
 .stats b{display:block;font:600 26px var(--display);color:var(--plum-deep)}.stats span{font-size:12px;color:var(--muted)}
+.stats div[data-gf]{cursor:pointer}.stats div[data-gf]:hover{border-color:var(--plum)}
+.stats div.on{border:2px solid var(--plum);background:#f6ecef}
+.gfilter{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.gfilter input{flex:1 1 220px}.gfilter select{flex:0 1 260px;width:auto}
 .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .photos figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .photos img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.photos .hid img{opacity:.3}
@@ -203,7 +206,9 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
         </div>
       </div>
       <div class="stats" id="guestStats"></div>
-      <input id="guestQ" placeholder="Search by name, phone or room">
+      <p class="small muted" style="margin:0">Tap a box above to show only those guests, or pick a filter.</p>
+      <div class="gfilter"><input id="guestQ" placeholder="Search by name, phone or room"><select id="guestF" aria-label="Filter guests"></select>
+        <span class="small" id="gfCount"></span><button class="btn ghost sm" id="gfReset" hidden>Show all</button></div>
       <div class="row" id="gSelBar" hidden style="gap:10px">
         <span class="small" id="gSelCount">None selected</span>
         <button class="btn danger sm" id="gSelDel" disabled>Delete selected</button>
@@ -917,19 +922,48 @@ async function start() {
       } catch (e) { fail(e); }
       renderGuests();
     };
+    // Filters for the guest list (the stat boxes set them too).
+    let GF = 'all';
+    function guestFilters(phonesOf, rs) {
+      const F = [
+        ['all', 'All guests', () => true],
+        ['phone', 'Number saved (opened the app)', g => phonesOf(g).length],
+        ['nophone', 'No number yet', g => !phonesOf(g).length],
+        ['room', 'With a room', g => g.room],
+        ['noroom', 'No room yet', g => !g.room],
+        ['bride', "Bride's side", g => /bride/i.test(g.side || '')],
+        ['groom', "Groom's side", g => /groom/i.test(g.side || '')],
+        ['multi', 'More than 1 person', g => (+g.people || 1) > 1],
+      ];
+      for (const [k, n] of EVK) F.push(
+        ['ev:' + k, `${n}: invited`, g => g.events?.[k] !== false],
+        ['go:' + k, `${n}: said going`, g => rs[g.id]?.[k] === 'Going'],
+        ['nogo:' + k, `${n}: said not going`, g => rs[g.id]?.[k] && rs[g.id][k] !== 'Going'],
+        ['noev:' + k, `${n}: not invited`, g => g.events?.[k] === false]);
+      return F;
+    }
+    $('#guestF').onchange = () => { GF = $('#guestF').value; renderGuests(); };
+    $('#gfReset').onclick = () => { GF = 'all'; $('#guestQ').value = ''; renderGuests(); };
+    $('#guestStats').onclick = e => { const b = e.target.closest('[data-gf]'); if (!b) return; GF = GF === b.dataset.gf ? 'all' : b.dataset.gf; renderGuests(); };
     function renderGuests() {
       const people = GUESTS.reduce((n, g) => n + (+g.people || 1), 0);
       const rs = Object.fromEntries(RSVP.filter(r => r.phone).map(r => [r.phone, r.answers || {}]));
       const evCount = k => GUESTS.filter(g => g.events?.[k] !== false).reduce((n, g) => n + (+g.people || 1), 0);
       const going = k => RSVP.filter(r => r.answers?.[k] === 'Going').length;
-      $('#guestStats').innerHTML = `<div><b>${GUESTS.length}</b><span>Families</span></div><div><b>${people}</b><span>People invited</span></div><div><b>${GUESTS.filter(g => g.room).length}</b><span>With a room</span></div>` +
-        EVK.map(([k, n]) => `<div><b>${evCount(k)}</b><span>${n} invited · ${going(k)} said going</span></div>`).join('');
+      $('#guestStats').innerHTML = `<div data-gf="all"><b>${GUESTS.length}</b><span>Families</span></div><div data-gf="all"><b>${people}</b><span>People invited</span></div><div data-gf="room"><b>${GUESTS.filter(g => g.room).length}</b><span>With a room</span></div>` +
+        EVK.map(([k, n]) => `<div data-gf="ev:${esc(k)}"><b>${evCount(k)}</b><span>${n} invited · ${going(k)} said going</span></div>`).join('');
       const q = $('#guestQ').value.trim().toLowerCase();
       const phonesOf = g => [...new Set([g.phone, ...LINKS.filter(l => l.guestId === g.id).map(l => l.id)].filter(Boolean))];
       const byPhone = Object.fromEntries(LINKS.map(l => [l.id, l.guestId]));
       RSVP.forEach(r => { const gid = r.guestId || byPhone[r.phone]; if (gid) rs[gid] = r.answers || {}; });
-      $('#guestStats').insertAdjacentHTML('beforeend', `<div><b>${GUESTS.filter(g => phonesOf(g).length).length}</b><span>Opened the app (number saved)</span></div>`);
-      const rows = GUESTS.filter(g => !q || [g.name, ...phonesOf(g), g.room].join(' ').toLowerCase().includes(q)).sort((a, b) => String(a.name).localeCompare(b.name));
+      $('#guestStats').insertAdjacentHTML('beforeend', `<div data-gf="phone"><b>${GUESTS.filter(g => phonesOf(g).length).length}</b><span>Opened the app (number saved)</span></div>`);
+      const FL = guestFilters(phonesOf, rs); if (!FL.some(f => f[0] === GF)) GF = 'all';
+      const test = FL.find(f => f[0] === GF)[2];
+      $('#guestF').innerHTML = FL.map(([k, n]) => `<option value="${esc(k)}" ${k === GF ? 'selected' : ''}>${esc(n)} (${GUESTS.filter(FL.find(f => f[0] === k)[2]).length})</option>`).join('');
+      $$('#guestStats [data-gf]').forEach(b => b.classList.toggle('on', GF !== 'all' && b.dataset.gf === GF));
+      const rows = GUESTS.filter(g => test(g) && (!q || [g.name, ...phonesOf(g), g.room].join(' ').toLowerCase().includes(q))).sort((a, b) => String(a.name).localeCompare(b.name));
+      $('#gfCount').textContent = GF !== 'all' || q ? `Showing ${rows.length} of ${GUESTS.length}` : '';
+      $('#gfReset').hidden = GF === 'all' && !q;
       shownIds = rows.map(g => g.id); $('#gSelBar').hidden = $('#gSelTh').hidden = !can.owner;
       $('#guestRows').innerHTML = rows.length ? rows.map(g => `<tr>${can.owner ? `<td><input type="checkbox" data-gsel="${esc(g.id)}" ${SEL.has(g.id) ? 'checked' : ''} aria-label="Select ${esc(g.name)}" style="width:18px;height:18px"></td>` : ''}<td><b>${esc(g.name)}</b>${g.relation ? `<br><span class="muted small">${esc(g.relation)}</span>` : ''}${can.owner ? `<br><button class="btn ghost sm" data-gedit="${esc(g.id)}" style="margin-top:4px">Edit</button>` : ''}</td><td>${phonesOf(g).map(p => `<a href="tel:+91${esc(p)}">${esc(p)}</a>`).join('<br>') || '<span class="muted small">Not yet</span>'}${phonesOf(g).length ? `<br><button class="btn ghost sm" data-free="${esc(g.id)}" style="margin-top:4px">Free up name</button>` : ''}</td><td>${esc(g.side || '')}</td><td>${g.people || 1}</td><td>${esc(g.room || '—')}</td>
         <td class="small">${EVK.filter(([k]) => g.events?.[k] !== false).map(([, n]) => n.split(' ')[0]).join(', ')}</td><td class="small">${rs[g.id] ? Object.entries(rs[g.id]).map(([k, v]) => `${k.slice(0, 4)}: ${esc(v)}`).join('<br>') : '<span class="muted">—</span>'}</td><td>${can.owner ? `<button class="btn danger sm" data-gdel="${esc(g.id)}">Delete</button>` : ''}</td></tr>`).join('')
