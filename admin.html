@@ -182,8 +182,10 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
       <div class="card stack" id="arrForm" hidden>
         <h3 id="arrFormTitle">Add a pickup</h3>
         <div class="grid2">
-          <label class="fld"><span>Guest name</span><input id="afName" list="afGuests" placeholder="Start typing a name from the guest list"><datalist id="afGuests"></datalist></label>
-          <label class="fld"><span>Mobile number</span><input id="afPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="10-digit number"></label>
+          <div class="fld" style="grid-column:1/-1"><span>Guests travelling together (one car / one pickup)</span>
+            <div id="afNames" class="stack" style="gap:6px"></div><datalist id="afGuests"></datalist>
+            <button class="btn ghost sm" id="afAddName" type="button" style="align-self:flex-start;margin-top:6px">+ Add another guest</button></div>
+          <label class="fld"><span>Contact mobile number</span><input id="afPhone" type="tel" inputmode="numeric" maxlength="14" placeholder="10-digit number"></label>
           <label class="fld"><span>Coming by</span><select id="afMode"><option>Train</option><option>Flight</option><option>Bus</option><option>Car</option></select></label>
           <label class="fld"><span>Train / flight / from</span><input id="afFrom" placeholder="e.g. 11007 Deccan Express"></label>
           <label class="fld"><span>Pickup point (guest sees "At …")</span><input id="afPickAt" list="afPickList" placeholder="e.g. Navi Mumbai airport"><datalist id="afPickList"><option value="Karjat station"><option value="Navi Mumbai airport"><option value="Mumbai airport T2"><option value="Pune airport"><option value="Panvel station"></datalist></label>
@@ -869,75 +871,108 @@ async function start() {
     const dayLbl = d => ({ 30: 'Mon 30 Nov', 1: 'Tue 1 Dec', 2: 'Wed 2 Dec', 3: 'Thu 3 Dec', 4: 'Fri 4 Dec' })[d] || d;
     sub('drivers', collection(db, 'drivers'), s => { DRIVERS = list(s); renderArr(); renderTeam(); });
     sub('pickups', collection(db, 'arrivals'), s => { ARR = list(s); renderArr(); });
-    // Team-added pickups: id g_<guest id> when the name is on the guest list (the guest's phone then
-    // shows the driver too), otherwise t_<time>. Marked byTeam so the team can edit and delete them.
-    let afEditing = null;
-    const afGuest = () => { const n = $('#afName').value.trim().toLowerCase(); return n ? (GUESTS || []).find(g => String(g.name).trim().toLowerCase() === n) : null; };
-    const afHintDraw = () => { const g = afGuest();
-      $('#afHint').textContent = !$('#afName').value.trim() ? '' : g ? `On the guest list. ${g.name} will also see this pickup and their driver in the app.` : 'Not on the guest list: the team sees this pickup, but no guest app shows it.'; };
-    function openAF(a) {
-      afEditing = a ? a.id : null; $('#arrForm').hidden = false; $('#arrFormTitle').textContent = a ? 'Edit pickup' : 'Add a pickup';
+    // Team-added pickups and drops. Several guests travelling together share one group (groupId):
+    // one entry per person (g_<guest id> when they're on the guest list, so their phone shows it,
+    // else t_<group>_<n>), all with the same details, and drivers are assigned to the whole group.
+    let afEditing = null;   // group being edited
+    const gKey = a => a.groupId || a.id;
+    const findG = n => { n = String(n || '').trim().toLowerCase(); return n ? (GUESTS || []).find(g => String(g.name).trim().toLowerCase() === n) : null; };
+    const afNamesNow = () => [...new Set($$('[data-afn]').map(x => x.value.trim()).filter(Boolean))];
+    const afHintDraw = () => {
+      const N = afNamesNow(), on = N.filter(findG), off = N.filter(n => !findG(n));
+      $('#afHint').textContent = !N.length ? '' : (on.length ? `On the guest list (they see this pickup and the driver in their app): ${on.join(', ')}. ` : '') + (off.length ? `Not on the guest list (only the team sees them): ${off.join(', ')}.` : '');
+      if (+$('#afPeople').value < N.length) $('#afPeople').value = N.length;
+    };
+    const afAddRow = (v = '') => {
+      const r = document.createElement('div'); r.className = 'row'; r.style.cssText = 'flex-wrap:nowrap;gap:6px';
+      r.innerHTML = `<input data-afn list="afGuests" placeholder="Start typing a name from the guest list" style="flex:1"><button class="btn ghost sm" type="button" aria-label="Remove this name">×</button>`;
+      const inp = r.querySelector('input'); inp.value = v;
+      inp.oninput = () => { afHintDraw(); const g = findG(inp.value); if (g && !$('#afPhone').value) $('#afPhone').value = g.phone || ''; };
+      r.querySelector('button').onclick = () => { if ($$('[data-afn]').length > 1) r.remove(); else inp.value = ''; afHintDraw(); };
+      $('#afNames').appendChild(r); return inp;
+    };
+    $('#afAddName').onclick = () => afAddRow().focus();
+    function openAF(key) {
+      const G = key ? ARR.filter(a => gKey(a) === key) : [], a = G[0];
+      afEditing = key || null; $('#arrForm').hidden = false; $('#arrFormTitle').textContent = a ? 'Edit pickup / drop' : 'Add pickup / drop';
       $('#afGuests').innerHTML = (GUESTS || []).map(g => `<option value="${esc(g.name)}">`).join('');
-      $('#afName').value = a?.name || ''; $('#afName').disabled = !!a; $('#afPhone').value = a?.phone || ''; $('#afMode').value = a?.mode || 'Train';
+      $('#afNames').innerHTML = ''; (G.length ? G.map(x => x.name) : ['']).forEach(n => afAddRow(n));
+      $('#afPhone').value = a?.phone || ''; $('#afMode').value = a?.mode || 'Train';
       $('#afFrom').value = a?.from || ''; $('#afDay').value = a?.day || '1'; $('#afTime').value = a?.time || '08:00';
       $('#afPeople').value = a?.people || 1; $('#afLeave').value = a?.leave || '3'; $('#afPickup').checked = a ? !!a.pickup : true;
       $('#afPickAt').value = a?.pickAt || ''; $('#afDropTime').value = a?.dropTime || '10:00'; $('#afDropTo').value = a?.dropTo || ''; $('#afDrop').checked = a ? !!a.drop : true;
-      afHintDraw(); $('#arrForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); if (!a) $('#afName').focus();
+      afHintDraw(); $('#arrForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); if (!a) $$('[data-afn]')[0]?.focus();
     }
-    $('#afName').oninput = () => { afHintDraw(); const g = afGuest(); if (g && !$('#afPhone').value) $('#afPhone').value = g.phone || ''; };
     $('#arrAdd').onclick = () => openAF(null);
     $('#afCancel').onclick = () => { $('#arrForm').hidden = true; afEditing = null; };
     $('#afMode').onchange = () => { if ($('#afMode').value === 'Car') $('#afPickup').checked = $('#afDrop').checked = false; };
     $('#afSave').onclick = async () => {
-      const name = $('#afName').value.trim(); if (!name) return toast('Type the guest\'s name');
+      const names = afNamesNow(); if (!names.length) return toast('Type at least one guest\'s name');
       const phone = normPhone($('#afPhone').value); if (phone && phone.length !== 10) return toast('The mobile number needs 10 digits');
-      const g = afGuest();
-      const id = afEditing || (g ? 'g_' + g.id : 't_' + Date.now());
-      if (!afEditing && g && ARR.some(a => a.id === id)) return toast(`${g.name} already has a pickup added by the team. Tap Edit on it`);
       if (!$('#afPickup').checked && !$('#afDrop').checked && $('#afMode').value !== 'Car') return toast('Tick pickup, drop or both');
-      const data = { name: g ? g.name : name, guestId: g ? g.id : '', phone, mode: $('#afMode').value, from: $('#afFrom').value.trim(), day: $('#afDay').value,
-        time: $('#afTime').value || '08:00', people: Math.max(1, +$('#afPeople').value || 1), leave: $('#afLeave').value, pickup: $('#afMode').value !== 'Car' && $('#afPickup').checked,
+      const key = afEditing || 'grp_' + Date.now(), old = ARR.filter(a => gKey(a) === key);
+      const members = names.map((n, i) => { const g = findG(n);
+        return { n: g ? g.name : n, g, id: g ? 'g_' + g.id : (old.find(o => !o.guestId && o.name === n)?.id || `t_${key}_${i + 1}`) }; });
+      const clash = members.find(m => { const ex = ARR.find(a => a.id === m.id); return ex && gKey(ex) !== key; });
+      if (clash) return toast(`${clash.n} already has a pickup. Edit that one, or remove them from it first`);
+      const lead = old[0] || {};
+      const base = { mode: $('#afMode').value, from: $('#afFrom').value.trim(), day: $('#afDay').value, time: $('#afTime').value || '08:00',
+        people: Math.max(names.length, +$('#afPeople').value || 1), leave: $('#afLeave').value, pickup: $('#afMode').value !== 'Car' && $('#afPickup').checked,
         pickAt: $('#afPickAt').value.trim(), drop: $('#afDrop').checked, dropTime: $('#afDropTime').value || '10:00', dropTo: $('#afDropTo').value.trim(),
-        byTeam: true, addedBy: u.email, updatedAt: serverTimestamp() };
+        phone, groupId: key, members: members.map(m => m.n), byTeam: true, addedBy: u.email, updatedAt: serverTimestamp() };
       $('#afSave').disabled = true;
-      try { await setDoc(doc(db, 'arrivals', id), data, { merge: true }); toast(afEditing ? 'Pickup updated' : 'Pickup added. Assign a driver below'); $('#arrForm').hidden = true; afEditing = null; }
-      catch (e) { fail(e); }
+      try {
+        const bt = writeBatch(db);
+        for (const m of members) {
+          const isNew = !old.some(o => o.id === m.id);
+          // a person added to a group that already has drivers gets the same drivers
+          const extra = isNew ? { ...(lead.driver ? { driver: lead.driver } : {}), ...(lead.dropDriver ? { dropDriver: lead.dropDriver } : {}) } : {};
+          bt.set(doc(db, 'arrivals', m.id), { ...base, ...extra, name: m.n, guestId: m.g ? m.g.id : '' }, { merge: true });
+        }
+        old.filter(o => !members.some(m => m.id === o.id)).forEach(o => bt.delete(doc(db, 'arrivals', o.id)));   // removed from the group
+        await bt.commit();
+        toast(afEditing ? 'Saved' : `Added ${names.length === 1 ? names[0] : names.length + ' guests together'}. Assign a driver below`);
+        $('#arrForm').hidden = true; afEditing = null;
+      } catch (e) { fail(e); }
       $('#afSave').disabled = false;
     };
     function renderArr() {
-      const A2 = [...ARR].sort((a, b) => (+((a.day === '30') ? 0 : a.day) - +((b.day === '30') ? 0 : b.day)) || String(a.time).localeCompare(String(b.time)));
-      const ppl = A2.reduce((n, a) => n + (+a.people || 1), 0), pk = A2.filter(a => a.pickup && a.mode !== 'Car'), un = pk.filter(a => !a.driver?.n);
-      const dr = A2.filter(a => a.drop), dun = dr.filter(a => !a.dropDriver?.n);
-      $('#arrStats').innerHTML = `<div><b>${A2.length}</b><span>Families sent details</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>Pickup: no driver yet</span></div><div><b>${dr.length}</b><span>Need drop</span></div><div><b>${dun.length}</b><span>Drop: no driver yet</span></div>`;
+      // one card per group (guests who filled it in themselves are a group of one)
+      const byKey = new Map(); for (const a of ARR) { const k = gKey(a); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(a); }
+      const GR = [...byKey.entries()].map(([key, L]) => ({ key, L, a: L[0] }))
+        .sort((x, y) => (+((x.a.day === '30') ? 0 : x.a.day) - +((y.a.day === '30') ? 0 : y.a.day)) || String(x.a.time).localeCompare(String(y.a.time)));
+      const ppl = GR.reduce((n, g) => n + Math.max(+g.a.people || 1, g.L.length), 0);
+      const pk = GR.filter(g => g.a.pickup && g.a.mode !== 'Car'), un = pk.filter(g => !g.a.driver?.n);
+      const dr = GR.filter(g => g.a.drop), dun = dr.filter(g => !g.a.dropDriver?.n);
+      $('#arrStats').innerHTML = `<div><b>${GR.length}</b><span>Groups / families</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>Pickup: no driver yet</span></div><div><b>${dr.length}</b><span>Need drop</span></div><div><b>${dun.length}</b><span>Drop: no driver yet</span></div>`;
       badges.pickups = (un.length + dun.length) || 0; tabs();
       const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('');
-      const drv = (a, k, pre, stages) => `<div class="grid2"><select data-${pre}drv="${a.id}">${opts(a[k])}</select>
-          <div class="row"><input data-${pre}eta="${a.id}" placeholder="${pre ? 'Pickup time at venue, e.g. 10:00 AM' : 'ETA, e.g. 7:50 AM'}" value="${esc(a[k]?.eta || '')}" style="flex:1">
-          <select data-${pre}stage="${a.id}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>`;
-      $('#arrList').innerHTML = A2.length ? A2.map(a => `<div class="item ${(a.pickup && a.mode !== 'Car' && !a.driver?.n) || (a.drop && !a.dropDriver?.n) ? 'open' : ''}">
-        <div class="row between"><b>${esc(a.name || 'Guest (not signed in)')}</b><span class="row" style="gap:6px">${a.byTeam ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
-        <p class="small">${esc(a.mode)} · ${esc(a.from || '')}${a.pickAt ? ` · pickup at <b>${esc(a.pickAt)}</b>` : ''} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${a.people || 1} people · leaving ${dayLbl(a.leave)}</p>
+      const drv = (g, k, pre, stages) => `<div class="grid2"><select data-${pre}drv="${esc(g.key)}">${opts(g.a[k])}</select>
+          <div class="row"><input data-${pre}eta="${esc(g.key)}" placeholder="${pre ? 'Pickup time at venue, e.g. 10:00 AM' : 'ETA, e.g. 7:50 AM'}" value="${esc(g.a[k]?.eta || '')}" style="flex:1">
+          <select data-${pre}stage="${esc(g.key)}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(g.a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>`;
+      $('#arrList').innerHTML = GR.length ? GR.map(g => { const a = g.a, team = g.L.some(x => x.byTeam);
+        return `<div class="item ${(a.pickup && a.mode !== 'Car' && !a.driver?.n) || (a.drop && !a.dropDriver?.n) ? 'open' : ''}">
+        <div class="row between"><b>${g.L.map(x => esc(x.name || 'Guest (not signed in)')).join(', ')}</b><span class="row" style="gap:6px">${g.L.length > 1 ? `<span class="chip">${g.L.length} together</span>` : ''}${team ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
+        <p class="small">${esc(a.mode)} · ${esc(a.from || '')}${a.pickAt ? ` · pickup at <b>${esc(a.pickAt)}</b>` : ''} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${Math.max(+a.people || 1, g.L.length)} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
-        ${a.pickup && a.mode !== 'Car' ? `<p class="small" style="margin:6px 0 0"><b>Pickup driver</b></p>${drv(a, 'driver', '', ['Assigned', 'On the way', 'Arrived'])}
-          <button class="btn sm" data-assign="${a.id}" style="align-self:flex-start">${a.driver?.n ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
-        ${a.drop ? `<p class="small" style="margin:8px 0 0"><b>Drop:</b> ${dayLbl(a.leave)}, leave the venue ${esc(a.dropTime || '')}${a.dropTo ? ` → ${esc(a.dropTo)}` : ''}</p>${drv(a, 'dropDriver', 'd', ['Assigned', 'On the way', 'Dropped'])}
-          <button class="btn sm" data-dassign="${a.id}" style="align-self:flex-start">${a.dropDriver?.n ? 'Update drop driver' : 'Assign drop driver'}</button>` : ''}
-        ${a.byTeam ? `<div class="row" style="gap:6px"><button class="btn ghost sm" data-arredit="${a.id}">Edit</button><button class="btn danger sm" data-arrdel="${a.id}">Delete</button></div>` : ''}</div>`).join('') : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
-      $$('[data-arredit]').forEach(b => b.onclick = () => openAF(ARR.find(a => a.id === b.dataset.arredit)));
-      $$('[data-arrdel]').forEach(b => b.onclick = () => { const a = ARR.find(x => x.id === b.dataset.arrdel); if (!a || !confirm(`Delete the pickup for ${a.name}?`)) return;
-        deleteDoc(doc(db, 'arrivals', a.id)).then(() => toast('Pickup deleted')).catch(fail); });
-      $$('[data-assign]').forEach(b => b.onclick = () => {
-        const id = b.dataset.assign, d = DRIVERS.find(x => x.id === $(`[data-drv="${id}"]`).value);
-        if (!d) return toast('Choose a driver');
-        updateDoc(doc(db, 'arrivals', id), { driver: { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-eta="${id}"]`).value.trim(), stage: +$(`[data-stage="${id}"]`).value } })
-          .then(() => toast('The guest can now see their driver')).catch(fail);
-      });
-      $$('[data-dassign]').forEach(b => b.onclick = () => {
-        const id = b.dataset.dassign, d = DRIVERS.find(x => x.id === $(`[data-ddrv="${id}"]`).value);
-        if (!d) return toast('Choose a driver');
-        updateDoc(doc(db, 'arrivals', id), { dropDriver: { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-deta="${id}"]`).value.trim(), stage: +$(`[data-dstage="${id}"]`).value } })
-          .then(() => toast('The guest can now see their drop driver')).catch(fail);
-      });
+        ${a.pickup && a.mode !== 'Car' ? `<p class="small" style="margin:6px 0 0"><b>Pickup driver</b></p>${drv(g, 'driver', '', ['Assigned', 'On the way', 'Arrived'])}
+          <button class="btn sm" data-assign="${esc(g.key)}" style="align-self:flex-start">${a.driver?.n ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
+        ${a.drop ? `<p class="small" style="margin:8px 0 0"><b>Drop:</b> ${dayLbl(a.leave)}, leave the venue ${esc(a.dropTime || '')}${a.dropTo ? ` → ${esc(a.dropTo)}` : ''}</p>${drv(g, 'dropDriver', 'd', ['Assigned', 'On the way', 'Dropped'])}
+          <button class="btn sm" data-dassign="${esc(g.key)}" style="align-self:flex-start">${a.dropDriver?.n ? 'Update drop driver' : 'Assign drop driver'}</button>` : ''}
+        ${team ? `<div class="row" style="gap:6px"><button class="btn ghost sm" data-arredit="${esc(g.key)}">Edit</button><button class="btn danger sm" data-arrdel="${esc(g.key)}">Delete</button></div>` : ''}</div>`; }).join('')
+        : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
+      const groupOf = k => byKey.get(k) || [];
+      $$('[data-arredit]').forEach(b => b.onclick = () => openAF(b.dataset.arredit));
+      $$('[data-arrdel]').forEach(b => b.onclick = () => { const L = groupOf(b.dataset.arrdel); if (!L.length || !confirm(`Delete the pickup / drop for ${L.map(x => x.name).join(', ')}?`)) return;
+        const bt = writeBatch(db); L.forEach(x => bt.delete(doc(db, 'arrivals', x.id))); bt.commit().then(() => toast('Deleted')).catch(fail); });
+      const assign = (k, field, pre, msg) => {
+        const d = DRIVERS.find(x => x.id === $(`[data-${pre}drv="${CSS.escape(k)}"]`).value); if (!d) return toast('Choose a driver');
+        const v = { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-${pre}eta="${CSS.escape(k)}"]`).value.trim(), stage: +$(`[data-${pre}stage="${CSS.escape(k)}"]`).value };
+        const bt = writeBatch(db); groupOf(k).forEach(x => bt.update(doc(db, 'arrivals', x.id), { [field]: v }));
+        bt.commit().then(() => toast(msg)).catch(fail);
+      };
+      $$('[data-assign]').forEach(b => b.onclick = () => assign(b.dataset.assign, 'driver', '', 'Everyone in this pickup can now see their driver'));
+      $$('[data-dassign]').forEach(b => b.onclick = () => assign(b.dataset.dassign, 'dropDriver', 'd', 'Everyone in this drop can now see their driver'));
     }
 
     // ---------- guests ----------

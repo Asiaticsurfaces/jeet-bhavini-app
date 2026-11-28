@@ -227,7 +227,7 @@ async function start() {
   // The guest's own arrival details, or ones the pickup team added for them (arrivals/g_<guest id>).
   const applyArr = () => {
     const a = ownArr || teamArr; if (!a) return;
-    travel = { mode: a.mode, day: a.day, time: a.time, from: a.from || '', people: a.people || 1, leave: a.leave, pickup: !!a.pickup, pickAt: a.pickAt || '' };
+    travel = { mode: a.mode, day: a.day, time: a.time, from: a.from || '', people: a.people || 1, leave: a.leave, pickup: !!a.pickup, pickAt: a.pickAt || '', withN: (a.members || []).filter(n => n !== a.name) };
     tMode = travel.mode; tPick = travel.pickup;
     const d = [ownArr, teamArr].map(x => x && x.driver).find(x => x && x.n);
     DRIVER = d || null;

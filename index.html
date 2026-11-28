@@ -725,6 +725,7 @@ function renderPickup(){
     <div class="steps">${[0,1,2].map(i=>`<div class="${i<=st?'on':''}"></div>`).join('')}</div>
     <div class="steplbl"><span>Assigned</span><span>On the way</span><span>At ${esc(pickAt(travel))}</span></div>
     <p class="muted small">For ${esc(travel.from||travel.mode)} · ${dayLbl(travel.day)}, ${fmtT(travel.time)} · ${travel.people} ${travel.people==1?'person':'people'}.${CLOUD_ON()?'':' Sample driver shown.'}</p>`}
+  if(travel&&travel.withN&&travel.withN.length)el.insertAdjacentHTML('beforeend',`<p class="muted small">Travelling together with ${esc(travel.withN.join(', '))}.</p>`);
   if(DROP){const D=DROP.driver,st=D?D.stage||0:0;
     el.insertAdjacentHTML('beforeend',`<div class="row between" style="margin-top:14px"><p class="eyebrow">Your drop</p><span class="chip ${D?'sage':''}">${D?['Assigned','On the way','Dropped'][st]:'Requested'}</span></div>
     <h3>${dayLbl(DROP.day)||''}${DROP.time?', leave at '+fmtT(DROP.time):''}</h3>${DROP.to?`<p class="muted small">To ${esc(DROP.to)}</p>`:''}
