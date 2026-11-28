@@ -42,6 +42,11 @@ input,select,textarea{width:100%;font:15px var(--body);padding:10px 12px;border-
 .cdslot{border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--card)}
 .cdslot.today{border:2px solid var(--plum)}
 .cdslot .ph{aspect-ratio:4/5;border-radius:10px;background:#efe8dc center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+.sumtab{width:100%;border-collapse:collapse;font-size:14px}
+.sumtab th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+.sumtab td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.sumtab tr.day td{background:#f6ecef;font-weight:600;color:var(--plum-deep)}
+.sumtab tr[data-go]{cursor:pointer}.sumtab tr[data-go]:hover td{background:#fbf6ef}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .stats div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}
 .stats b{display:block;font:600 26px var(--display);color:var(--plum-deep)}.stats span{font-size:12px;color:var(--muted)}
@@ -178,6 +183,7 @@ th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;le
     <section data-sec="pickups" class="stack" hidden>
       <div class="stats" id="arrStats"></div>
       <p class="muted small">Assign a driver and the guest sees the name, car, number plate and a Call button on their Home screen. Drivers come from the Drivers tab of the Excel.</p>
+      <div id="arrSummary" class="stack"></div>
       <div class="row"><button class="btn" id="arrAdd">+ Add pickup / drop</button><span class="small muted">For guests who called or messaged instead of filling it in the app.</span></div>
       <div class="card stack" id="arrForm" hidden>
         <h3 id="arrFormTitle">Add a pickup</h3>
@@ -960,8 +966,33 @@ async function start() {
             <input data-${pre}tc="${esc(g.key)}" placeholder="Car, e.g. White Dzire" value="${esc(t ? g.a[k].car : '')}">
             <input data-${pre}tl="${esc(g.key)}" placeholder="Number plate" value="${esc(t ? g.a[k].plate : '')}">
             <p class="small muted" style="grid-column:1/-1;margin:0">Book the taxi now. Guests see "Taxi booked"; fill in the driver's details about 2 hours before and tap the button again.</p></div>`; };
+      // Summary: by date, then by pickup point (and drops by date and where to). Tap a line to jump to it.
+      const tmin = t => String(t || '').padStart(5, '0');
+      const sumRows = (list, dayOf, placeOf, timeOf, dKey) => {
+        const days = new Map();
+        for (const g of list) { const d = String(dayOf(g.a)); if (!days.has(d)) days.set(d, new Map()); const m = days.get(d), pl = placeOf(g.a) || '—';
+          if (!m.has(pl)) m.set(pl, []); m.get(pl).push(g); }
+        const order = d => d === '30' ? 0 : +d || 99;
+        return [...days.entries()].sort((x, y) => order(x[0]) - order(y[0])).map(([d, m]) => {
+          const all = [...m.values()].flat(), ppl = all.reduce((n, g) => n + Math.max(+g.a.people || 1, g.L.length), 0);
+          return `<tr class="day"><td colspan="5">${esc(dayLbl(d) || d)} · ${all.length} group${all.length === 1 ? '' : 's'} · ${ppl} people</td></tr>` +
+            [...m.entries()].sort((x, y) => tmin(timeOf(x[1][0].a)).localeCompare(tmin(timeOf(y[1][0].a)))).map(([pl, L]) => {
+              const times = [...new Set(L.map(g => timeOf(g.a)).filter(Boolean))].sort((x, y) => tmin(x).localeCompare(tmin(y)));
+              const p = L.reduce((n, g) => n + Math.max(+g.a.people || 1, g.L.length), 0), need = L.filter(g => !hasD(g.a[dKey])).length;
+              return `<tr data-go="${esc(L[0].key)}"><td>${esc(pl)}</td><td>${times.map(esc).join(', ')}</td><td>${L.length}</td><td>${p}</td><td>${need ? `<span class="chip red">${need} need driver</span>` : '<span class="chip sage">All assigned</span>'}</td></tr>`;
+            }).join('');
+        }).join('');
+      };
+      const head = '<tr><th>Place</th><th>Time</th><th>Groups</th><th>People</th><th>Driver</th></tr>';
+      const pkRows = sumRows(pk, a => a.day, a => a.pickAt || (a.mode === 'Flight' ? 'Airport' : a.mode === 'Train' ? 'Station' : a.mode), a => a.time, 'driver');
+      const drRows = sumRows(dr, a => a.leave, a => a.dropTo, a => a.dropTime, 'dropDriver');
+      $('#arrSummary').innerHTML = (pk.length || dr.length) ? `<div class="card stack" style="gap:8px">
+          ${pk.length ? `<h3>Pickups by date</h3><div class="tablewrap"><table class="sumtab">${head}${pkRows}</table></div>` : ''}
+          ${dr.length ? `<h3 style="margin-top:8px">Drops by date</h3><div class="tablewrap"><table class="sumtab">${head.replace('Place', 'Drop to')}${drRows}</table></div>` : ''}
+          <p class="small muted" style="margin:0">Tap a line to jump to its card below.</p></div>` : '';
+      $$('#arrSummary [data-go]').forEach(r => r.onclick = () => { const c = $(`#arrList [data-card="${CSS.escape(r.dataset.go)}"]`); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.style.outline = '3px solid var(--plum)'; setTimeout(() => c.style.outline = '', 1800); } });
       $('#arrList').innerHTML = GR.length ? GR.map(g => { const a = g.a, team = g.L.some(x => x.byTeam);
-        return `<div class="item ${(a.pickup && a.mode !== 'Car' && !hasD(a.driver)) || (a.drop && !hasD(a.dropDriver)) ? 'open' : ''}">
+        return `<div data-card="${esc(g.key)}" class="item ${(a.pickup && a.mode !== 'Car' && !hasD(a.driver)) || (a.drop && !hasD(a.dropDriver)) ? 'open' : ''}">
         <div class="row between"><b>${g.L.map(x => esc(x.name || 'Guest (not signed in)')).join(', ')}</b><span class="row" style="gap:6px">${g.L.length > 1 ? `<span class="chip">${g.L.length} together</span>` : ''}${team ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
         <p class="small">${esc(a.mode)} · ${esc(a.from || '')}${a.pickAt ? ` · pickup at <b>${esc(a.pickAt)}</b>` : ''} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${Math.max(+a.people || 1, g.L.length)} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
