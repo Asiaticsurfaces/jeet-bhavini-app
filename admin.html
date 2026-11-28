@@ -875,6 +875,7 @@ async function start() {
     // one entry per person (g_<guest id> when they're on the guest list, so their phone shows it,
     // else t_<group>_<n>), all with the same details, and drivers are assigned to the whole group.
     let afEditing = null;   // group being edited
+    const hasD = d => !!(d && (d.n || d.taxi));   // a driver, or a taxi booked (details may come later)
     const gKey = a => a.groupId || a.id;
     const findG = n => { n = String(n || '').trim().toLowerCase(); return n ? (GUESTS || []).find(g => String(g.name).trim().toLowerCase() === n) : null; };
     const afNamesNow = () => [...new Set($$('[data-afn]').map(x => x.value.trim()).filter(Boolean))];
@@ -942,32 +943,51 @@ async function start() {
       const GR = [...byKey.entries()].map(([key, L]) => ({ key, L, a: L[0] }))
         .sort((x, y) => (+((x.a.day === '30') ? 0 : x.a.day) - +((y.a.day === '30') ? 0 : y.a.day)) || String(x.a.time).localeCompare(String(y.a.time)));
       const ppl = GR.reduce((n, g) => n + Math.max(+g.a.people || 1, g.L.length), 0);
-      const pk = GR.filter(g => g.a.pickup && g.a.mode !== 'Car'), un = pk.filter(g => !g.a.driver?.n);
-      const dr = GR.filter(g => g.a.drop), dun = dr.filter(g => !g.a.dropDriver?.n);
-      $('#arrStats').innerHTML = `<div><b>${GR.length}</b><span>Groups / families</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>Pickup: no driver yet</span></div><div><b>${dr.length}</b><span>Need drop</span></div><div><b>${dun.length}</b><span>Drop: no driver yet</span></div>`;
+      const pk = GR.filter(g => g.a.pickup && g.a.mode !== 'Car'), un = pk.filter(g => !hasD(g.a.driver));
+      const dr = GR.filter(g => g.a.drop), dun = dr.filter(g => !hasD(g.a.dropDriver));
+      const tp = GR.filter(g => (g.a.driver?.taxi && !g.a.driver.n) || (g.a.dropDriver?.taxi && !g.a.dropDriver.n)).length;
+      $('#arrStats').innerHTML = `<div><b>${GR.length}</b><span>Groups / families</span></div><div><b>${ppl}</b><span>People arriving</span></div><div><b>${pk.length}</b><span>Need pickup</span></div><div><b>${un.length}</b><span>Pickup: no driver yet</span></div><div><b>${dr.length}</b><span>Need drop</span></div><div><b>${dun.length}</b><span>Drop: no driver yet</span></div>${tp ? `<div><b>${tp}</b><span>🚕 Taxi: driver details to add</span></div>` : ''}`;
       badges.pickups = (un.length + dun.length) || 0; tabs();
-      const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('');
-      const drv = (g, k, pre, stages) => `<div class="grid2"><select data-${pre}drv="${esc(g.key)}">${opts(g.a[k])}</select>
+      const opts = d => `<option value="">— Choose driver —</option>` + DRIVERS.map(x => `<option value="${x.id}" ${d?.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.car ? ' · ' + esc(x.car) : ''}</option>`).join('')
+        + `<option value="taxi" ${d?.taxi ? 'selected' : ''}>🚕 Taxi (no driver free)</option>`;
+      const drv = (g, k, pre, stages) => { const t = g.a[k]?.taxi;
+        return `<div class="grid2"><select data-${pre}drv="${esc(g.key)}" data-taxisel="${pre}">${opts(g.a[k])}</select>
           <div class="row"><input data-${pre}eta="${esc(g.key)}" placeholder="${pre ? 'Pickup time at venue, e.g. 10:00 AM' : 'ETA, e.g. 7:50 AM'}" value="${esc(g.a[k]?.eta || '')}" style="flex:1">
-          <select data-${pre}stage="${esc(g.key)}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(g.a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>`;
+          <select data-${pre}stage="${esc(g.key)}" style="width:auto">${stages.map((n, i) => `<option value="${i}" ${(g.a[k]?.stage || 0) == i ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
+          <div class="grid2" data-${pre}taxi="${esc(g.key)}" ${t ? '' : 'hidden'}>
+            <input data-${pre}tn="${esc(g.key)}" placeholder="Taxi driver's name (add ~2 hr before)" value="${esc(t ? g.a[k].n : '')}">
+            <input data-${pre}tp="${esc(g.key)}" type="tel" inputmode="numeric" maxlength="14" placeholder="Taxi driver's mobile" value="${esc(t ? g.a[k].phone : '')}">
+            <input data-${pre}tc="${esc(g.key)}" placeholder="Car, e.g. White Dzire" value="${esc(t ? g.a[k].car : '')}">
+            <input data-${pre}tl="${esc(g.key)}" placeholder="Number plate" value="${esc(t ? g.a[k].plate : '')}">
+            <p class="small muted" style="grid-column:1/-1;margin:0">Book the taxi now. Guests see "Taxi booked"; fill in the driver's details about 2 hours before and tap the button again.</p></div>`; };
       $('#arrList').innerHTML = GR.length ? GR.map(g => { const a = g.a, team = g.L.some(x => x.byTeam);
-        return `<div class="item ${(a.pickup && a.mode !== 'Car' && !a.driver?.n) || (a.drop && !a.dropDriver?.n) ? 'open' : ''}">
+        return `<div class="item ${(a.pickup && a.mode !== 'Car' && !hasD(a.driver)) || (a.drop && !hasD(a.dropDriver)) ? 'open' : ''}">
         <div class="row between"><b>${g.L.map(x => esc(x.name || 'Guest (not signed in)')).join(', ')}</b><span class="row" style="gap:6px">${g.L.length > 1 ? `<span class="chip">${g.L.length} together</span>` : ''}${team ? '<span class="chip">Added by team</span>' : ''}<span class="chip ${a.pickup && a.mode !== 'Car' ? 'plum' : ''}">${a.pickup && a.mode !== 'Car' ? 'Pickup' : 'Own transport'}</span>${a.drop ? '<span class="chip plum">Drop</span>' : ''}</span></div>
         <p class="small">${esc(a.mode)} · ${esc(a.from || '')}${a.pickAt ? ` · pickup at <b>${esc(a.pickAt)}</b>` : ''} · <b>${dayLbl(a.day)}, ${esc(a.time)}</b> · ${Math.max(+a.people || 1, g.L.length)} people · leaving ${dayLbl(a.leave)}</p>
         ${a.phone ? `<a class="small" href="tel:+91${esc(a.phone)}">${esc(a.phone)}</a>` : ''}
         ${a.pickup && a.mode !== 'Car' ? `<p class="small" style="margin:6px 0 0"><b>Pickup driver</b></p>${drv(g, 'driver', '', ['Assigned', 'On the way', 'Arrived'])}
-          <button class="btn sm" data-assign="${esc(g.key)}" style="align-self:flex-start">${a.driver?.n ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
+          <button class="btn sm" data-assign="${esc(g.key)}" style="align-self:flex-start">${hasD(a.driver) ? 'Update pickup driver' : 'Assign pickup driver'}</button>` : ''}
         ${a.drop ? `<p class="small" style="margin:8px 0 0"><b>Drop:</b> ${dayLbl(a.leave)}, leave the venue ${esc(a.dropTime || '')}${a.dropTo ? ` → ${esc(a.dropTo)}` : ''}</p>${drv(g, 'dropDriver', 'd', ['Assigned', 'On the way', 'Dropped'])}
-          <button class="btn sm" data-dassign="${esc(g.key)}" style="align-self:flex-start">${a.dropDriver?.n ? 'Update drop driver' : 'Assign drop driver'}</button>` : ''}
+          <button class="btn sm" data-dassign="${esc(g.key)}" style="align-self:flex-start">${hasD(a.dropDriver) ? 'Update drop driver' : 'Assign drop driver'}</button>` : ''}
         ${team ? `<div class="row" style="gap:6px"><button class="btn ghost sm" data-arredit="${esc(g.key)}">Edit</button><button class="btn danger sm" data-arrdel="${esc(g.key)}">Delete</button></div>` : ''}</div>`; }).join('')
         : '<p class="muted">No arrival details yet. Guests add them in Info → My arrival.</p>';
       const groupOf = k => byKey.get(k) || [];
       $$('[data-arredit]').forEach(b => b.onclick = () => openAF(b.dataset.arredit));
       $$('[data-arrdel]').forEach(b => b.onclick = () => { const L = groupOf(b.dataset.arrdel); if (!L.length || !confirm(`Delete the pickup / drop for ${L.map(x => x.name).join(', ')}?`)) return;
         const bt = writeBatch(db); L.forEach(x => bt.delete(doc(db, 'arrivals', x.id))); bt.commit().then(() => toast('Deleted')).catch(fail); });
+      $$('[data-taxisel]').forEach(s => s.onchange = () => { const box = $(`[data-${s.dataset.taxisel}taxi="${CSS.escape(s.getAttribute(`data-${s.dataset.taxisel}drv`))}"]`); if (box) box.hidden = s.value !== 'taxi'; });
       const assign = (k, field, pre, msg) => {
-        const d = DRIVERS.find(x => x.id === $(`[data-${pre}drv="${CSS.escape(k)}"]`).value); if (!d) return toast('Choose a driver');
-        const v = { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta: $(`[data-${pre}eta="${CSS.escape(k)}"]`).value.trim(), stage: +$(`[data-${pre}stage="${CSS.escape(k)}"]`).value };
+        const q = x => $(`[data-${pre}${x}="${CSS.escape(k)}"]`), sel = q('drv').value;
+        const eta = q('eta').value.trim(), stage = +q('stage').value;
+        let v;
+        if (sel === 'taxi') {   // taxi: the driver's details can come later (about 2 hours before)
+          const ph = normPhone(q('tp').value); if (ph && ph.length !== 10) return toast('The taxi driver\'s mobile needs 10 digits');
+          v = { id: 'taxi', taxi: true, n: q('tn').value.trim(), phone: ph, car: q('tc').value.trim(), plate: q('tl').value.trim(), eta, stage };
+          msg = v.n ? msg : 'Taxi booked. Add the driver\'s details about 2 hours before';
+        } else {
+          const d = DRIVERS.find(x => x.id === sel); if (!d) return toast('Choose a driver');
+          v = { id: d.id, n: d.name, phone: d.phone || '', car: d.car || '', plate: d.plate || '', eta, stage };
+        }
         const bt = writeBatch(db); groupOf(k).forEach(x => bt.update(doc(db, 'arrivals', x.id), { [field]: v }));
         bt.commit().then(() => toast(msg)).catch(fail);
       };
